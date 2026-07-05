@@ -1,0 +1,239 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// Staff QR scanner — full-screen, mobile-first. High-contrast, big tap
+// targets, one-hand usable on a shop floor / delivery truck / install site.
+
+.sb-staff-scan {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: #0f1115;
+    color: #f4f5f7;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+    &-head {
+        padding: 0.8rem 1rem;
+        background: #171a20;
+        border-bottom: 1px solid #262b34;
+        text-align: center;
+    }
+    &-title {
+        font-weight: 600;
+        font-size: 1rem;
+        letter-spacing: 0.01em;
+    }
+
+    // --- camera viewport ---
+    &-camera {
+        position: relative;
+        flex: 1;
+        min-height: 55vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: #000;
+    }
+    &-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    &-reticle {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: min(70vw, 320px);
+        height: min(70vw, 320px);
+        transform: translate(-50%, -50%);
+        border: 3px solid rgba(255, 255, 255, 0.85);
+        border-radius: 18px;
+        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+    }
+    &-hint {
+        position: absolute;
+        bottom: 1.4rem;
+        left: 1rem;
+        right: 1rem;
+        margin: 0;
+        text-align: center;
+        font-size: 0.95rem;
+        color: #e7e9ee;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    }
+    &-flash {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        right: 1rem;
+        margin: 0;
+        text-align: center;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        background: rgba(220, 120, 40, 0.92);
+        font-size: 0.9rem;
+    }
+
+    // --- fallback / busy / error ---
+    &-fallback,
+    &-busy,
+    &-errorcard {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 2rem 1.25rem;
+        text-align: center;
+    }
+    &-error {
+        color: #ff9a8a;
+        margin: 0;
+    }
+    &-spinner {
+        width: 34px;
+        height: 34px;
+        border: 3px solid #333a45;
+        border-top-color: #6fb4ff;
+        border-radius: 50%;
+        animation: sb-staff-spin 0.8s linear infinite;
+    }
+
+    // --- buttons ---
+    &-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        padding: 0.75rem 1.5rem;
+        background: #2f7de3;
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-align: center;
+
+        &--ghost {
+            background: transparent;
+            border: 1px solid #3a424e;
+            color: #cfd4dc;
+        }
+        &--sticky {
+            position: sticky;
+            bottom: 0.75rem;
+            width: calc(100% - 2rem);
+            margin: 1rem;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+        }
+        &:disabled { opacity: 0.6; }
+    }
+    &-file {
+        position: absolute;
+        width: 1px; height: 1px;
+        opacity: 0;
+        overflow: hidden;
+    }
+
+    // --- result cards ---
+    &-result {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.9rem 0.9rem 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+}
+
+.sb-staff-card {
+    background: #171a20;
+    border: 1px solid #262b34;
+    border-radius: 14px;
+    padding: 0.85rem 1rem;
+
+    &--headline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+        background: #1d2530;
+    }
+    &-title {
+        margin: 0 0 0.5rem;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #8b93a1;
+    }
+}
+
+.sb-staff-pkg-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    flex: 1 1 auto;
+}
+
+.sb-staff-state-badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: #333a45;
+    color: #e7e9ee;
+
+    &[data-state="done"] { background: #1f7a4d; }
+    &[data-state="released"] { background: #2f6fd0; }
+    &[data-state="ready"] { background: #b6771a; }
+    &[data-state="draft"] { background: #444b56; }
+}
+
+.sb-staff-flag {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #7a2b2b;
+    color: #ffd9d3;
+}
+
+.sb-staff-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid #21262f;
+    font-size: 0.92rem;
+
+    &:last-child { border-bottom: none; }
+
+    span {
+        color: #8b93a1;
+        flex: 0 0 auto;
+    }
+    b {
+        text-align: right;
+        word-break: break-word;
+        font-weight: 600;
+    }
+}
+
+.sb-staff-sub {
+    margin-top: 0.5rem;
+    padding-top: 0.4rem;
+    border-top: 1px dashed #2a313b;
+
+    &-title {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #8b93a1;
+        margin-bottom: 0.2rem;
+    }
+}
+
+@keyframes sb-staff-spin {
+    to { transform: rotate(360deg); }
+}

@@ -406,3 +406,64 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
             "line_id": resolved["line_id"],
             "quote_number": resolved["quote_number"],
         }
+
+    # ------------------------------------------------------------------
+    # STAFF QR scanner (2026-07-05) — installers / shipping / factory.
+    #
+    # Distinct from the customer scan-part above in EVERY dimension: it
+    # is NOT order-scoped (staff look up ANY package), it returns FULL
+    # internal detail (customer, manufacturing, shipping, scan history),
+    # and it is gated to INTERNAL users only. A portal customer must
+    # never reach it. Its own mobile-friendly page lives at /southbrook/
+    # scan; the JSON lookup is /southbrook/api/scan/lookup.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _sb_is_internal_user():
+        user = request.env.user
+        # Internal staff = member of base.group_user AND not a portal
+        # share user. Public/portal users are excluded.
+        return bool(
+            user
+            and not user._is_public()
+            and not user.share
+            and user.has_group("base.group_user")
+        )
+
+    @http.route(
+        "/southbrook/api/scan/lookup",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_scan_lookup(self, payload=None, **kw):
+        """Resolve a scanned Southbrook QR to its production package and
+        return FULL internal detail for staff. Internal users only."""
+        if not self._sb_is_internal_user():
+            return {"error": "forbidden",
+                    "detail": "This scanner is for Southbrook staff."}
+        if not _scan_rate_limit_check(request.env.user.id):
+            return {"error": "rate_limited"}
+        if not isinstance(payload, str) or not payload.strip():
+            return {"error": "invalid",
+                    "detail": "payload must be a non-empty string."}
+
+        result = request.env["southbrook.qr.staff"].sudo().lookup(payload)
+        if not result.get("ok"):
+            return {"error": result.get("error", "lookup_failed")}
+        return {"ok": True, "info": result["info"]}
+
+    @http.route(
+        "/southbrook/scan",
+        type="http",
+        auth="user",
+        website=True,
+        sitemap=False,
+    )
+    def southbrook_staff_scan_page(self, **kw):
+        """Full-screen mobile QR scanner page for Southbrook staff. A
+        portal/customer user is redirected to their portal home — this
+        surface is internal-only."""
+        if not self._sb_is_internal_user():
+            return request.redirect("/my")
+        return request.render(
+            "southbrook_room_capture.staff_scan_page", {})

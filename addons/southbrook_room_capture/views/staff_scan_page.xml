@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Full-screen mobile staff scanner page, served by
+         controllers/main.py's /southbrook/scan route (internal users
+         only; portal users are redirected server-side). website.layout
+         loads web.assets_frontend + the PublicComponentInteraction that
+         mounts the <owl-component> below on the shared public-root env
+         (the sanctioned no-double-startServices path). -->
+    <template id="staff_scan_page" name="Southbrook Staff QR Scanner">
+        <t t-call="website.layout">
+            <div id="wrap" class="sb-staff-scan-wrap">
+                <owl-component name="southbrook_room_capture.StaffQrScanner"
+                               props="{}">
+                    <div class="sb-staff-scan-boot">
+                        <p>Loading scanner…</p>
+                    </div>
+                </owl-component>
+            </div>
+        </t>
+    </template>
+</odoo>

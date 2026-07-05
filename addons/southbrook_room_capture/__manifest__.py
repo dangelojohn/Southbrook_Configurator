@@ -61,7 +61,7 @@ by southbrook_floor_traveler.
     "author": "Southbrook Cabinetry",
     "license": "LGPL-3",
     "category": "Website/eCommerce",
-    "version": "19.0.2.0.0",
+    "version": "19.0.3.0.0",
     "depends": [
         "southbrook_estimating",
         "southbrook_estimating_website",
@@ -90,6 +90,8 @@ by southbrook_floor_traveler.
     "data": [
         "security/ir.model.access.csv",
         "data/utm_data.xml",
+        # 2026-07-05 — staff QR scanner page (/southbrook/scan).
+        "views/staff_scan_page.xml",
     ],
     # 2026-07-04 — frontend assets. Registered in THIS addon's own
     # manifest (not southbrook_estimating_website's) even though this
@@ -121,6 +123,12 @@ by southbrook_floor_traveler.
             "southbrook_room_capture/static/src/js/qr_scan.esm.js",
             "southbrook_room_capture/static/src/xml/qr_scan.xml",
             "southbrook_room_capture/static/src/scss/qr_scan.scss",
+            # 2026-07-05 — staff QR scanner (installers/shipping/factory):
+            # a full-screen mobile page at /southbrook/scan mounted via
+            # the public_components registry. Reuses the jsQR lib above.
+            "southbrook_room_capture/static/src/js/staff_scan.esm.js",
+            "southbrook_room_capture/static/src/xml/staff_scan.xml",
+            "southbrook_room_capture/static/src/scss/staff_scan.scss",
         ],
     },
     "installable": True,

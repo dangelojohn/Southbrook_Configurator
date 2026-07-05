@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Staff QR scanner — full-screen mobile page. OWL tokenizer rules
+    honoured: t-if/t-att expressions use || && ! (never or/and/not);
+    no bare disallowed globals; display helpers live on the component.
+-->
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_room_capture.StaffQrScanner">
+        <div class="sb-staff-scan">
+
+            <!-- Header -->
+            <header class="sb-staff-scan-head">
+                <span class="sb-staff-scan-title">Southbrook · Scan a Cabinet</span>
+            </header>
+
+            <!-- Camera / scanning viewport -->
+            <t t-if="state.phase === 'starting' || state.phase === 'scanning'">
+                <div class="sb-staff-scan-camera">
+                    <video t-ref="sb_staff_video"
+                           class="sb-staff-scan-video"
+                           playsinline="playsinline"
+                           muted="muted"
+                           autoplay="autoplay"></video>
+                    <div class="sb-staff-scan-reticle" aria-hidden="true"></div>
+                    <p class="sb-staff-scan-hint" t-esc="state.hint"/>
+                    <p t-if="state.flashMessage"
+                       class="sb-staff-scan-flash" t-esc="state.flashMessage"/>
+                </div>
+            </t>
+
+            <!-- No-camera fallback -->
+            <t t-if="state.phase === 'fallback' || state.phase === 'fallback_busy'">
+                <div class="sb-staff-scan-fallback">
+                    <p class="sb-staff-scan-hint" t-esc="state.hint"/>
+                    <p t-if="state.error" class="sb-staff-scan-error" t-esc="state.error"/>
+                    <label class="sb-staff-scan-btn">
+                        <t t-if="state.phase === 'fallback_busy'">Reading…</t>
+                        <t t-else="">Take / choose a photo of the label</t>
+                        <input type="file" accept="image/*" capture="environment"
+                               class="sb-staff-scan-file"
+                               t-att-disabled="state.phase === 'fallback_busy' ? 'disabled' : ''"
+                               t-on-change="_onFallbackFileChange"/>
+                    </label>
+                    <button type="button" class="sb-staff-scan-btn sb-staff-scan-btn--ghost"
+                            t-on-click="_onRetryCamera">Try the camera again</button>
+                </div>
+            </t>
+
+            <!-- Looking up -->
+            <t t-if="state.phase === 'looking_up'">
+                <div class="sb-staff-scan-busy">
+                    <span class="sb-staff-scan-spinner" aria-hidden="true"></span>
+                    <p>Looking up this package…</p>
+                </div>
+            </t>
+
+            <!-- Error -->
+            <t t-if="state.phase === 'error'">
+                <div class="sb-staff-scan-errorcard">
+                    <p class="sb-staff-scan-error" t-esc="state.error"/>
+                    <button type="button" class="sb-staff-scan-btn"
+                            t-on-click="_onScanAnother">Scan again</button>
+                </div>
+            </t>
+
+            <!-- Full internal result -->
+            <t t-if="state.phase === 'result' &amp;&amp; state.info">
+                <div class="sb-staff-scan-result">
+
+                    <!-- Package headline -->
+                    <div class="sb-staff-card sb-staff-card--headline">
+                        <div class="sb-staff-pkg-name" t-esc="state.info.package.name"/>
+                        <span class="sb-staff-state-badge"
+                              t-att-data-state="state.info.package.state"
+                              t-esc="state.info.package.state_label"/>
+                        <span t-if="state.info.package.pricing_pending"
+                              class="sb-staff-flag">Pricing pending</span>
+                    </div>
+
+                    <!-- Product / spec -->
+                    <section class="sb-staff-card">
+                        <h3 class="sb-staff-card-title">Product</h3>
+                        <div class="sb-staff-row"><span>Item</span><b t-esc="_or(state.info.product.name)"/></div>
+                        <div class="sb-staff-row" t-if="state.info.product.sku"><span>SKU</span><b t-esc="state.info.product.sku"/></div>
+                        <div class="sb-staff-row" t-if="state.info.product.spec"><span>Spec</span><b t-esc="state.info.product.spec"/></div>
+                        <div class="sb-staff-row"><span>Qty</span><b t-esc="_or(state.info.product.qty)"/></div>
+                        <div class="sb-staff-row" t-if="state.info.product.width_mm"><span>Width</span><b t-esc="_mm(state.info.product.width_mm)"/></div>
+                        <div class="sb-staff-row" t-if="state.info.product.panel_count"><span>Panels</span><b t-esc="state.info.product.panel_count"/></div>
+                        <div class="sb-staff-row" t-if="state.info.product.door_count"><span>Doors</span><b t-esc="state.info.product.door_count"/></div>
+                    </section>
+
+                    <!-- Customer / order -->
+                    <section class="sb-staff-card">
+                        <h3 class="sb-staff-card-title">Customer &amp; Order</h3>
+                        <div class="sb-staff-row"><span>Order</span><b t-esc="_or(state.info.customer.order_name)"/></div>
+                        <div class="sb-staff-row"><span>Customer</span><b t-esc="_or(state.info.customer.partner_name)"/></div>
+                        <div class="sb-staff-row" t-if="state.info.customer.partner_phone"><span>Phone</span><b t-esc="state.info.customer.partner_phone"/></div>
+                        <div class="sb-staff-row" t-if="state.info.customer.address"><span>Address</span><b t-esc="state.info.customer.address"/></div>
+                        <div class="sb-staff-row" t-if="state.info.customer.salesperson"><span>Rep</span><b t-esc="state.info.customer.salesperson"/></div>
+                        <div class="sb-staff-row" t-if="state.info.customer.client_ref"><span>Client ref</span><b t-esc="state.info.customer.client_ref"/></div>
+                    </section>
+
+                    <!-- Install placement -->
+                    <section class="sb-staff-card"
+                             t-if="state.info.placement.zone || state.info.placement.wall">
+                        <h3 class="sb-staff-card-title">Placement</h3>
+                        <div class="sb-staff-row" t-if="state.info.placement.zone_label || state.info.placement.zone"><span>Zone</span><b t-esc="_or(state.info.placement.zone_label || state.info.placement.zone)"/></div>
+                        <div class="sb-staff-row" t-if="state.info.placement.wall"><span>Wall</span><b t-esc="state.info.placement.wall"/></div>
+                        <div class="sb-staff-row" t-if="state.info.placement.position_from_left_mm"><span>From left</span><b t-esc="_mm(state.info.placement.position_from_left_mm)"/></div>
+                    </section>
+
+                    <!-- Manufacturing -->
+                    <section class="sb-staff-card">
+                        <h3 class="sb-staff-card-title">Manufacturing</h3>
+                        <div class="sb-staff-row"><span>Package</span><b t-esc="state.info.manufacturing.package_state_label"/></div>
+                        <div class="sb-staff-row" t-if="state.info.manufacturing.mo_name"><span>MO</span><b t-esc="state.info.manufacturing.mo_name"/></div>
+                        <div class="sb-staff-row" t-if="state.info.manufacturing.mo_state"><span>MO state</span><b t-esc="state.info.manufacturing.mo_state"/></div>
+                        <div class="sb-staff-row" t-if="state.info.manufacturing.mo_date_planned"><span>Planned</span><b t-esc="state.info.manufacturing.mo_date_planned"/></div>
+                        <div class="sb-staff-row" t-if="state.info.manufacturing.cutlist"><span>Cut list</span><b t-esc="state.info.manufacturing.cutlist"/></div>
+                        <div class="sb-staff-row" t-if="state.info.manufacturing.hardware_package"><span>Hardware</span><b t-esc="state.info.manufacturing.hardware_package"/></div>
+                        <div t-if="_workorders().length" class="sb-staff-sub">
+                            <div class="sb-staff-sub-title">Work orders</div>
+                            <div class="sb-staff-row" t-foreach="_workorders()" t-as="wo" t-key="wo_index">
+                                <span t-esc="wo.workcenter"/>
+                                <b t-esc="wo.state"/>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Shipping -->
+                    <section class="sb-staff-card" t-if="_hasShipping()">
+                        <h3 class="sb-staff-card-title">Shipping</h3>
+                        <div t-foreach="state.info.shipping.pickings" t-as="pk" t-key="pk_index"
+                             class="sb-staff-sub">
+                            <div class="sb-staff-row"><span t-esc="pk.name"/><b t-esc="pk.state"/></div>
+                            <div class="sb-staff-row" t-if="pk.scheduled_date"><span>Scheduled</span><b t-esc="pk.scheduled_date"/></div>
+                            <div class="sb-staff-row" t-if="pk.date_done"><span>Delivered</span><b t-esc="pk.date_done"/></div>
+                            <div class="sb-staff-row" t-if="pk.carrier"><span>Carrier</span><b t-esc="pk.carrier"/></div>
+                            <div class="sb-staff-row" t-if="pk.tracking"><span>Tracking</span><b t-esc="pk.tracking"/></div>
+                        </div>
+                    </section>
+
+                    <!-- Scan history -->
+                    <section class="sb-staff-card" t-if="_hasScans()">
+                        <h3 class="sb-staff-card-title">Recent scans</h3>
+                        <div class="sb-staff-row" t-foreach="state.info.scan_history" t-as="sc" t-key="sc_index">
+                            <span t-esc="sc.workcenter_code || sc.wc || '—'"/>
+                            <b t-esc="sc.ts || sc.at || sc.timestamp || ''"/>
+                        </div>
+                    </section>
+
+                    <button type="button" class="sb-staff-scan-btn sb-staff-scan-btn--sticky"
+                            t-on-click="_onScanAnother">Scan another</button>
+                </div>
+            </t>
+
+        </div>
+    </t>
+
+</templates>
