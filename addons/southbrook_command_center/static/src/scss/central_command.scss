@@ -19,6 +19,7 @@
         .sb_cc_title { font-weight: 600; font-size: 15px; }
         .sb_cc_role { opacity: .75; text-transform: capitalize; }
         .sb_cc_spacer { flex: 1 1 auto; }
+        .sb_cc_refreshing { font-size: 11px; color: #9fd3ff; }
         .sb_cc_stale { font-size: 11px; color: #f0ad4e; }
         .sb_cc_bus { font-size: 11px; padding: 1px 6px; border-radius: 8px; }
         .sb_cc_bus_on { background: #2e7d32; }
@@ -28,11 +29,26 @@
     .sb_cc_msg { padding: 24px; color: #555; }
     .sb_cc_error { color: #b00020; }
 
-    // 5-region grid: health (top), issues (left), flow (center),
-    // hermes (right), alerts (bottom).
+    // initial-load skeleton
+    .sb_cc_skeleton {
+        padding: 16px;
+        .sb_cc_sk_bar, .sb_cc_sk_row {
+            background: linear-gradient(90deg, #ececf0 25%, #f5f5f7 37%, #ececf0 63%);
+            background-size: 400% 100%;
+            animation: sb_cc_shimmer 1.4s ease infinite;
+            border-radius: 6px;
+        }
+        .sb_cc_sk_bar { height: 56px; margin-bottom: 12px; }
+        .sb_cc_sk_row { height: 40px; margin-bottom: 8px; }
+    }
+    @keyframes sb_cc_shimmer {
+        0% { background-position: 100% 0; }
+        100% { background-position: 0 0; }
+    }
+
     .sb_cc_grid {
         display: grid;
-        grid-template-columns: minmax(320px, 1.4fr) 1fr 1fr;
+        grid-template-columns: minmax(340px, 1.4fr) 1fr 1fr;
         grid-template-areas:
             "health health health"
             "issues flow    hermes"
@@ -40,6 +56,8 @@
         gap: 10px;
         padding: 10px;
         flex: 1 1 auto;
+        transition: opacity .15s ease;
+        &.sb_cc_busy { opacity: .6; }   // dim (not blank) while refreshing
     }
 
     .sb_cc_health { grid-area: health; }
@@ -55,17 +73,21 @@
         padding: 10px 12px;
     }
 
-    .sb_cc_health {
+    // -- Factory Health: clickable header + stat grid --
+    .sb_cc_health_head {
         display: flex;
         align-items: center;
         gap: 14px;
         cursor: pointer;
-        flex-wrap: wrap;
+        padding: 4px 6px;
+        border-radius: 6px;
+        transition: background .12s ease;
+        &:hover { background: #f0f3f7; }
 
         .sb_cc_health_score {
             font-size: 30px;
             font-weight: 700;
-            padding: 2px 12px;
+            padding: 2px 14px;
             border-radius: 6px;
             color: #fff;
             background: #6c757d;
@@ -73,29 +95,91 @@
         .sb_cc_band_green { background: #2e7d32; }
         .sb_cc_band_amber { background: #f0ad4e; }
         .sb_cc_band_red   { background: #c62828; }
-        .sb_cc_health_label { font-weight: 600; }
-        .sb_cc_health_expl { color: #667; font-size: 12px; flex: 1 1 260px; }
-        .sb_cc_health_factors { flex-basis: 100%; font-size: 12px; color: #555; }
-        .sb_cc_factor { padding: 1px 0; }
+        .sb_cc_health_headtext { display: flex; flex-direction: column; flex: 1 1 auto; }
+        .sb_cc_health_label { font-weight: 600; font-size: 15px; }
+        .sb_cc_health_sub { font-size: 12px; color: #8a94a0; }
+        .sb_cc_chevron { font-size: 16px; color: #8a94a0; }
     }
 
-    .sb_cc_panel_h { font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+    .sb_cc_health_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 8px;
+        margin-top: 10px;
+        .sb_cc_stat {
+            display: flex;
+            flex-direction: column;
+            background: #f7f9fb;
+            border: 1px solid #eceff3;
+            border-radius: 6px;
+            padding: 8px 10px;
+            .sb_cc_stat_val { font-size: 20px; font-weight: 700; color: #1f2733; }
+            .sb_cc_stat_label { font-size: 12px; color: #55606c; }
+            .sb_cc_stat_pts { font-size: 11px; color: #8a94a0; margin-top: 2px; }
+        }
+    }
+
+    .sb_cc_panel_h {
+        font-weight: 600;
+        margin-bottom: 6px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 4px;
+        .sb_cc_showing { font-weight: 400; font-size: 12px; color: #8a94a0; }
+    }
     .sb_cc_sub_h { font-weight: 600; margin-top: 6px; font-size: 12px; }
     .sb_cc_empty { color: #8a94a0; font-size: 13px; padding: 8px 0; }
 
+    // -- filter bar --
+    .sb_cc_filterbar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+        .sb_cc_chip {
+            font-size: 12px;
+            padding: 2px 10px;
+            border-radius: 12px;
+            border: 1px solid #cfd6df;
+            background: #fff;
+            color: #55606c;
+            cursor: pointer;
+            &:hover { background: #f0f3f7; }
+        }
+        .sb_cc_chip_on { background: #1f2733; color: #fff; border-color: #1f2733; }
+        .sb_cc_chip_clear { color: #b00020; border-color: #e6b3ba; }
+        .sb_cc_typesel {
+            font-size: 12px; padding: 2px 6px; border-radius: 6px;
+            border: 1px solid #cfd6df; background: #fff;
+        }
+    }
+
+    // -- issue card --
     .sb_cc_issue {
         border-left: 3px solid #e3e6ea;
         padding: 6px 8px;
         margin-bottom: 8px;
         background: #fafbfc;
+        border-radius: 0 4px 4px 0;
 
         .sb_cc_issue_top { display: flex; gap: 8px; align-items: baseline; }
         .sb_cc_issue_impact { font-weight: 600; }
-        .sb_cc_issue_meta { font-size: 12px; color: #667; display: flex; gap: 10px; }
-        .sb_cc_action { font-size: 13px; color: #1f6feb; margin-top: 2px; }
+        .sb_cc_issue_meta {
+            font-size: 12px; display: flex; gap: 12px; margin-top: 3px;
+            .sb_cc_owner { font-weight: 600; color: #2b3a4a; i { margin-right: 3px; opacity: .7; } }
+            .sb_cc_type {
+                color: #55606c; background: #eef1f5; border-radius: 4px;
+                padding: 0 6px; text-transform: capitalize;
+            }
+        }
+        .sb_cc_action { font-size: 13px; color: #1f6feb; margin-top: 3px; i { font-size: 11px; } }
         .sb_cc_why { font-size: 12px; color: #778; margin-top: 2px; }
-        .sb_cc_issue_btns { margin-top: 2px; }
+        .sb_cc_issue_btns { margin-top: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .sb_cc_confirm { font-size: 12px; color: #b00020; font-weight: 600; }
     }
+    .sb_cc_issue_critical { border-left-color: #c62828; }
+    .sb_cc_issue_high { border-left-color: #e8590c; }
+    .sb_cc_issue_medium { border-left-color: #f0ad4e; }
 
     .sb_cc_sev {
         font-size: 11px; text-transform: uppercase; font-weight: 700;
@@ -106,7 +190,14 @@
     .sb_cc_sev_high { background: #e8590c; }
     .sb_cc_sev_critical { background: #c62828; }
 
-    .sb_cc_flow_row, .sb_cc_alert_row, .sb_cc_rec { font-size: 13px; padding: 2px 0; }
+    // -- flow / hermes / alerts --
+    .sb_cc_flow_row {
+        display: flex; justify-content: space-between; font-size: 13px;
+        padding: 4px 0; border-bottom: 1px solid #f2f4f6;
+        .sb_cc_flow_state { text-transform: capitalize; color: #55606c; }
+        .sb_cc_flow_count { font-weight: 700; }
+    }
+    .sb_cc_alert_row, .sb_cc_rec { font-size: 13px; padding: 2px 0; }
     .sb_cc_rec_top { display: flex; gap: 8px; }
     .sb_cc_prio { font-size: 11px; color: #8a5a00; text-transform: uppercase; }
     .sb_cc_alert_type { color: #667; margin-right: 6px; font-size: 12px; }

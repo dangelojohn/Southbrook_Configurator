@@ -8,32 +8,52 @@
                 <span class="sb_cc_title">Central Command</span>
                 <span class="sb_cc_role" t-if="state.role"> · <t t-esc="state.role"/></span>
                 <span class="sb_cc_spacer"/>
+                <span t-if="state.refreshing" class="sb_cc_refreshing">Refreshing…</span>
                 <span t-if="state.factoryHealthStale" class="sb_cc_stale">stale</span>
                 <span class="sb_cc_bus" t-att-class="state.busConnected ? 'sb_cc_bus_on' : 'sb_cc_bus_off'"
                       t-esc="state.busConnected ? 'live' : 'manual'"/>
-                <button class="btn btn-primary btn-sm" t-on-click="onRefresh">Refresh</button>
+                <button class="btn btn-primary btn-sm" t-on-click="onRefresh"
+                        t-att-disabled="state.refreshing">Refresh</button>
             </div>
 
-            <div t-if="state.loading" class="sb_cc_msg">Loading Central Command…</div>
+            <!-- initial load skeleton (does NOT show on refresh) -->
+            <div t-if="state.loading" class="sb_cc_skeleton">
+                <div class="sb_cc_sk_bar"/>
+                <div class="sb_cc_sk_row"/>
+                <div class="sb_cc_sk_row"/>
+                <div class="sb_cc_sk_row"/>
+                <div class="sb_cc_msg">Loading Central Command…</div>
+            </div>
             <div t-if="state.error" class="sb_cc_msg sb_cc_error" t-esc="state.error"/>
 
-            <div t-if="!state.loading &amp;&amp; !state.error" class="sb_cc_grid">
+            <div t-if="!state.loading &amp;&amp; !state.error" class="sb_cc_grid"
+                 t-att-class="state.refreshing ? 'sb_cc_busy' : ''">
 
-                <!-- Factory Health (top) -->
-                <div class="sb_cc_health" t-on-click="toggleHealth">
+                <!-- Factory Health (top) — stat grid, click-to-explain -->
+                <div class="sb_cc_health">
                     <t t-if="state.factoryHealth">
-                        <span class="sb_cc_health_score"
-                              t-att-class="'sb_cc_band_' + (state.factoryHealth.band || 'unknown')">
-                            <t t-esc="state.factoryHealth.score === null ? '–' : state.factoryHealth.score"/>
-                        </span>
-                        <span class="sb_cc_health_label">Factory Health</span>
-                        <span class="sb_cc_health_expl" t-esc="state.factoryHealth.explanation"/>
-                        <div t-if="state.healthExpanded" class="sb_cc_health_factors">
+                        <div class="sb_cc_health_head" t-on-click="toggleHealth"
+                             t-att-title="state.healthExpanded ? 'Hide breakdown' : 'Show breakdown'">
+                            <span class="sb_cc_health_score"
+                                  t-att-class="'sb_cc_band_' + (state.factoryHealth.band || 'unknown')">
+                                <t t-esc="state.factoryHealth.score === null ? '–' : state.factoryHealth.score"/>
+                            </span>
+                            <span class="sb_cc_health_headtext">
+                                <span class="sb_cc_health_label">Factory Health</span>
+                                <span class="sb_cc_health_sub">
+                                    Click to <t t-esc="state.healthExpanded ? 'hide' : 'show'"/> the metric breakdown
+                                </span>
+                            </span>
+                            <span class="sb_cc_chevron" t-esc="state.healthExpanded ? '▾' : '▸'"/>
+                        </div>
+                        <div t-if="state.healthExpanded" class="sb_cc_health_grid">
                             <div t-foreach="state.factoryHealth.factors || []" t-as="f" t-key="f_index"
-                                 class="sb_cc_factor">
-                                <span t-esc="f.label"/>:
-                                <span t-esc="f.value"/>
-                                <span t-if="f.points"> (<t t-esc="f.points"/> pts)</span>
+                                 class="sb_cc_stat">
+                                <span class="sb_cc_stat_val" t-esc="f.value"/>
+                                <span class="sb_cc_stat_label" t-esc="f.label"/>
+                                <span class="sb_cc_stat_pts">
+                                    <t t-esc="f.points"/><t t-if="f.of"> / <t t-esc="f.of"/></t> pts
+                                </span>
                             </div>
                         </div>
                     </t>
@@ -41,31 +61,70 @@
 
                 <!-- Critical Issues (left, primary) -->
                 <div class="sb_cc_issues">
-                    <div class="sb_cc_panel_h">Critical Issues (<t t-esc="state.exceptionsTotal"/>)<t t-if="state.exceptionsTotal > state.exceptions.length"> · showing <t t-esc="state.exceptions.length"/></t></div>
-                    <div t-if="!state.exceptions.length" class="sb_cc_empty">No open exceptions.</div>
-                    <div t-foreach="state.exceptions" t-as="ex" t-key="ex.id" class="sb_cc_issue">
+                    <div class="sb_cc_panel_h">
+                        Critical Issues (<t t-esc="state.exceptionsTotal"/>)
+                        <span class="sb_cc_showing"
+                              t-if="hasFilter || state.exceptionsTotal > state.exceptions.length">
+                            · showing <t t-esc="filteredExceptions.length"/>
+                        </span>
+                    </div>
+
+                    <div class="sb_cc_filterbar">
+                        <button class="sb_cc_chip"
+                                t-att-class="state.filterSeverity === 'critical' ? 'sb_cc_chip_on' : ''"
+                                t-on-click="() => this.setSeverityFilter('critical')">Critical</button>
+                        <button class="sb_cc_chip"
+                                t-att-class="state.filterSeverity === 'high' ? 'sb_cc_chip_on' : ''"
+                                t-on-click="() => this.setSeverityFilter('high')">High</button>
+                        <select class="sb_cc_typesel" t-on-change="onTypeFilter">
+                            <option value="">All types</option>
+                            <option t-foreach="exceptionTypesPresent" t-as="ty" t-key="ty"
+                                    t-att-value="ty" t-esc="typeLabel(ty)"/>
+                        </select>
+                        <button t-if="hasFilter" class="sb_cc_chip sb_cc_chip_clear"
+                                t-on-click="clearFilters">Clear</button>
+                    </div>
+
+                    <div t-if="!filteredExceptions.length" class="sb_cc_empty">
+                        <t t-if="hasFilter">No issues match this filter.</t>
+                        <t t-else="">No open exceptions.</t>
+                    </div>
+                    <div t-foreach="filteredExceptions" t-as="ex" t-key="ex.id" class="sb_cc_issue"
+                         t-att-class="'sb_cc_issue_' + (ex.severity || 'low')">
                         <div class="sb_cc_issue_top">
                             <span t-att-class="severityClass(ex.severity)" t-esc="ex.severity"/>
                             <span class="sb_cc_issue_impact" t-esc="ex.impact_summary"/>
                         </div>
                         <div class="sb_cc_issue_meta">
                             <span class="sb_cc_owner">
+                                <i class="fa fa-user-o"/>
                                 <t t-esc="ex.owner_id &amp;&amp; ex.owner_id[1] ? ex.owner_id[1] : 'Unassigned'"/>
                             </span>
-                            <span class="sb_cc_type" t-esc="ex.exception_type"/>
+                            <span class="sb_cc_type" t-esc="typeLabel(ex.exception_type)"/>
                         </div>
                         <div t-if="ex.recommended_action" class="sb_cc_action">
-                            → <t t-esc="ex.recommended_action"/>
+                            <i class="fa fa-arrow-right"/> <t t-esc="ex.recommended_action"/>
                         </div>
                         <div t-if="ex.why_text" class="sb_cc_why" t-esc="ex.why_text"/>
                         <div class="sb_cc_issue_btns">
-                            <button class="btn btn-sm btn-link"
-                                    t-on-click="() => this.onNavigate(ex.source_model, ex.source_res_id)">Open source</button>
-                            <button t-if="ex.state === 'new'" class="btn btn-sm btn-link"
-                                    t-on-click="() => this.onAcknowledge(ex.id)">Acknowledge</button>
-                            <button t-if="ex.state !== 'resolved' &amp;&amp; ex.state !== 'dismissed'"
-                                    class="btn btn-sm btn-link"
-                                    t-on-click="() => this.onResolve(ex.id)">Resolve</button>
+                            <button class="btn btn-sm btn-secondary"
+                                    t-on-click="() => this.onNavigate(ex.source_model, ex.source_res_id)">
+                                <i class="fa fa-external-link"/> Open source</button>
+                            <t t-if="state.confirmingId === ex.id">
+                                <span class="sb_cc_confirm">Confirm <t t-esc="state.confirmingAction"/>?</span>
+                                <button class="btn btn-sm btn-danger"
+                                        t-on-click="() => this.confirmAction(ex.id)">Yes</button>
+                                <button class="btn btn-sm btn-light"
+                                        t-on-click="() => this.cancelConfirm()">No</button>
+                            </t>
+                            <t t-else="">
+                                <button t-if="ex.state === 'new'" class="btn btn-sm btn-outline-secondary"
+                                        t-on-click="() => this.onAcknowledge(ex.id)">Acknowledge</button>
+                                <button class="btn btn-sm btn-outline-primary"
+                                        t-on-click="() => this.askResolve(ex.id)">Resolve</button>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        t-on-click="() => this.askDismiss(ex.id)">Dismiss</button>
+                            </t>
                         </div>
                     </div>
                 </div>
@@ -76,7 +135,8 @@
                     <t t-if="state.flow">
                         <div t-foreach="state.flow.mo_state_counts || []" t-as="s" t-key="s_index"
                              class="sb_cc_flow_row">
-                            <span t-esc="s.state"/>: <span t-esc="s.state_count"/>
+                            <span class="sb_cc_flow_state" t-esc="s.state"/>
+                            <span class="sb_cc_flow_count" t-esc="s.state_count"/>
                         </div>
                         <div t-if="state.flow.bottleneck" class="sb_cc_bottleneck">
                             <div class="sb_cc_sub_h">Bottleneck</div>

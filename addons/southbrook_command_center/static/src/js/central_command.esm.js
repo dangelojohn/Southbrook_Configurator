@@ -4,8 +4,8 @@
 // Registered as action tag "southbrook_command_center.central_command".
 // Read-only against business objects: buttons navigate to the source record
 // or call the exception model's own workflow methods; the dashboard never
-// writes business state. Live updates ride bus.bus when available and degrade
-// to a manual Refresh otherwise (DELIVERABLE_5_DELIVERY.md §5).
+// writes business state. Uses only services proven available in this v19
+// backend context (action, orm, bus_service) + the @web/core/user module.
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
@@ -28,7 +28,8 @@ export class CentralCommand extends Component {
         this.busService = useService("bus_service");
 
         this.state = useState({
-            loading: true,
+            loading: true,       // initial load only
+            refreshing: false,   // subsequent refresh — keep content visible
             error: null,
             role: null,
             busConnected: false,
@@ -40,6 +41,10 @@ export class CentralCommand extends Component {
             flow: null,
             recommendations: [],
             alerts: [],
+            filterSeverity: "",
+            filterType: "",
+            confirmingId: null,
+            confirmingAction: null,
         });
 
         this._onExceptionMsg = this._onExceptionMsg.bind(this);
@@ -48,7 +53,7 @@ export class CentralCommand extends Component {
 
         onWillStart(async () => {
             await this._resolveRole();
-            await this._loadAll();
+            await this._loadAll(false);
         });
 
         onMounted(() => this._subscribeBus());
@@ -65,6 +70,28 @@ export class CentralCommand extends Component {
             // fall through to default
         }
         return 1;
+    }
+
+    // Client-side filtered view of the loaded cards (severity + type chips).
+    get filteredExceptions() {
+        let list = this.state.exceptions;
+        if (this.state.filterSeverity) {
+            list = list.filter((e) => e.severity === this.state.filterSeverity);
+        }
+        if (this.state.filterType) {
+            list = list.filter((e) => e.exception_type === this.state.filterType);
+        }
+        return list;
+    }
+
+    get exceptionTypesPresent() {
+        const seen = [];
+        for (const e of this.state.exceptions) {
+            if (e.exception_type && !seen.includes(e.exception_type)) {
+                seen.push(e.exception_type);
+            }
+        }
+        return seen;
     }
 
     async _resolveRole() {
@@ -88,8 +115,12 @@ export class CentralCommand extends Component {
         }
     }
 
-    async _loadAll() {
-        this.state.loading = true;
+    async _loadAll(isRefresh) {
+        if (isRefresh) {
+            this.state.refreshing = true;
+        } else {
+            this.state.loading = true;
+        }
         this.state.error = null;
         try {
             const payload = await rpc("/command_center/bootstrap", {
@@ -107,18 +138,66 @@ export class CentralCommand extends Component {
             this.state.error = (e && e.message) || "Failed to load Central Command";
         } finally {
             this.state.loading = false;
+            this.state.refreshing = false;
         }
     }
 
     onRefresh() {
-        this._loadAll();
+        this._loadAll(true);
     }
 
     toggleHealth() {
         this.state.healthExpanded = !this.state.healthExpanded;
     }
 
-    // -- bus -----------------------------------------------------------
+    setSeverityFilter(sev) {
+        this.state.filterSeverity = this.state.filterSeverity === sev ? "" : sev;
+    }
+
+    onTypeFilter(ev) {
+        this.state.filterType = ev.target.value;
+    }
+
+    clearFilters() {
+        this.state.filterSeverity = "";
+        this.state.filterType = "";
+    }
+
+    get hasFilter() {
+        return !!this.state.filterSeverity || !!this.state.filterType;
+    }
+
+    // -- confirm-before-mutate (misclick protection, no dialog service) --
+    askResolve(id) {
+        this.state.confirmingId = id;
+        this.state.confirmingAction = "resolve";
+    }
+
+    askDismiss(id) {
+        this.state.confirmingId = id;
+        this.state.confirmingAction = "dismiss";
+    }
+
+    cancelConfirm() {
+        this.state.confirmingId = null;
+        this.state.confirmingAction = null;
+    }
+
+    confirmAction(id) {
+        const action = this.state.confirmingAction;
+        this.state.confirmingId = null;
+        this.state.confirmingAction = null;
+        const method = action === "dismiss" ? "action_dismiss" : "action_resolve";
+        this.orm.call("southbrook.command.exception", method, [[id]])
+            .then(() => this._loadAll(true));
+    }
+
+    onAcknowledge(id) {
+        this.orm.call("southbrook.command.exception", "action_acknowledge", [[id]])
+            .then(() => this._loadAll(true));
+    }
+
+    // -- bus (Phase 3 — no publishers yet; subscribing is harmless) -----
     _subscribeBus() {
         try {
             const cid = this.companyId;
@@ -185,7 +264,6 @@ export class CentralCommand extends Component {
     }
 
     _onHermesMsg() {
-        // Cheapest correct behavior: re-pull the recommendations panel.
         rpc("/command_center/bootstrap", { company_id: this.companyId, role: this.state.role })
             .then((p) => {
                 this.state.recommendations = p.recommendations || [];
@@ -207,18 +285,12 @@ export class CentralCommand extends Component {
         });
     }
 
-    onAcknowledge(id) {
-        this.orm.call("southbrook.command.exception", "action_acknowledge", [[id]])
-            .then(() => this._loadAll());
-    }
-
-    onResolve(id) {
-        this.orm.call("southbrook.command.exception", "action_resolve", [[id]])
-            .then(() => this._loadAll());
-    }
-
     severityClass(sev) {
         return "sb_cc_sev sb_cc_sev_" + (sev || "low");
+    }
+
+    typeLabel(t) {
+        return (t || "").split("_").join(" ");
     }
 }
 
