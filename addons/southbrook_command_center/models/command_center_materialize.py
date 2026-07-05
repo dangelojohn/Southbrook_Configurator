@@ -40,6 +40,16 @@ class SouthbrookCommandExceptionMaterialize(models.Model):
             user = getattr(source_record, attr, False) if source_record else False
             if user:
                 return user.id
+        # OQ-8 (resolved 2026-07-05): no natural owner -> configurable
+        # fallback (default: production manager), then admin as last resort
+        # so the required owner_id is never null.
+        login = self.env["ir.config_parameter"].sudo().get_param(
+            "command_center.default_owner_login", "")
+        if login:
+            fallback = self.env["res.users"].sudo().search(
+                [("login", "=", login)], limit=1)
+            if fallback:
+                return fallback.id
         admin = self.env.ref("base.user_admin", raise_if_not_found=False)
         return admin.id if admin else self.env.uid
 

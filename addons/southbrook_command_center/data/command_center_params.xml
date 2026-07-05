@@ -117,4 +117,13 @@
         <field name="value">24</field>
     </record>
 
+    <!-- OQ-8 (RESOLVED 2026-07-05): fallback exception owner when the source
+         record has no natural responsible user. Defaults to the production
+         manager; admin is the code-level last resort so owner_id (required)
+         is never null. Change this login to re-point the fallback. -->
+    <record id="param_cc_default_owner_login" model="ir.config_parameter">
+        <field name="key">command_center.default_owner_login</field>
+        <field name="value">production.manager@southbrookcabinetry.local</field>
+    </record>
+
 </odoo>
