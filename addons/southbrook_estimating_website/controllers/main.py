@@ -2602,8 +2602,19 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
         Plus Maple price-extra +10% / +2 week info entries per
         Sprint B2's lessons learned.
+
+        2026-07-05 — the hard-severity checks (Rule 1, Rule 2) now live
+        on sale.order.southbrook_hard_validation_issues() (southbrook_
+        estimating), shared with action_confirm()'s own guard so the
+        backend Confirm button enforces the same rules this portal
+        preflight does, not just the client-side Send-to-Manufacturing
+        button. This method still owns the soft/info severities below,
+        since those never blocked anything and don't need a shared home.
         """
-        issues = []
+        issues = [
+            dict(issue, severity="hard")
+            for issue in order.southbrook_hard_validation_issues()
+        ]
         for line in order.order_line:
             if not line.product_id:
                 continue
@@ -2624,40 +2635,6 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                     for vs in attr_vals.values() for t in tokens
                 )
 
-            # Rule 1 — Contractor series + Five-Piece door.
-            if _has_token("contractor") and _has_token("five-piece",
-                                                       "5-piece", "woodgrain"):
-                issues.append({
-                    "severity": "hard",
-                    "code": "series_door_incompatible",
-                    "line_id": line.id,
-                    "message": (
-                        f"{line.name}: Contractor series only allows "
-                        "the white thermofoil slab door."
-                    ),
-                })
-            # Rule 1 (inverse) — Elegance series + Slab door.
-            if _has_token("elegance") and _has_token("slab", "thermofoil"):
-                issues.append({
-                    "severity": "hard",
-                    "code": "series_door_incompatible",
-                    "line_id": line.id,
-                    "message": (
-                        f"{line.name}: Elegance series uses five-piece "
-                        "woodgrain doors only."
-                    ),
-                })
-            # Rule 2 — Maple box only on Contemporary/Elegance.
-            if _has_token("maple") and _has_token("contractor"):
-                issues.append({
-                    "severity": "hard",
-                    "code": "box_series_incompatible",
-                    "line_id": line.id,
-                    "message": (
-                        f"{line.name}: Maple carcass not available on "
-                        "Contractor series."
-                    ),
-                })
             # Info — Maple lead-time + price impact (CLAUDE.md §5).
             if _has_token("maple"):
                 issues.append({

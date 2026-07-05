@@ -18,7 +18,8 @@ blocked but the operations team is alerted.
 """
 import logging
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -227,12 +228,88 @@ class SaleOrder(models.Model):
         return configurator_obj.with_context(**ctx).get_wizard_action()
 
     # ------------------------------------------------------------------
+    # QA follow-up (2026-07-05): hard config-rule validation, shared
+    # between the portal preflight check (southbrook_estimating_website
+    # controllers/main.py, _southbrook_collect_validation) and
+    # action_confirm() below. Before this, the hard-severity checks
+    # (Rule 1 series/door, Rule 2 Maple/Contractor) only lived in the
+    # portal controller and only gated the customer-facing "Send to
+    # Manufacturing" button client-side — a sales rep confirming the
+    # SAME order from the ordinary backend Sales Order form had no
+    # equivalent guard and could push an invalid combination straight
+    # into a real Manufacturing Order. This is the single source of
+    # truth both surfaces now call; the portal controller keeps its own
+    # per-line loop only for the soft/info severities (width/door-count
+    # suggestions, Maple lead-time note), which never blocked anything
+    # and don't need a shared home.
+    def southbrook_hard_validation_issues(self):
+        """Return a list of {code, line_id, message} dicts — hard-
+        severity config rule violations that must block confirmation.
+        Empty list means the order is clean. Mirrors CLAUDE.md §5 rules
+        1 and 2 (declarative data enforces selection; this is a defence-
+        in-depth check against combinations that predate a rule, or
+        were entered before the rule existed / via direct ORM writes)."""
+        self.ensure_one()
+        issues = []
+        for line in self.order_line:
+            if not line.product_id:
+                continue
+            name_lower = (line.name or "").lower()
+            attr_vals = {}
+            for ptav in line.product_id.product_template_attribute_value_ids:
+                attr = (ptav.attribute_id.name or "").lower()
+                attr_vals.setdefault(attr, []).append((ptav.name or "").lower())
+
+            def _has_token(*tokens):
+                return any(t in name_lower for t in tokens) or any(
+                    any(t in v for v in vs)
+                    for vs in attr_vals.values() for t in tokens
+                )
+
+            if _has_token("contractor") and _has_token(
+                    "five-piece", "5-piece", "woodgrain"):
+                issues.append({
+                    "code": "series_door_incompatible",
+                    "line_id": line.id,
+                    "message": (
+                        f"{line.name}: Contractor series only allows "
+                        "the white thermofoil slab door."
+                    ),
+                })
+            if _has_token("elegance") and _has_token("slab", "thermofoil"):
+                issues.append({
+                    "code": "series_door_incompatible",
+                    "line_id": line.id,
+                    "message": (
+                        f"{line.name}: Elegance series uses five-piece "
+                        "woodgrain doors only."
+                    ),
+                })
+            if _has_token("maple") and _has_token("contractor"):
+                issues.append({
+                    "code": "box_series_incompatible",
+                    "line_id": line.id,
+                    "message": (
+                        f"{line.name}: Maple carcass not available on "
+                        "Contractor series."
+                    ),
+                })
+        return issues
+
+    # ------------------------------------------------------------------
     # Analytics capture (NF1 — Build Spec section 8 "AI data spine")
     # ------------------------------------------------------------------
     # Fire the southbrook.order.analytics.capture() hook at confirm-time.
     # Idempotent; safe to re-confirm. NF1 carve-out: this is data capture,
     # not business logic — does not bump the 7-routine custom register.
     def action_confirm(self):
+        for order in self:
+            issues = order.southbrook_hard_validation_issues()
+            if issues:
+                raise UserError(_(
+                    "This order has configuration rule violations and "
+                    "cannot be confirmed:\n\n%s"
+                ) % "\n".join("- %s" % i["message"] for i in issues))
         result = super().action_confirm()
         Analytics = self.env["southbrook.order.analytics"]
         for order in self:
