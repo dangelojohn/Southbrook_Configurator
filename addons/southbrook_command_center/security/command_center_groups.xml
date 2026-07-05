@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  Central Command role groups (Deliverable 4's five role-based default
+  views + one base group for the materializer/service identity).
+
+  IMPORTANT — these six groups are DELIBERATELY STANDALONE. They do NOT use
+  `implied_ids` to inherit from `base.group_user`/`base.group_portal` or
+  from each other. This deployment has a documented, previously-hit trap:
+  `implied_ids` wiring on `res.groups` (and the related `res.users.
+  group_ids` — NOT the removed `groups_id` name — write path) can silently
+  no-op instead of granting the expected implied access, per this repo's
+  known-issues record (`odoo19_base_group_user_implied_ids_trap`). Rather
+  than depend on implied-access propagation working correctly, every group
+  below is wired explicitly and independently in
+  `security/ir.model.access.csv`.
+
+  NOTE: Odoo 19 REMOVED `res.groups.category_id` entirely (verified against
+  this repo's own convention in southbrook_installer/security/
+  southbrook_installer_groups.xml and southbrook_quality's groups file) — it
+  is not merely deprecated, referencing it is an unknown-field install
+  error. Groups below are therefore flat (no category_id field at all); the
+  module manifest's own `category` key is the v19-correct grouping
+  mechanism, already set to "Manufacturing" in `__manifest__.py`.
+
+  Practical consequence (see the frozen-contract note in the task
+  handoff): because there is no implied hierarchy, the five role groups
+  below get READ-ONLY access to `southbrook.command.exception` by design
+  (per this task's ACL instruction). A role-group user calling
+  `action_acknowledge` / `action_start_progress` / `action_resolve` /
+  `action_dismiss` needs write access, which only `group_command_center_
+  user` (the base/materializer group) has. Downstream work (views/
+  controllers) must either (a) also add role users to
+  `group_command_center_user`, or (b) route the state-changing action
+  calls through a `sudo()`-scoped service method — this module does not
+  decide that for you; it only avoids the implied_ids trap.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <!-- Base group: read/write/create on southbrook.command.exception,
+             standing in for the sync/materializer service identity and for
+             any user who should have full operational access regardless
+             of role-specific default view. -->
+        <record id="group_command_center_user" model="res.groups">
+            <field name="name">Central Command / Base User</field>
+            <field name="comment">
+                Base Central Command access group. Grants read/write/create
+                on southbrook.command.exception (see ir.model.access.csv).
+                Standalone — no implied_ids — per this deployment's
+                documented implied_ids silent-no-op trap.
+            </field>
+        </record>
+
+        <record id="group_command_center_owner" model="res.groups">
+            <field name="name">Central Command / Owner</field>
+            <field name="comment">
+                Owner/GM default view — Factory Health + exception queue
+                across all roles. Standalone group, read-only ACL on
+                southbrook.command.exception; no implied_ids (see module
+                docstring above).
+            </field>
+        </record>
+
+        <record id="group_command_center_production_manager" model="res.groups">
+            <field name="name">Central Command / Production Manager</field>
+            <field name="comment">
+                Production Manager default view — schedule_confidence +
+                job-level exceptions. Standalone group; no implied_ids.
+            </field>
+        </record>
+
+        <record id="group_command_center_shop_foreman" model="res.groups">
+            <field name="name">Central Command / Shop Foreman</field>
+            <field name="comment">
+                Shop Foreman default view — shop-floor telemetry, MI
+                blockers, breakdown alerts. Standalone group; no
+                implied_ids.
+            </field>
+        </record>
+
+        <record id="group_command_center_purchasing_manager" model="res.groups">
+            <field name="name">Central Command / Purchasing Manager</field>
+            <field name="comment">
+                Purchasing Manager default view — PO delivery-risk panel.
+                Standalone group; no implied_ids.
+            </field>
+        </record>
+
+        <record id="group_command_center_warehouse_manager" model="res.groups">
+            <field name="name">Central Command / Warehouse Manager</field>
+            <field name="comment">
+                Warehouse Manager default view — delivery/install +
+                3PL ASN state. Standalone group; no implied_ids.
+            </field>
+        </record>
+
+    </data>
+</odoo>

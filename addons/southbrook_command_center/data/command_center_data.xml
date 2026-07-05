@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo noupdate="1">
+
+    <!-- Human-readable name sequence for exceptions (the model create()
+         falls back to CC-%06d if this is absent, but seed it for clean names). -->
+    <record id="seq_command_exception" model="ir.sequence">
+        <field name="name">Central Command Exception</field>
+        <field name="code">southbrook.command.exception</field>
+        <field name="prefix">CC-</field>
+        <field name="padding">6</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <!-- Materializer cron: 15-minute cadence (honors the no-fast-cron
+         constraint — DELIVERABLE_8 OQ / D5). Reads alerting sources and
+         upserts Central Command's own exception rows. Writes to no other model. -->
+    <record id="cron_command_center_materialize" model="ir.cron">
+        <field name="name">Central Command: materialize exceptions</field>
+        <field name="model_id" ref="model_southbrook_command_exception"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_materialize_exceptions()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+</odoo>

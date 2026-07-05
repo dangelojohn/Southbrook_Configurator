@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# Phase-1 safe scope (DELIVERABLE_7_ROADMAP.md): the exception model, the
+# read-time scoring library, and the cron-scan materializer that writes ONLY
+# to southbrook.command.exception. The intrusive create/write overrides on
+# live business models (mi_check / breakdown_alert / sale_order /
+# hermes_recommendation) are deliberately NOT part of this install — they are
+# preserved under saved/_deferred_phase2_hooks/ pending integration testing
+# before they touch production writes.
+from . import southbrook_command_exception
+from . import command_center
+from . import command_center_materialize

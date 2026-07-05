@@ -1,0 +1,129 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+"""Central Command bootstrap controller.
+
+One JSON round-trip (`/command_center/bootstrap`) serving all five dashboard
+panels, per DELIVERABLE_5_DELIVERY.md §3. READ-ONLY: this endpoint performs
+zero create/write on any business object. Every panel query is wrapped so a
+field/model mismatch degrades that one panel to empty rather than 500-ing the
+whole dashboard — a resilience requirement because the bootstrap runs on every
+dashboard open.
+"""
+import logging
+
+from odoo import http
+from odoo.http import request
+
+_logger = logging.getLogger(__name__)
+
+
+# Per-role default domains on southbrook.command.exception (DELIVERABLE_4_UI.md
+# §3). Applied server-side on top of the always-open filter. Unknown role ->
+# no extra narrowing (owner/broadest view).
+def _domain_for_role(role):
+    if role == "production_manager":
+        return [("exception_type", "in",
+                 ["mi_blocker", "job_blocked", "approval_gate_stall",
+                  "bom_skip", "cutlist_divergence"])]
+    if role == "shop_foreman":
+        return [("exception_type", "in", ["mi_blocker", "breakdown_alert"])]
+    if role == "purchasing_manager":
+        return [("exception_type", "=", "po_delivery_risk")]
+    if role == "warehouse_manager":
+        return [("exception_type", "in", ["breakdown_alert", "po_delivery_risk"])]
+    # owner / unknown -> high+critical cross-cut, no type narrowing
+    return [("severity", "in", ["high", "critical"])]
+
+
+class CommandCenterController(http.Controller):
+
+    @http.route("/command_center/bootstrap", type="json", auth="user")
+    def bootstrap(self, company_id=None, role=None, **kw):
+        env = request.env
+        cid = int(company_id) if company_id else env.company.id
+        return {
+            "company_id": cid,
+            "role": role,
+            "factory_health": self._factory_health(env),
+            "flow": self._flow(env, cid),
+            "exceptions": self._exceptions(env, cid, role),
+            "recommendations": self._recommendations(env),
+            "alerts": self._alerts(env, cid),
+        }
+
+    # -- panel 1 -------------------------------------------------------
+    def _factory_health(self, env):
+        try:
+            return env["southbrook.command.center"].factory_health_score()
+        except Exception:  # noqa: BLE001 - panel must degrade, never 500
+            _logger.exception("command_center: factory_health panel failed")
+            return {"score": None, "band": "unknown", "factors": [],
+                    "explanation": "Factory Health unavailable."}
+
+    # -- panel 2 (Critical Issues) -------------------------------------
+    def _exceptions(self, env, cid, role):
+        try:
+            domain = [("company_id", "=", cid),
+                      ("state", "not in", ("resolved", "dismissed"))]
+            domain += _domain_for_role(role)
+            return env["southbrook.command.exception"].search_read(
+                domain=domain,
+                fields=["name", "exception_type", "severity", "severity_rank",
+                        "owner_id", "state", "impact_summary",
+                        "recommended_action", "why_text", "source_model",
+                        "source_res_id", "mo_id", "task_id", "sale_order_id",
+                        "purchase_order_id", "hermes_recommendation_id",
+                        "create_date"],
+                order="severity_rank asc, create_date desc",
+                limit=50,
+            )
+        except Exception:  # noqa: BLE001
+            _logger.exception("command_center: exceptions panel failed")
+            return []
+
+    # -- panel 3 (Production Flow) -------------------------------------
+    def _flow(self, env, cid):
+        out = {"mo_state_counts": [], "bottleneck": None, "oee": []}
+        try:
+            out["mo_state_counts"] = env["mrp.production"].read_group(
+                [("state", "in", ("confirmed", "progress", "to_close"))],
+                ["state"], ["state"])
+        except Exception:  # noqa: BLE001
+            _logger.exception("command_center: mo_state_counts failed")
+        try:
+            report = env["southbrook.mes_mps.bottleneck_report"].search(
+                [], order="create_date desc", limit=1)
+            if report:
+                lines = report.bottleneck_line_ids if "bottleneck_line_ids" in report._fields else report.browse()
+                out["bottleneck"] = {
+                    "report_id": report.id,
+                    "lines": [{"id": ln.id, "name": ln.display_name}
+                              for ln in lines[:5]],
+                }
+        except Exception:  # noqa: BLE001
+            _logger.exception("command_center: bottleneck failed")
+        return out
+
+    # -- panel 4 (Hermes) ----------------------------------------------
+    def _recommendations(self, env):
+        try:
+            return env["southbrook.hermes.recommendation"].search_read(
+                domain=[("state", "in", ("draft", "ready"))],
+                fields=["summary", "rationale", "priority", "state",
+                        "recommendation_type", "proposed_action",
+                        "source_model", "source_res_id"],
+                order="priority desc, create_date desc", limit=25)
+        except Exception:  # noqa: BLE001
+            _logger.exception("command_center: recommendations panel failed")
+            return []
+
+    # -- panel 5 (Alert Stream) ----------------------------------------
+    def _alerts(self, env, cid):
+        try:
+            return env["southbrook.ops.event"].search_read(
+                domain=[],
+                fields=["event_type", "summary", "severity", "res_model",
+                        "res_id", "create_date"],
+                order="create_date desc", limit=30)
+        except Exception:  # noqa: BLE001
+            _logger.exception("command_center: alerts panel failed")
+            return []

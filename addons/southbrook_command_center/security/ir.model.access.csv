@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_command_exception_user,southbrook.command.exception (base user),model_southbrook_command_exception,group_command_center_user,1,1,1,0
+access_command_exception_owner,southbrook.command.exception (owner),model_southbrook_command_exception,group_command_center_owner,1,0,0,0
+access_command_exception_production_manager,southbrook.command.exception (production manager),model_southbrook_command_exception,group_command_center_production_manager,1,0,0,0
+access_command_exception_shop_foreman,southbrook.command.exception (shop foreman),model_southbrook_command_exception,group_command_center_shop_foreman,1,0,0,0
+access_command_exception_purchasing_manager,southbrook.command.exception (purchasing manager),model_southbrook_command_exception,group_command_center_purchasing_manager,1,0,0,0
+access_command_exception_warehouse_manager,southbrook.command.exception (warehouse manager),model_southbrook_command_exception,group_command_center_warehouse_manager,1,0,0,0

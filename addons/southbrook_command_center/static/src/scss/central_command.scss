@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// Central Command dashboard — exception-first layout (DELIVERABLE_4_UI.md).
+
+.sb_cc_root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #f6f7f9;
+    overflow: auto;
+
+    .sb_cc_header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: #1f2733;
+        color: #fff;
+
+        .sb_cc_title { font-weight: 600; font-size: 15px; }
+        .sb_cc_role { opacity: .75; text-transform: capitalize; }
+        .sb_cc_spacer { flex: 1 1 auto; }
+        .sb_cc_stale { font-size: 11px; color: #f0ad4e; }
+        .sb_cc_bus { font-size: 11px; padding: 1px 6px; border-radius: 8px; }
+        .sb_cc_bus_on { background: #2e7d32; }
+        .sb_cc_bus_off { background: #6c757d; }
+    }
+
+    .sb_cc_msg { padding: 24px; color: #555; }
+    .sb_cc_error { color: #b00020; }
+
+    // 5-region grid: health (top), issues (left), flow (center),
+    // hermes (right), alerts (bottom).
+    .sb_cc_grid {
+        display: grid;
+        grid-template-columns: minmax(320px, 1.4fr) 1fr 1fr;
+        grid-template-areas:
+            "health health health"
+            "issues flow    hermes"
+            "alerts alerts  alerts";
+        gap: 10px;
+        padding: 10px;
+        flex: 1 1 auto;
+    }
+
+    .sb_cc_health { grid-area: health; }
+    .sb_cc_issues { grid-area: issues; }
+    .sb_cc_flow   { grid-area: flow; }
+    .sb_cc_hermes { grid-area: hermes; }
+    .sb_cc_alerts { grid-area: alerts; }
+
+    .sb_cc_health, .sb_cc_issues, .sb_cc_flow, .sb_cc_hermes, .sb_cc_alerts {
+        background: #fff;
+        border: 1px solid #e3e6ea;
+        border-radius: 6px;
+        padding: 10px 12px;
+    }
+
+    .sb_cc_health {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        cursor: pointer;
+        flex-wrap: wrap;
+
+        .sb_cc_health_score {
+            font-size: 30px;
+            font-weight: 700;
+            padding: 2px 12px;
+            border-radius: 6px;
+            color: #fff;
+            background: #6c757d;
+        }
+        .sb_cc_band_green { background: #2e7d32; }
+        .sb_cc_band_amber { background: #f0ad4e; }
+        .sb_cc_band_red   { background: #c62828; }
+        .sb_cc_health_label { font-weight: 600; }
+        .sb_cc_health_expl { color: #667; font-size: 12px; flex: 1 1 260px; }
+        .sb_cc_health_factors { flex-basis: 100%; font-size: 12px; color: #555; }
+        .sb_cc_factor { padding: 1px 0; }
+    }
+
+    .sb_cc_panel_h { font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+    .sb_cc_sub_h { font-weight: 600; margin-top: 6px; font-size: 12px; }
+    .sb_cc_empty { color: #8a94a0; font-size: 13px; padding: 8px 0; }
+
+    .sb_cc_issue {
+        border-left: 3px solid #e3e6ea;
+        padding: 6px 8px;
+        margin-bottom: 8px;
+        background: #fafbfc;
+
+        .sb_cc_issue_top { display: flex; gap: 8px; align-items: baseline; }
+        .sb_cc_issue_impact { font-weight: 600; }
+        .sb_cc_issue_meta { font-size: 12px; color: #667; display: flex; gap: 10px; }
+        .sb_cc_action { font-size: 13px; color: #1f6feb; margin-top: 2px; }
+        .sb_cc_why { font-size: 12px; color: #778; margin-top: 2px; }
+        .sb_cc_issue_btns { margin-top: 2px; }
+    }
+
+    .sb_cc_sev {
+        font-size: 11px; text-transform: uppercase; font-weight: 700;
+        padding: 0 6px; border-radius: 3px; color: #fff;
+    }
+    .sb_cc_sev_low { background: #6c757d; }
+    .sb_cc_sev_medium { background: #f0ad4e; }
+    .sb_cc_sev_high { background: #e8590c; }
+    .sb_cc_sev_critical { background: #c62828; }
+
+    .sb_cc_flow_row, .sb_cc_alert_row, .sb_cc_rec { font-size: 13px; padding: 2px 0; }
+    .sb_cc_rec_top { display: flex; gap: 8px; }
+    .sb_cc_prio { font-size: 11px; color: #8a5a00; text-transform: uppercase; }
+    .sb_cc_alert_type { color: #667; margin-right: 6px; font-size: 12px; }
+}

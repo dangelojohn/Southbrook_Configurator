@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_command_center.CentralCommand">
+        <div class="sb_cc_root o_action_manager">
+            <div class="sb_cc_header">
+                <span class="sb_cc_title">Central Command</span>
+                <span class="sb_cc_role" t-if="state.role"> · <t t-esc="state.role"/></span>
+                <span class="sb_cc_spacer"/>
+                <span t-if="state.factoryHealthStale" class="sb_cc_stale">stale</span>
+                <span class="sb_cc_bus" t-att-class="state.busConnected ? 'sb_cc_bus_on' : 'sb_cc_bus_off'"
+                      t-esc="state.busConnected ? 'live' : 'manual'"/>
+                <button class="btn btn-primary btn-sm" t-on-click="onRefresh">Refresh</button>
+            </div>
+
+            <div t-if="state.loading" class="sb_cc_msg">Loading Central Command…</div>
+            <div t-if="state.error" class="sb_cc_msg sb_cc_error" t-esc="state.error"/>
+
+            <div t-if="!state.loading &amp;&amp; !state.error" class="sb_cc_grid">
+
+                <!-- Factory Health (top) -->
+                <div class="sb_cc_health" t-on-click="toggleHealth">
+                    <t t-if="state.factoryHealth">
+                        <span class="sb_cc_health_score"
+                              t-att-class="'sb_cc_band_' + (state.factoryHealth.band || 'unknown')">
+                            <t t-esc="state.factoryHealth.score === null ? '–' : state.factoryHealth.score"/>
+                        </span>
+                        <span class="sb_cc_health_label">Factory Health</span>
+                        <span class="sb_cc_health_expl" t-esc="state.factoryHealth.explanation"/>
+                        <div t-if="state.healthExpanded" class="sb_cc_health_factors">
+                            <div t-foreach="state.factoryHealth.factors || []" t-as="f" t-key="f_index"
+                                 class="sb_cc_factor">
+                                <span t-esc="f.label"/>:
+                                <span t-esc="f.value"/>
+                                <span t-if="f.points"> (<t t-esc="f.points"/> pts)</span>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+
+                <!-- Critical Issues (left, primary) -->
+                <div class="sb_cc_issues">
+                    <div class="sb_cc_panel_h">Critical Issues (<t t-esc="state.exceptions.length"/>)</div>
+                    <div t-if="!state.exceptions.length" class="sb_cc_empty">No open exceptions.</div>
+                    <div t-foreach="state.exceptions" t-as="ex" t-key="ex.id" class="sb_cc_issue">
+                        <div class="sb_cc_issue_top">
+                            <span t-att-class="severityClass(ex.severity)" t-esc="ex.severity"/>
+                            <span class="sb_cc_issue_impact" t-esc="ex.impact_summary"/>
+                        </div>
+                        <div class="sb_cc_issue_meta">
+                            <span class="sb_cc_owner">
+                                <t t-esc="ex.owner_id &amp;&amp; ex.owner_id[1] ? ex.owner_id[1] : 'Unassigned'"/>
+                            </span>
+                            <span class="sb_cc_type" t-esc="ex.exception_type"/>
+                        </div>
+                        <div t-if="ex.recommended_action" class="sb_cc_action">
+                            → <t t-esc="ex.recommended_action"/>
+                        </div>
+                        <div t-if="ex.why_text" class="sb_cc_why" t-esc="ex.why_text"/>
+                        <div class="sb_cc_issue_btns">
+                            <button class="btn btn-sm btn-link"
+                                    t-on-click="() => this.onNavigate(ex.source_model, ex.source_res_id)">Open source</button>
+                            <button t-if="ex.state === 'new'" class="btn btn-sm btn-link"
+                                    t-on-click="() => this.onAcknowledge(ex.id)">Acknowledge</button>
+                            <button t-if="ex.state !== 'resolved' &amp;&amp; ex.state !== 'dismissed'"
+                                    class="btn btn-sm btn-link"
+                                    t-on-click="() => this.onResolve(ex.id)">Resolve</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Production Flow (center) -->
+                <div class="sb_cc_flow">
+                    <div class="sb_cc_panel_h">Production Flow</div>
+                    <t t-if="state.flow">
+                        <div t-foreach="state.flow.mo_state_counts || []" t-as="s" t-key="s_index"
+                             class="sb_cc_flow_row">
+                            <span t-esc="s.state"/>: <span t-esc="s.state_count"/>
+                        </div>
+                        <div t-if="state.flow.bottleneck" class="sb_cc_bottleneck">
+                            <div class="sb_cc_sub_h">Bottleneck</div>
+                            <div t-foreach="state.flow.bottleneck.lines || []" t-as="bl" t-key="bl.id"
+                                 t-esc="bl.name"/>
+                        </div>
+                    </t>
+                </div>
+
+                <!-- Hermes Recommendations (right) -->
+                <div class="sb_cc_hermes">
+                    <div class="sb_cc_panel_h">Recommendations</div>
+                    <div t-if="!state.recommendations.length" class="sb_cc_empty">None pending.</div>
+                    <div t-foreach="state.recommendations" t-as="rec" t-key="rec.id" class="sb_cc_rec">
+                        <div class="sb_cc_rec_top">
+                            <span class="sb_cc_prio" t-esc="rec.priority"/>
+                            <span t-esc="rec.summary"/>
+                        </div>
+                        <div t-if="rec.proposed_action" class="sb_cc_rec_action" t-esc="rec.proposed_action"/>
+                    </div>
+                </div>
+
+                <!-- Alert Stream (bottom) -->
+                <div class="sb_cc_alerts">
+                    <div class="sb_cc_panel_h">Alerts</div>
+                    <div t-if="!state.alerts.length" class="sb_cc_empty">No recent activity.</div>
+                    <div t-foreach="state.alerts" t-as="al" t-key="al_index" class="sb_cc_alert_row">
+                        <span class="sb_cc_alert_type" t-esc="al.event_type || al.source"/>
+                        <span t-esc="al.summary"/>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

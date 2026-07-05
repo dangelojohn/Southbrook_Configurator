@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  Tunable ir.config_parameter defaults for the four Deliverable 3 scoring
+  functions, plus one Deliverable 8 workflow threshold (OQ-10a) seeded here
+  for the future exception-materializer to read. Every value below is
+  explicitly "flagged for owner sign-off" in DELIVERABLE_3_SCORING.md /
+  DELIVERABLE_8_OPEN_QUESTIONS.md (OQ-3..OQ-6, OQ-10a) — these are sensible
+  defaults, not ratified business numbers. noupdate="1" so an owner's tuned
+  value in Settings > Technical > System Parameters survives a module
+  upgrade (`-u`) instead of being silently reset.
+-->
+<odoo noupdate="1">
+
+    <!-- ================= Factory Health Score (OQ-3) ================= -->
+    <record id="param_cc_fh_weight_oee" model="ir.config_parameter">
+        <field name="key">command_center.factory_health.weight_oee</field>
+        <field name="value">0.30</field>
+    </record>
+    <record id="param_cc_fh_weight_otd" model="ir.config_parameter">
+        <field name="key">command_center.factory_health.weight_otd</field>
+        <field name="value">0.25</field>
+    </record>
+    <record id="param_cc_fh_weight_fpy" model="ir.config_parameter">
+        <field name="key">command_center.factory_health.weight_fpy</field>
+        <field name="value">0.20</field>
+    </record>
+    <record id="param_cc_fh_weight_blocker" model="ir.config_parameter">
+        <field name="key">command_center.factory_health.weight_blocker</field>
+        <field name="value">0.15</field>
+    </record>
+    <record id="param_cc_fh_weight_capacity" model="ir.config_parameter">
+        <field name="key">command_center.factory_health.weight_capacity</field>
+        <field name="value">0.10</field>
+    </record>
+    <record id="param_cc_fh_blocker_penalty" model="ir.config_parameter">
+        <field name="key">command_center.factory_health.blocker_penalty_per_blocker</field>
+        <field name="value">15</field>
+    </record>
+    <record id="param_cc_fh_band_green_min" model="ir.config_parameter">
+        <field name="key">command_center.factory_health.band_green_min</field>
+        <field name="value">80</field>
+    </record>
+    <record id="param_cc_fh_band_amber_min" model="ir.config_parameter">
+        <field name="key">command_center.factory_health.band_amber_min</field>
+        <field name="value">60</field>
+    </record>
+
+    <!-- ================= schedule_confidence (OQ-4) =================== -->
+    <record id="param_cc_sc_gate_over_capacity" model="ir.config_parameter">
+        <field name="key">command_center.schedule_confidence.gate_penalty_over_capacity</field>
+        <field name="value">20</field>
+    </record>
+    <record id="param_cc_sc_gate_crew_gap" model="ir.config_parameter">
+        <field name="key">command_center.schedule_confidence.gate_penalty_crew_gap</field>
+        <field name="value">15</field>
+    </record>
+    <record id="param_cc_sc_gate_equipment_blocked" model="ir.config_parameter">
+        <field name="key">command_center.schedule_confidence.gate_penalty_equipment_blocked</field>
+        <field name="value">25</field>
+    </record>
+    <record id="param_cc_sc_gate_material_at_risk" model="ir.config_parameter">
+        <field name="key">command_center.schedule_confidence.gate_penalty_material_at_risk</field>
+        <field name="value">25</field>
+    </record>
+    <record id="param_cc_sc_band_high_min" model="ir.config_parameter">
+        <field name="key">command_center.schedule_confidence.band_high_min</field>
+        <field name="value">75</field>
+    </record>
+    <record id="param_cc_sc_band_medium_min" model="ir.config_parameter">
+        <field name="key">command_center.schedule_confidence.band_medium_min</field>
+        <field name="value">40</field>
+    </record>
+
+    <!-- ================= Job margin (OQ-5) ============================= -->
+    <record id="param_cc_jm_at_risk_max_pct" model="ir.config_parameter">
+        <field name="key">command_center.job_margin.at_risk_max_pct</field>
+        <field name="value">15</field>
+    </record>
+    <record id="param_cc_jm_watch_max_pct" model="ir.config_parameter">
+        <field name="key">command_center.job_margin.watch_max_pct</field>
+        <field name="value">25</field>
+    </record>
+    <record id="param_cc_jm_revenue_field" model="ir.config_parameter">
+        <field name="key">command_center.job_margin.revenue_field</field>
+        <field name="value">amount_untaxed</field>
+    </record>
+
+    <!-- ================= PO delivery-risk (OQ-6) ======================= -->
+    <record id="param_cc_po_min_receipts" model="ir.config_parameter">
+        <field name="key">command_center.po_delivery_risk.min_receipts</field>
+        <field name="value">5</field>
+    </record>
+    <record id="param_cc_po_grace_days" model="ir.config_parameter">
+        <field name="key">command_center.po_delivery_risk.grace_days</field>
+        <field name="value">1</field>
+    </record>
+    <record id="param_cc_po_slack_threshold_days" model="ir.config_parameter">
+        <field name="key">command_center.po_delivery_risk.slack_threshold_days</field>
+        <field name="value">3</field>
+    </record>
+    <record id="param_cc_po_band_red_min" model="ir.config_parameter">
+        <field name="key">command_center.po_delivery_risk.band_red_min</field>
+        <field name="value">60</field>
+    </record>
+    <record id="param_cc_po_band_amber_min" model="ir.config_parameter">
+        <field name="key">command_center.po_delivery_risk.band_amber_min</field>
+        <field name="value">25</field>
+    </record>
+
+    <!-- ========= Workflow (Deliverable 8, OQ-10a) — not read by the
+         four scoring methods; seeded here for the future exception
+         materializer/sync method that fires `approval_gate_stall`. ====== -->
+    <record id="param_cc_wf_approval_gate_stall_hours" model="ir.config_parameter">
+        <field name="key">command_center.workflow.approval_gate_stall_hours</field>
+        <field name="value">24</field>
+    </record>
+
+</odoo>
