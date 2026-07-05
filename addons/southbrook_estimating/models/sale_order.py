@@ -254,17 +254,22 @@ class SaleOrder(models.Model):
         for line in self.order_line:
             if not line.product_id:
                 continue
-            name_lower = (line.name or "").lower()
-            attr_vals = {}
+            # IMPORTANT (2026-07-05 code-review fix): scan ONLY the
+            # variant's real product.template.attribute.value records —
+            # the authoritative configuration — never line.name. line.name
+            # is user-editable free text; a rep typing "Contractor: rush
+            # job" into the description of a legitimate woodgrain-door line
+            # must NOT hard-block Confirm. The portal preflight collector
+            # keeps its own name-based SOFT checks (advisory, non-blocking)
+            # where a false positive is harmless; a blocking guard cannot
+            # afford them.
+            attr_tokens = []
             for ptav in line.product_id.product_template_attribute_value_ids:
-                attr = (ptav.attribute_id.name or "").lower()
-                attr_vals.setdefault(attr, []).append((ptav.name or "").lower())
+                attr_tokens.append((ptav.name or "").lower())
 
             def _has_token(*tokens):
-                return any(t in name_lower for t in tokens) or any(
-                    any(t in v for v in vs)
-                    for vs in attr_vals.values() for t in tokens
-                )
+                return any(
+                    t in v for v in attr_tokens for t in tokens)
 
             if _has_token("contractor") and _has_token(
                     "five-piece", "5-piece", "woodgrain"):
