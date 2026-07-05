@@ -383,10 +383,11 @@ class SouthbrookCommandCenter(models.AbstractModel):
 
         vendor = getattr(purchase_order, "partner_id", False)
 
-        # --- Step 1: vendor reliability ratio (OQ-1: stock.picking planned/
-        # effective date field names are UNVERIFIED against Odoo 19 core in
-        # this checkout - guarded defensively; degrades to "unknown"/None
-        # rather than crashing or guessing a wrong field name). ---
+        # --- Step 1: vendor reliability ratio. OQ-1 RESOLVED (verified on
+        # prod 2026-07-05): stock.picking.scheduled_date (planned) and
+        # date_done (effective) both exist, so this computes a real ratio
+        # (reliability_note="computed"). The _fields guard below is retained
+        # as harmless insurance against non-standard stock variants. ---
         vendor_reliability_ratio = None
         reliability_note = "insufficient_history"
         n_receipts = 0

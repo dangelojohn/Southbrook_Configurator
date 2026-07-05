@@ -64,6 +64,24 @@ class TestCommandException(TransactionCase):
         self.assertEqual(rec.state, "dismissed")
         self.assertFalse(rec.active)
 
+    def test_reopen_undo(self):
+        # action_reopen powers the dashboard undo-toast: a resolved/dismissed
+        # exception returns to the open queue with timestamps cleared.
+        rec = self._make(source_res_id=9)
+        rec.action_resolve()
+        self.assertEqual(rec.state, "resolved")
+        self.assertFalse(rec.active)
+        rec.action_reopen()
+        self.assertEqual(rec.state, "new")
+        self.assertTrue(rec.active)
+        self.assertFalse(rec.resolved_date)
+        # a dismissed one reopens too
+        rec2 = self._make(source_res_id=10)
+        rec2.action_dismiss()
+        rec2.action_reopen()
+        self.assertEqual(rec2.state, "new")
+        self.assertTrue(rec2.active)
+
     # -- scoring: must return the contract dict and never raise ---------
     def test_factory_health_shape(self):
         out = self.Center.factory_health_score()
