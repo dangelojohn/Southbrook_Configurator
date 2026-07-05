@@ -11,6 +11,7 @@
     <!-- Root app menu -->
     <menuitem id="menu_command_center_root"
               name="Central Command"
+              web_icon="southbrook_command_center,static/description/icon.png"
               groups="group_command_center_user"
               sequence="8"/>
 
