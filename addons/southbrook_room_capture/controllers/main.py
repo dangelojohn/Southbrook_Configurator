@@ -181,6 +181,28 @@ def _scan_rate_limit_check(key):
 class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
     """AI room-capture JSON-RPC endpoint."""
 
+    # Sane residential ceiling range for the optional scale hint (mm).
+    _SB_MIN_CEILING_MM = 1500
+    _SB_MAX_CEILING_MM = 4500
+
+    @staticmethod
+    def _sb_sanitize_scale_reference(scale_reference):
+        """Return a safe scale_reference or None. Only a ceiling_height_mm
+        inside a sane residential range survives; anything else (wrong
+        type, out of range, a homeowner's '8 ft' arriving as 8) is
+        dropped so the AI never gets a garbage scale anchor. Never raises."""
+        if not isinstance(scale_reference, dict):
+            return None
+        raw = scale_reference.get("ceiling_height_mm")
+        try:
+            mm = int(round(float(raw)))
+        except (TypeError, ValueError):
+            return None
+        cls = SouthbrookRoomCaptureApi
+        if cls._SB_MIN_CEILING_MM <= mm <= cls._SB_MAX_CEILING_MM:
+            return {"ceiling_height_mm": mm}
+        return None
+
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/analyze-photos",
         type="json",
@@ -280,6 +302,15 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
                               % (idx, _MAX_IMAGE_BYTES),
                 }
             validated_images.append({"data": raw, "mime": mime})
+
+        # Fail-safe scale clamp (2026-07-05): the ceiling hint is only a
+        # scale AID, never authoritative. The UI now sends it from a
+        # fixed dropdown (millimetres), but a crafted request could still
+        # POST anything — so drop a ceiling_height_mm outside a sane
+        # residential range (1.5m–4.5m) rather than feed the AI a garbage
+        # scale anchor (e.g. "8" meaning feet arriving as 8mm). Never
+        # errors; a bad hint is simply ignored.
+        scale_reference = self._sb_sanitize_scale_reference(scale_reference)
 
         Capture = request.env["southbrook.room.capture"].sudo()
         try:

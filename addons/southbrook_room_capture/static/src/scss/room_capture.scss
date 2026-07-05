@@ -81,6 +81,46 @@
         background: transparent;
         border-style: dashed;
     }
+
+    // 2026-07-05 customer rework — the photo path is the recommended
+    // easy path, so its camera button reads as the filled primary CTA;
+    // "Enter it myself" is a quiet ghost so it never competes.
+    &--primary {
+        background: var(--sb-walnut);
+        color: var(--sb-paper);
+        border-color: var(--sb-walnut);
+
+        &:hover:not(:disabled) {
+            background: var(--sb-walnut-d);
+            border-color: var(--sb-walnut-d);
+        }
+    }
+    &--ghost {
+        background: transparent;
+        border-color: transparent;
+        color: var(--sb-ink-dim);
+        text-decoration: underline;
+        min-height: 44px;
+        padding: 0.6rem 0.8rem;
+
+        &:hover:not(:disabled) {
+            background: transparent;
+            color: var(--sb-ink);
+        }
+    }
+}
+
+// 2026-07-05 — friendly "how to take good photos" guidance. Better
+// inputs mean fewer low-confidence estimates and fewer dead-ends.
+.sb-capture-tips {
+    margin: 0.4rem 0 0.8rem;
+    padding-left: 1.1rem;
+    font-family: var(--sb-font-sans);
+    font-size: 0.82rem;
+    color: var(--sb-ink-dim);
+    line-height: 1.5;
+
+    li { margin: 0.1rem 0; }
 }
 
 // Visually-hidden file input — kept in the DOM (not display:none) so
@@ -112,9 +152,9 @@
         cursor: pointer;
     }
 
-    input {
-        width: 6rem;
-        padding: 0.3rem 0.5rem;
+    input,
+    select {
+        padding: 0.35rem 0.5rem;
         border: 1px solid var(--sb-rule);
         border-radius: var(--sb-radius-sm);
         font-family: var(--sb-font-sans);
@@ -126,6 +166,15 @@
             outline: 2px solid var(--sb-sky);
             outline-offset: 2px;
         }
+    }
+    input { width: 6rem; }
+    // 2026-07-05 — the ceiling hint is now a foolproof dropdown (feet
+    // labels, mm values, safe "Not sure" default) instead of a raw mm
+    // number input. Comfortable tap target on mobile.
+    select {
+        min-height: 40px;
+        min-width: 12rem;
+        cursor: pointer;
     }
 }
 

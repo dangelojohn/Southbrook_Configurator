@@ -3339,35 +3339,27 @@ const TEMPLATE = xml`
                 </t>
                 <t t-else="">
                     <div class="sb-room-empty">
-                        <h2>No room configured yet</h2>
+                        <h2>Map your kitchen — the easy way</h2>
                         <p>
-                            Add room dimensions, walls, and constraints to anchor
-                            this order to a physical space. Cabinets you add can
-                            then be placed against walls with live conflict
-                            detection.
+                            Snap a few photos of your kitchen and we'll sketch
+                            out the room layout for you. No measuring, no math.
+                            You'll get a chance to review and adjust everything
+                            before anything is saved.
                         </p>
+
+                        <!-- 2026-07-04 — AI ROOM CAPTURE entry point.
+                             2026-07-05 — customer-focused rework: photos are
+                             framed as the easy primary path; manual entry is
+                             the secondary option. The camera button opens the
+                             rear camera on a phone; upload opens the photo
+                             library (multi-select) on any device. -->
                         <div class="sb-capture-cta-row">
-                            <button class="o_owl_add_cabinet_btn sb-room-setup-cta"
-                                    t-on-click="_openRoomSetupWizard">
-                                Set Up Room
-                            </button>
-                            <!-- 2026-07-04 — AI ROOM CAPTURE entry point.
-                                 Fallback UI hook owned by
-                                 southbrook_room_capture; see the
-                                 room_capture_* state comment above for
-                                 why this lives directly in OrderBuilder
-                                 rather than a cross-addon patch.
-                                 2026-07-05 — split into camera vs upload
-                                 (see the two-input comment above). On a
-                                 phone, "Capture Room" opens the rear
-                                 camera; "Upload photos" opens the library
-                                 (multi-select) on any device. -->
                             <button type="button"
-                                    class="sb-capture-btn"
+                                    class="sb-capture-btn sb-capture-btn--primary"
                                     t-att-disabled="state.room_capture_busy"
                                     t-on-click="_sbOpenRoomCamera">
                                 <span class="sb-capture-btn-icon" aria-hidden="true">📷</span>
-                                Capture Room
+                                Take photos
                             </button>
                             <button type="button"
                                     class="sb-capture-btn sb-capture-btn--upload"
@@ -3376,28 +3368,50 @@ const TEMPLATE = xml`
                                 <span class="sb-capture-btn-icon" aria-hidden="true">🖼️</span>
                                 Upload photos
                             </button>
+                            <button type="button"
+                                    class="sb-capture-btn sb-capture-btn--ghost"
+                                    t-att-disabled="state.room_capture_busy"
+                                    t-on-click="_openRoomSetupWizard">
+                                Enter it myself
+                            </button>
                         </div>
+
+                        <!-- Foolproof photo guidance — better inputs mean fewer
+                             "it didn't work" moments. -->
+                        <ul t-if="!state.room_capture_busy" class="sb-capture-tips">
+                            <li>Stand back so a whole wall fits in the frame.</li>
+                            <li>Take 2–4 photos — one per wall works great.</li>
+                            <li>Good light and a steady hand help us read the room.</li>
+                        </ul>
+
                         <div t-if="state.room_capture_busy" class="sb-capture-busy">
                             <span class="sb-capture-busy-spinner" aria-hidden="true"></span>
-                            <span>Analyzing your photos…</span>
+                            <span>Reading your photos… this takes a few seconds.</span>
                         </div>
                         <p t-if="state.room_capture_error" class="sb-capture-error"
                            t-esc="state.room_capture_error"/>
+
+                        <!-- Foolproof ceiling hint: a friendly dropdown in feet
+                             with a safe "Not sure" default — NEVER a bare mm
+                             number input (a homeowner typing "8" for feet used
+                             to send 8mm and silently wreck the scale estimate).
+                             Values are millimetres so the existing handler and
+                             scale_reference contract are unchanged. -->
                         <div class="sb-capture-scale-hint">
                             <label for="sb_room_capture_ceiling_hint">
-                                Known ceiling height (mm, optional)
+                                About how tall are your ceilings?
                             </label>
-                            <input id="sb_room_capture_ceiling_hint"
-                                   type="number"
-                                   min="0"
-                                   t-att-value="state.room_capture_ceiling_hint_mm"
-                                   t-on-change="_sbOnCeilingHintChanged"/>
+                            <select id="sb_room_capture_ceiling_hint"
+                                    class="sb-capture-scale-select"
+                                    t-att-value="state.room_capture_ceiling_hint_mm || ''"
+                                    t-on-change="_sbOnCeilingHintChanged">
+                                <option value="">Not sure — that's okay</option>
+                                <option value="2438">8 ft (standard)</option>
+                                <option value="2743">9 ft</option>
+                                <option value="3048">10 ft</option>
+                                <option value="3658">12 ft or higher</option>
+                            </select>
                         </div>
-                        <p class="sb-room-empty-note">
-                            <small>You can still add cabinets and design without
-                                   setting up a room — it just unlocks the Room
-                                   Layout tab in Phase 3.</small>
-                        </p>
                     </div>
                 </t>
             </div>
@@ -5022,25 +5036,29 @@ class OrderBuilder extends Component {
                 this.state.ui.wizard = "room_setup";
             } else {
                 // Any error, low-confidence estimate, or zero-wall
-                // result is treated as "AI failed" — never prefill from
-                // a partial/garbage estimate. Open the wizard blank so
-                // the user can enter the room by hand.
-                // H1 — state.room is NEVER nulled here; only the
-                // prefill slot is cleared, so a real persisted room
-                // (if one somehow existed) would be unaffected.
-                const detail = (res && (res.detail || res.error)) || "";
-                this.state.room_capture_error = detail
-                    ? "Couldn't read the room from photos (" + detail
-                        + ") — please enter it manually."
-                    : "Couldn't read the room from photos — please enter it manually.";
+                // result is treated as "AI failed" — never prefill from a
+                // partial/garbage estimate. 2026-07-05 foolproof rework:
+                // do NOT auto-open a blank wizard (dropping a customer who
+                // wanted "just take photos" into a bare manual form feels
+                // like they broke something). Stay on the friendly empty
+                // state — the "Take photos / Upload / Enter it myself"
+                // buttons are right there — and show a warm, reassuring
+                // message. NEVER surface the raw server error code to the
+                // customer. H1 — state.room is untouched; only the prefill
+                // slot is cleared.
+                this.state.room_capture_error =
+                    "We couldn't quite make out the room from those photos "
+                    + "— no problem. Try a couple more (one clear shot per "
+                    + "wall works best), or tap “Enter it myself.”";
                 this.state.ui.aiPrefillRoom = null;
-                this.state.ui.wizard = "room_setup";
             }
         } catch (e) {
+            // Network / unexpected failure — same reassuring, stay-put
+            // behavior. Never expose the underlying error to the customer.
             this.state.room_capture_error =
-                "Couldn't read the room from photos — please enter it manually.";
+                "Something went wrong reading your photos — please try "
+                + "again in a moment, or tap “Enter it myself.”";
             this.state.ui.aiPrefillRoom = null;
-            this.state.ui.wizard = "room_setup";
         } finally {
             this.state.room_capture_busy = false;
         }
