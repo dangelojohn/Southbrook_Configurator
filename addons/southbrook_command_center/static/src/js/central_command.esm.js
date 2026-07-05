@@ -36,6 +36,7 @@ export class CentralCommand extends Component {
             factoryHealthStale: false,
             healthExpanded: false,
             exceptions: [],
+            exceptionsTotal: 0,
             flow: null,
             recommendations: [],
             alerts: [],
@@ -98,6 +99,7 @@ export class CentralCommand extends Component {
             this.state.factoryHealth = payload.factory_health;
             this.state.flow = payload.flow;
             this.state.exceptions = payload.exceptions || [];
+            this.state.exceptionsTotal = payload.exceptions_total || 0;
             this.state.recommendations = payload.recommendations || [];
             this.state.alerts = payload.alerts || [];
             this.state.factoryHealthStale = false;
@@ -153,6 +155,7 @@ export class CentralCommand extends Component {
             if (gone !== -1) {
                 this.state.exceptions.splice(gone, 1);
             }
+            this.state.exceptionsTotal = Math.max(0, this.state.exceptionsTotal - 1);
             this.state.factoryHealthStale = true;
             return;
         }

@@ -41,7 +41,7 @@
 
                 <!-- Critical Issues (left, primary) -->
                 <div class="sb_cc_issues">
-                    <div class="sb_cc_panel_h">Critical Issues (<t t-esc="state.exceptions.length"/>)</div>
+                    <div class="sb_cc_panel_h">Critical Issues (<t t-esc="state.exceptionsTotal"/>)<t t-if="state.exceptionsTotal > state.exceptions.length"> · showing <t t-esc="state.exceptions.length"/></t></div>
                     <div t-if="!state.exceptions.length" class="sb_cc_empty">No open exceptions.</div>
                     <div t-foreach="state.exceptions" t-as="ex" t-key="ex.id" class="sb_cc_issue">
                         <div class="sb_cc_issue_top">

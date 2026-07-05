@@ -46,9 +46,23 @@ class CommandCenterController(http.Controller):
             "factory_health": self._factory_health(env),
             "flow": self._flow(env, cid),
             "exceptions": self._exceptions(env, cid, role),
+            "exceptions_total": self._exceptions_total(env, cid, role),
             "recommendations": self._recommendations(env),
             "alerts": self._alerts(env, cid),
         }
+
+    # True open-exception count for the panel header — independent of the
+    # rendered list's limit, so the counter matches the Exceptions list view
+    # and decrements correctly on acknowledge/resolve/dismiss.
+    def _exceptions_total(self, env, cid, role):
+        try:
+            domain = [("company_id", "=", cid),
+                      ("state", "not in", ("resolved", "dismissed"))]
+            domain += _domain_for_role(role)
+            return env["southbrook.command.exception"].search_count(domain)
+        except Exception:  # noqa: BLE001
+            _logger.exception("command_center: exceptions_total failed")
+            return 0
 
     # -- panel 1 -------------------------------------------------------
     def _factory_health(self, env):
