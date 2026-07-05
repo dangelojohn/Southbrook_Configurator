@@ -3169,17 +3169,31 @@ const TEMPLATE = xml`
                 <!-- 2026-07-04 — AI ROOM CAPTURE. Empty-state-only:
                      capture is for fast INITIAL room entry, not for
                      re-scanning a saved room (editing a saved room
-                     uses the normal Edit Room flow). This hidden file
-                     input is only reachable from the no-room branch's
-                     "Capture room from photos" CTA below, via
-                     _sbOpenRoomCapture. Styling (.sb-capture-file-input)
-                     owned by
-                     southbrook_room_capture/static/src/scss/room_capture.scss. -->
+                     uses the normal Edit Room flow). Styling
+                     (.sb-capture-file-input) owned by
+                     southbrook_room_capture/static/src/scss/room_capture.scss.
+
+                     2026-07-05 — TWO distinct hidden inputs feed the same
+                     handler. A single input can't do both jobs: putting
+                     capture="environment" on it makes iOS/Android open
+                     the rear CAMERA directly and IGNORE `multiple` (and
+                     block the photo library); omitting capture gives the
+                     LIBRARY (multi-select) but no direct-camera shortcut.
+                     So the "Capture Room" button uses the camera input
+                     (capture, single shot — the standing-in-your-kitchen
+                     job) and the "Upload photos" button uses the library
+                     input (multiple, no capture — reviewing existing
+                     photos on any device). -->
                 <input type="file"
-                       t-ref="sb_room_capture_file_input"
+                       t-ref="sb_room_capture_camera_input"
                        class="sb-capture-file-input"
                        accept="image/*"
                        capture="environment"
+                       t-on-change="_sbOnCaptureFilesSelected"/>
+                <input type="file"
+                       t-ref="sb_room_capture_upload_input"
+                       class="sb-capture-file-input"
+                       accept="image/*"
                        multiple="multiple"
                        t-on-change="_sbOnCaptureFilesSelected"/>
                 <t t-if="state.room">
@@ -3342,13 +3356,25 @@ const TEMPLATE = xml`
                                  southbrook_room_capture; see the
                                  room_capture_* state comment above for
                                  why this lives directly in OrderBuilder
-                                 rather than a cross-addon patch. -->
+                                 rather than a cross-addon patch.
+                                 2026-07-05 — split into camera vs upload
+                                 (see the two-input comment above). On a
+                                 phone, "Capture Room" opens the rear
+                                 camera; "Upload photos" opens the library
+                                 (multi-select) on any device. -->
                             <button type="button"
                                     class="sb-capture-btn"
                                     t-att-disabled="state.room_capture_busy"
-                                    t-on-click="_sbOpenRoomCapture">
+                                    t-on-click="_sbOpenRoomCamera">
                                 <span class="sb-capture-btn-icon" aria-hidden="true">📷</span>
-                                Capture room from photos
+                                Capture Room
+                            </button>
+                            <button type="button"
+                                    class="sb-capture-btn sb-capture-btn--upload"
+                                    t-att-disabled="state.room_capture_busy"
+                                    t-on-click="_sbOpenRoomUpload">
+                                <span class="sb-capture-btn-icon" aria-hidden="true">🖼️</span>
+                                Upload photos
                             </button>
                         </div>
                         <div t-if="state.room_capture_busy" class="sb-capture-busy">
@@ -3919,9 +3945,11 @@ class OrderBuilder extends Component {
         this._onLineQtyChange = this._onLineQtyChange.bind(this);
         this._onBulkToggle = this._onBulkToggle.bind(this);
 
-        // 2026-07-04 — AI ROOM CAPTURE. Ref to the hidden file input
-        // that _sbOpenRoomCapture clicks programmatically.
-        this._sbRoomCaptureFileRef = useRef("sb_room_capture_file_input");
+        // 2026-07-04 — AI ROOM CAPTURE. Refs to the two hidden file
+        // inputs the capture buttons click programmatically (2026-07-05:
+        // camera vs upload — see the two-input template comment).
+        this._sbRoomCaptureCameraRef = useRef("sb_room_capture_camera_input");
+        this._sbRoomCaptureUploadRef = useRef("sb_room_capture_upload_input");
 
         // P1 bugfix: synchronous lock prevents double-add on rapid clicks
         // (the reactive `state.catalog_busy` flag flips inside an async
@@ -4878,14 +4906,26 @@ class OrderBuilder extends Component {
     // nothing image-related is logged.
     // ------------------------------------------------------------------
 
-    _sbOpenRoomCapture = () => {
+    // 2026-07-05 — two entry points into the SAME analyze flow. The
+    // camera input (capture="environment") makes a phone open the rear
+    // camera directly; the upload input (multiple, no capture) opens the
+    // photo library on any device. Both fire _sbOnCaptureFilesSelected.
+    _sbTriggerCaptureInput = (ref) => {
         if (this.state.room_capture_busy) return;
         this.state.room_capture_error = null;
-        const el = this._sbRoomCaptureFileRef.el;
+        const el = ref && ref.el;
         if (el) {
             el.value = "";   // reset so re-picking the same file re-fires change
             el.click();
         }
+    };
+
+    _sbOpenRoomCamera = () => {
+        this._sbTriggerCaptureInput(this._sbRoomCaptureCameraRef);
+    };
+
+    _sbOpenRoomUpload = () => {
+        this._sbTriggerCaptureInput(this._sbRoomCaptureUploadRef);
     };
 
     _sbOnCeilingHintChanged = (ev) => {
@@ -4896,7 +4936,11 @@ class OrderBuilder extends Component {
 
     _sbOnCaptureFilesSelected = async (ev) => {
         const input = ev.target;
-        const selected = Array.from(input.files || []).slice(0, 5);
+        const allSelected = Array.from(input.files || []);
+        const selected = allSelected.slice(0, 5);
+        // 2026-07-05 — surface why extras were dropped rather than
+        // silently analyzing only the first 5 (upload path can pick more).
+        const tooMany = allSelected.length > 5;
         // Reset the input value immediately so selecting the exact same
         // file(s) again still fires a fresh "change" event next time.
         input.value = "";
@@ -4920,9 +4964,11 @@ class OrderBuilder extends Component {
         }
 
         this.state.room_capture_busy = true;
-        this.state.room_capture_error = hasOversized
-            ? "Each photo must be under 8 MB."
-            : null;
+        // Compose any non-fatal notices (oversized-skipped + >5 dropped).
+        const notices = [];
+        if (hasOversized) notices.push("Each photo must be under 8 MB.");
+        if (tooMany) notices.push("Using the first 5 photos (max per capture).");
+        this.state.room_capture_error = notices.length ? notices.join(" ") : null;
         try {
             const readAsBase64 = (file) => new Promise((resolve, reject) => {
                 const reader = new FileReader();

@@ -31,9 +31,16 @@ import logging
 import os
 import warnings
 
-from odoo import api, models
+from odoo import _, api, models
+from odoo.tools import plaintext2html
 
 _logger = logging.getLogger(__name__)
+
+_SHAPE_LABELS = {
+    "straight": "straight run", "l_shape": "L-shaped", "u_shape": "U-shaped",
+    "galley": "galley", "g_shape": "G-shaped", "island": "island",
+    "peninsula": "peninsula", "custom": "custom",
+}
 
 # ----------------------------------------------------------------------
 # Domain vocabularies — MUST mirror southbrook.room / .wall / .constraint
@@ -351,27 +358,50 @@ class SouthbrookRoomCapture(models.AbstractModel):
             "so a human can review and correct it before anything is "
             "saved. This is a DRAFT estimate only.",
             "",
-            "Estimate: the overall layout_shape (one of: "
-            + ", ".join(LAYOUT_SHAPES) + ", or null if unclear); "
-            "ceiling_height_mm (or null if unclear); the walls visible "
-            "(name, length_mm, confidence 0-1 each); and any "
-            "constraints (windows, doors, sink, cooktop, oven, "
-            "dishwasher, rangehood, fridge_space, power_outlet, "
-            "structural_post, other) with which wall they sit on "
-            "(wall_index, 0-based into the walls array you return), "
-            "their distance_from_left_mm along that wall, width_mm, "
-            "height_mm, height_from_floor_mm, and a confidence 0-1.",
+            "Extract as much usable room data as the photos support:",
+            "  • layout_shape — one of: " + ", ".join(LAYOUT_SHAPES)
+            + " (or null if genuinely unclear). If several photos show "
+            "different walls of one room, infer the OVERALL shape (e.g. "
+            "two walls meeting at a corner → l_shape) rather than "
+            "treating each photo as a separate room.",
+            "  • ceiling_height_mm — or null if unclear.",
+            "  • walls — one entry per distinct wall you can see, in a "
+            "consistent order; give each a name, length_mm, and "
+            "confidence 0-1. Deduplicate: the same wall shown in two "
+            "photos is ONE wall, not two.",
+            "  • constraints — every fixed feature you can see: windows, "
+            "doors, sink, cooktop, oven, dishwasher, rangehood, "
+            "fridge_space, power_outlet, structural_post, other. For "
+            "each give wall_index (0-based into your walls array), "
+            "distance_from_left_mm along that wall, width_mm, height_mm, "
+            "height_from_floor_mm, and confidence 0-1.",
             "",
-            "All lengths are in millimetres. If you cannot see enough "
-            "of the room to estimate a dimension, make your best "
-            "assumption and record it in `assumptions`; record "
-            "anything uncertain or ambiguous in `warnings`. Provide an "
-            "overall `confidence` (0-1) for the whole estimate.",
+            "Use real-world scale anchors visible in frame to calibrate "
+            "sizes — standard base cabinets are ~600mm wide and ~900mm "
+            "tall, a standard interior door ~800x2030mm, an outlet plate "
+            "~115mm, a dishwasher/oven opening ~600mm — and note which "
+            "anchor you used in `assumptions`.",
+            "",
+            "Also capture, in `assumptions`, brief context useful to the "
+            "estimator preparing a quote: the apparent existing cabinet "
+            "style/finish and rough count, visible appliance brands if "
+            "legible, and the room's general condition (e.g. 'dated oak "
+            "shaker uppers, ~8 doors', 'stainless GE range'). Keep each "
+            "note short and factual; do NOT guess at anything not "
+            "visible, and never invent a measurement.",
+            "",
+            "All lengths are in millimetres. Where you must estimate a "
+            "dimension you can't measure directly, make your best "
+            "assumption and record it in `assumptions`; record anything "
+            "uncertain or ambiguous in `warnings`. Provide an overall "
+            "`confidence` (0-1) for the whole estimate.",
         ]
         if scale_reference:
+            lines.append("")
             lines.append(
                 "A known reference measurement was provided to help "
-                "calibrate scale: %s" % json.dumps(scale_reference)
+                "calibrate scale — use it as the primary anchor: %s"
+                % json.dumps(scale_reference)
             )
         return "\n".join(lines)
 
@@ -805,3 +835,101 @@ class SouthbrookRoomCapture(models.AbstractModel):
             "warnings": estimate.get("warnings") or [],
             "confidence": estimate.get("confidence") or 0.0,
         }
+
+    # ------------------------------------------------------------------
+    # CRM follow-up (2026-07-05). A serious customer photographing their
+    # kitchen is a strong buying signal, so a TRUSTWORTHY capture lands a
+    # crm.lead — linked to the order + partner, tagged, idempotent per
+    # order — so a live Southbrook designer can follow up about their
+    # quote. Carries the AI's room summary AND its contextual
+    # observations (existing cabinet style, appliances, condition — the
+    # extra "info about the customer" the estimator needs to prepare a
+    # genuine quote). Never raises; a CRM failure must never break the
+    # customer's capture.
+    # ------------------------------------------------------------------
+    @api.model
+    def _capture_room_summary(self, estimate):
+        shape = _SHAPE_LABELS.get(estimate.get("layout_shape"),
+                                  estimate.get("layout_shape") or "unspecified")
+        walls = estimate.get("walls") or []
+        lines = ["Estimated room: %s, %d wall(s)." % (shape, len(walls))]
+        for i, w in enumerate(walls):
+            label = w.get("name") or ("Wall %s" % chr(ord("A") + (i % 26)))
+            piece = "  - %s: ~%d mm" % (label, w.get("length_mm") or 0)
+            cons = w.get("constraints") or []
+            if cons:
+                piece += " (" + ", ".join(
+                    c.get("constraint_type", "?") for c in cons) + ")"
+            lines.append(piece)
+        ch = estimate.get("ceiling_height_mm")
+        if ch:
+            lines.append("  Ceiling: ~%d mm" % ch)
+        conf = estimate.get("confidence")
+        if conf is not None:
+            lines.append("  AI confidence: %d%%" % int(round(float(conf) * 100)))
+        return "\n".join(lines)
+
+    @api.model
+    def create_capture_followup_lead(self, order, estimate):
+        """Create/update the ONE photo-capture follow-up lead for `order`
+        (idempotent via order.sb_room_capture_lead_id). `order` is trusted
+        (the controller resolved ownership) and `estimate` is a normalized
+        estimate the caller already deemed trustworthy. Returns the lead
+        or an empty recordset; never raises."""
+        Lead = self.env["crm.lead"].sudo()
+        try:
+            partner = order.partner_id
+            if not partner:
+                return Lead.browse()
+
+            details = [
+                "*** " + _("AI PHOTO-CAPTURE LEAD") + " ***",
+                _("A customer captured their kitchen from photos in the "
+                  "Order Builder — a strong buying signal. Follow up about "
+                  "their quote."),
+                "",
+                self._capture_room_summary(estimate),
+            ]
+            observations = [str(a) for a in (estimate.get("assumptions") or [])]
+            if observations:
+                details.append("")
+                details.append(_("AI observations (for the estimator):"))
+                details.extend("  • %s" % o for o in observations)
+            details.append("")
+            details.append(_("Order: %s") % (order.name or order.id))
+
+            source = self.env.ref(
+                "southbrook_room_capture.utm_source_room_capture",
+                raise_if_not_found=False)
+            medium = self.env.ref(
+                "southbrook_room_capture.utm_medium_room_capture",
+                raise_if_not_found=False)
+            ai_tag = self.env.ref(
+                "southbrook_agent_gateway.crm_tag_ai_agent",
+                raise_if_not_found=False)
+
+            vals = {
+                "name": "📷 " + _("Kitchen photo capture — %s")
+                        % (partner.name or _("customer")),
+                "type": "lead",
+                "partner_id": partner.id,
+                "contact_name": partner.name,
+                "email_from": partner.email or False,
+                "phone": partner.phone or False,
+                "description": plaintext2html("\n".join(details)),
+                "source_id": source.id if source else False,
+                "medium_id": medium.id if medium else False,
+                "tag_ids": [(4, ai_tag.id)] if ai_tag else False,
+            }
+            existing = order.sb_room_capture_lead_id
+            if existing:
+                existing.sudo().write(vals)
+                return existing
+            lead = Lead.create(vals)
+            order.sudo().write({"sb_room_capture_lead_id": lead.id})
+            return lead
+        except Exception as exc:  # noqa: BLE001 — CRM must never break capture
+            _logger.warning(
+                "southbrook_room_capture: follow-up lead creation failed "
+                "for order %s: %s", getattr(order, "id", "?"), exc)
+            return Lead.browse()

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Distinct provenance so sales can tell a photo-capture lead apart
+         from a chat-designer lead or a third-party AI-agent lead. -->
+    <record id="utm_source_room_capture" model="utm.source">
+        <field name="name">Room Photo Capture</field>
+    </record>
+    <record id="utm_medium_room_capture" model="utm.medium">
+        <field name="name">Kitchen Photo Capture</field>
+    </record>
+</odoo>

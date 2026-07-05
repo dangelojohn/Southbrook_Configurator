@@ -191,7 +191,7 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
         self, order_id, images=None, scale_reference=None, **kw,
     ):
         try:
-            self._southbrook_resolve_order(order_id)
+            order = self._southbrook_resolve_order(order_id)
         except MissingError:
             return {"error": "not_found"}
         except AccessError:
@@ -304,11 +304,24 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
             }
 
         estimate = result["estimate"]
+        low_confidence = bool(result.get("low_confidence"))
+
+        # CRM follow-up (2026-07-05): a TRUSTWORTHY capture (real walls +
+        # not low-confidence — the same bar the frontend uses to prefill)
+        # means a serious customer photographed a real kitchen, so land a
+        # follow-up lead for a live designer. Idempotent per order;
+        # best-effort — a CRM hiccup must never fail the capture response.
+        lead_saved = False
+        if estimate.get("walls") and not low_confidence:
+            lead = Capture.create_capture_followup_lead(order, estimate)
+            lead_saved = bool(lead)
+
         return {
             "ok": True,
             "estimate": estimate,
             "existing_room": Capture._estimate_to_existing_room(estimate),
-            "low_confidence": bool(result.get("low_confidence")),
+            "low_confidence": low_confidence,
+            "lead_saved": lead_saved,
         }
 
     # ------------------------------------------------------------------

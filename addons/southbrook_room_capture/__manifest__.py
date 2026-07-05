@@ -61,7 +61,7 @@ by southbrook_floor_traveler.
     "author": "Southbrook Cabinetry",
     "license": "LGPL-3",
     "category": "Website/eCommerce",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "depends": [
         "southbrook_estimating",
         "southbrook_estimating_website",
@@ -72,6 +72,12 @@ by southbrook_floor_traveler.
         # new /southbrook/api/order/<id>/scan-part route.
         "southbrook_kitchen_mrp",
         "southbrook_qr_kit",
+        # 2026-07-05 — a serious customer photographing their kitchen is
+        # a strong buying signal, so a trustworthy capture now also lands
+        # a CRM follow-up lead (so a live designer can reach out about
+        # their quote). Reuses the AI-agent gateway's CRM tag + shared
+        # provenance patterns (crm + utm come transitively).
+        "southbrook_agent_gateway",
     ],
     # httpx is imported lazily inside southbrook.room.capture._call_anthropic
     # (guarded exactly like addons/southbrook_ai_design/models/
@@ -83,6 +89,7 @@ by southbrook_floor_traveler.
     # southbrook_kitchen_mrp) and is pre-installed on the Odoo 19 image.
     "data": [
         "security/ir.model.access.csv",
+        "data/utm_data.xml",
     ],
     # 2026-07-04 — frontend assets. Registered in THIS addon's own
     # manifest (not southbrook_estimating_website's) even though this

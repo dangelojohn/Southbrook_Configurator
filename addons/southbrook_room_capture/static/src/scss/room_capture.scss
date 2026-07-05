@@ -73,6 +73,14 @@
         font-size: 1.05rem;
         line-height: 1;
     }
+
+    // 2026-07-05 — "Upload photos" is the secondary path next to the
+    // primary "Capture Room" camera button; render it lighter so the
+    // camera CTA reads as the default action on a phone.
+    &--upload {
+        background: transparent;
+        border-style: dashed;
+    }
 }
 
 // Visually-hidden file input — kept in the DOM (not display:none) so
