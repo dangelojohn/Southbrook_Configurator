@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="utm_source_ai_agent" model="utm.source">
+        <field name="name">AI Agent</field>
+    </record>
+    <record id="utm_medium_agent_api" model="utm.medium">
+        <field name="name">Agent API</field>
+    </record>
+</odoo>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="partner_category_ai_agent_lead" model="res.partner.category">
+        <field name="name">AI Agent Lead</field>
+    </record>
+</odoo>

@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_agent_inquiry_sales,southbrook.agent.inquiry sales,model_southbrook_agent_inquiry,sales_team.group_sale_salesman,1,1,0,0
+access_agent_inquiry_sales_mgr,southbrook.agent.inquiry sales manager,model_southbrook_agent_inquiry,sales_team.group_sale_manager,1,1,1,1

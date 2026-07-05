@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- ==============================================================
+         Customer-facing email-verification landing page.
+         Rendered by /agent/verify/<token>. Wrapped in website.layout
+         so it carries the site chrome + theme.
+         ============================================================== -->
+    <template id="verify_landing" name="AI Agent Quote Verification">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure">
+                <section class="container" style="padding: 64px 0; max-width: 720px;">
+                    <t t-if="verified">
+                        <h1>Thank you — your quote request is confirmed.</h1>
+                        <p class="lead">
+                            Reference <strong t-esc="reference"/>. A member
+                            of the Southbrook Cabinetry team will follow up
+                            with your quotation shortly.
+                        </p>
+                        <p>
+                            Want a head start? You can begin designing your
+                            kitchen right now:
+                        </p>
+                        <p>
+                            <a href="/kitchen-planner" class="btn btn-primary">
+                                Design Your Kitchen
+                            </a>
+                        </p>
+                    </t>
+                    <t t-else="">
+                        <h1>This confirmation link isn't valid.</h1>
+                        <p class="lead">
+                            The link may have expired or already been used.
+                            If you did ask for a quote, just reply to the
+                            email you received or contact us directly and
+                            we'll take care of it.
+                        </p>
+                    </t>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <!-- ==============================================================
+         LocalBusiness JSON-LD on every public page. Injected into
+         website.layout's <head> so AI research/shopping agents (and
+         ordinary search engines) get an unambiguous machine-readable
+         statement of what this business is — independent of whatever
+         the website-builder pages say. Static brand constants only; no
+         per-request data, so it's cache-safe.
+         ============================================================== -->
+    <template id="jsonld_localbusiness" inherit_id="website.layout"
+              name="Southbrook LocalBusiness JSON-LD">
+        <xpath expr="//head" position="inside">
+            <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "LocalBusiness",
+                "additionalType": "https://schema.org/HomeAndConstructionBusiness",
+                "name": "Southbrook Cabinetry",
+                "url": "https://southbrookcabinetry.space",
+                "description": "Custom kitchen cabinet design and manufacturing: configurable base, wall, tall, drawer and vanity cabinetry across four series, with retail, contractor and dealer programs, an online kitchen designer, and fast quotation turnaround.",
+                "knowsAbout": ["custom kitchen cabinets", "kitchen design", "cabinet manufacturing", "kitchen renovation"],
+                "makesOffer": {
+                    "@type": "Offer",
+                    "itemOffered": {
+                        "@type": "Service",
+                        "name": "Custom kitchen cabinetry — design, quotation and manufacturing"
+                    }
+                },
+                "potentialAction": {
+                    "@type": "QuoteAction",
+                    "target": "https://southbrookcabinetry.space/agent/api/v1/quote-request",
+                    "description": "AI agents may request a quotation for their customer via the documented API (see /llms.txt)."
+                }
+            }
+            </script>
+        </xpath>
+    </template>
+</odoo>

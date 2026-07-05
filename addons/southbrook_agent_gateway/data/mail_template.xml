@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- noupdate so a deployment can customise the wording in the
+         backend without an upgrade clobbering it. -->
+    <data noupdate="1">
+        <record id="mail_template_verify_inquiry" model="mail.template">
+            <field name="name">AI Agent Gateway: Verify Quote Request</field>
+            <field name="model_id" ref="southbrook_agent_gateway.model_southbrook_agent_inquiry"/>
+            <field name="subject">Confirm your Southbrook Cabinetry quote request ({{ object.reference }})</field>
+            <field name="email_to">{{ object.email }}</field>
+            <field name="lang">{{ object.partner_id.lang or 'en_US' }}</field>
+            <field name="auto_delete" eval="True"/>
+            <field name="body_html" type="html">
+<div style="margin: 0px; padding: 0px; font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+    <p>Hello <t t-out="object.customer_name or 'there'"/>,</p>
+    <p>
+        An AI assistant<t t-if="object.agent_name"> (<t t-out="object.agent_name"/>)</t>
+        just asked Southbrook Cabinetry for a kitchen-cabinet quote on
+        your behalf (reference <strong t-out="object.reference"/>).
+    </p>
+    <p>
+        To confirm this request really came from you — and so our team
+        can follow up with your quotation — please click:
+    </p>
+    <p style="margin: 16px 0;">
+        <a t-attf-href="{{ object.get_base_url() }}/agent/verify/{{ object.verify_token }}"
+           style="background-color: #1f6f52; padding: 10px 18px; text-decoration: none; color: #fff; border-radius: 4px;">
+            Confirm my quote request
+        </a>
+    </p>
+    <p>
+        If you didn't ask anyone to request this quote, simply ignore
+        this email — nothing further will happen and your details will
+        not be used.
+    </p>
+    <p>— Southbrook Cabinetry</p>
+</div>
+            </field>
+        </record>
+    </data>
+</odoo>
