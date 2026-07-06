@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  Seed kill-switches. noupdate="1": an admin's later edits to these rows
+  (e.g. flipping os.ai.enabled on) must survive module upgrades.
+
+  os.ai.enabled ships DISABLED — the kernel is dark by default (spec §
+  "ships dark"; kernel.run() step 1 treats an absent/disabled master switch
+  as blocked). os.ai.feature.smoke_test ships ENABLED so the one feature
+  key exercised by tests/demo has an explicit, visible row (kernel.run()
+  would default a *missing* feature switch to allowed anyway, but this row
+  documents the smoke-test feature explicitly rather than relying on the
+  absent-means-allowed default).
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="switch_os_ai_enabled" model="southbrook.os.switch">
+            <field name="key">os.ai.enabled</field>
+            <field name="name">AI Kernel — master</field>
+            <field name="category">ai</field>
+            <field name="enabled" eval="False"/>
+            <field name="note">Master AI switch. Off = every kernel.run() call is blocked:master. Ships dark by design.</field>
+        </record>
+
+        <record id="switch_os_ai_feature_smoke_test" model="southbrook.os.switch">
+            <field name="key">os.ai.feature.smoke_test</field>
+            <field name="name">AI Kernel — smoke_test feature</field>
+            <field name="category">ai</field>
+            <field name="enabled" eval="True"/>
+            <field name="note">Per-feature switch for the "smoke_test" feature key used by kernel tests/demos.</field>
+        </record>
+
+    </data>
+</odoo>

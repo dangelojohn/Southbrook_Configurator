@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_os_memory_search" model="ir.ui.view">
+        <field name="name">southbrook.os.memory.search</field>
+        <field name="model">southbrook.os.memory</field>
+        <field name="arch" type="xml">
+            <search string="Shared Memory">
+                <field name="namespace"/>
+                <field name="key"/>
+                <field name="source"/>
+                <separator/>
+                <group>
+                    <filter name="gb_namespace" string="Namespace" context="{'group_by': 'namespace'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_os_memory_list" model="ir.ui.view">
+        <field name="name">southbrook.os.memory.list</field>
+        <field name="model">southbrook.os.memory</field>
+        <field name="arch" type="xml">
+            <list string="Shared Memory">
+                <field name="namespace"/>
+                <field name="key"/>
+                <field name="source"/>
+                <field name="user_id"/>
+                <field name="expires_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_os_memory_form" model="ir.ui.view">
+        <field name="name">southbrook.os.memory.form</field>
+        <field name="model">southbrook.os.memory</field>
+        <field name="arch" type="xml">
+            <form string="Shared Memory">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="key"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="namespace"/>
+                            <field name="source"/>
+                            <field name="user_id"/>
+                        </group>
+                        <group>
+                            <field name="expires_at"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Value (JSON)">
+                        <field name="value_json" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_os_memory" model="ir.actions.act_window">
+        <field name="name">Shared Memory</field>
+        <field name="res_model">southbrook.os.memory</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No shared memory entries yet.</p>
+            <p>Namespaced key/value state written by remember() and read by recall().</p>
+        </field>
+    </record>
+
+</odoo>

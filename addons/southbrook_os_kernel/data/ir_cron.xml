@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  Odoo 19: ir.cron inherits ir.actions.server; `numbercall`/`doall` fields
+  are GONE (odoo19_ir_cron_schema_change); do not add them, install
+  would fail with an unknown-field error. Schedule is expressed purely via
+  interval_number + interval_type (+ active).
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="ir_cron_os_kernel_vacuum_memory" model="ir.cron">
+            <field name="name">OS Kernel: vacuum expired memory</field>
+            <field name="model_id" ref="model_southbrook_os_memory"/>
+            <field name="state">code</field>
+            <field name="code">model.vacuum_expired()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="ir_cron_os_kernel_reset_agent_budgets" model="ir.cron">
+            <field name="name">OS Kernel: reset agent daily budgets</field>
+            <field name="model_id" ref="model_southbrook_os_agent"/>
+            <field name="state">code</field>
+            <field name="code">model.reset_daily()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

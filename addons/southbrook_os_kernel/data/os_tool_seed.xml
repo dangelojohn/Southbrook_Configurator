@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  Seed rows for known Southbrook HTTP surfaces (OS_KERNEL_SPEC.md §Data).
+  noupdate="1" so admins can retire/annotate rows post-install without an
+  upgrade clobbering their edits. These are registry entries only; the
+  kernel module does not implement any of these routes itself.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="tool_sb_api_orders" model="southbrook.os.tool">
+            <field name="name">Southbrook Order API</field>
+            <field name="code">sb_api_orders</field>
+            <field name="http_method">POST</field>
+            <field name="path">/southbrook/api/order/&lt;id&gt;</field>
+            <field name="auth">session</field>
+            <field name="description">Order lookup/update surface, session auth.</field>
+        </record>
+
+        <record id="tool_agent_quote" model="southbrook.os.tool">
+            <field name="name">Agent Gateway — Quote</field>
+            <field name="code">agent_quote</field>
+            <field name="http_method">POST</field>
+            <field name="path">/agent/api/v1/quote</field>
+            <field name="module_name">southbrook_agent_gateway</field>
+            <field name="auth">api_key</field>
+            <field name="description">Agent-facing quote endpoint, API key auth.</field>
+        </record>
+
+        <record id="tool_agent_openapi" model="southbrook.os.tool">
+            <field name="name">Agent Gateway — OpenAPI Spec</field>
+            <field name="code">agent_openapi</field>
+            <field name="http_method">GET</field>
+            <field name="path">/agent/api/v1/openapi.json</field>
+            <field name="module_name">southbrook_agent_gateway</field>
+            <field name="auth">public</field>
+            <field name="description">Public OpenAPI manifest for the agent gateway.</field>
+        </record>
+
+        <record id="tool_llms_txt" model="southbrook.os.tool">
+            <field name="name">llms.txt</field>
+            <field name="code">llms_txt</field>
+            <field name="http_method">GET</field>
+            <field name="path">/llms.txt</field>
+            <field name="auth">public</field>
+            <field name="description">Public LLM-discovery manifest.</field>
+        </record>
+
+        <record id="tool_command_center_bootstrap" model="southbrook.os.tool">
+            <field name="name">Command Center Bootstrap</field>
+            <field name="code">command_center_bootstrap</field>
+            <field name="http_method">POST</field>
+            <field name="path">/command_center/bootstrap</field>
+            <field name="module_name">southbrook_command_center</field>
+            <field name="auth">session</field>
+            <field name="description">Command Center client-action bootstrap payload, session auth.</field>
+        </record>
+
+    </data>
+</odoo>

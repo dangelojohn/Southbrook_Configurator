@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_os_switch_viewer,southbrook.os.switch (viewer),model_southbrook_os_switch,group_os_viewer,1,0,0,0
+access_os_ai_request_viewer,southbrook.os.ai.request (viewer),model_southbrook_os_ai_request,group_os_viewer,1,0,0,0
+access_os_memory_viewer,southbrook.os.memory (viewer),model_southbrook_os_memory,group_os_viewer,1,0,0,0
+access_os_agent_viewer,southbrook.os.agent (viewer),model_southbrook_os_agent,group_os_viewer,1,0,0,0
+access_os_tool_viewer,southbrook.os.tool (viewer),model_southbrook_os_tool,group_os_viewer,1,0,0,0
+access_os_switch_admin,southbrook.os.switch (admin),model_southbrook_os_switch,group_os_admin,1,1,1,1
+access_os_ai_request_admin,southbrook.os.ai.request (admin),model_southbrook_os_ai_request,group_os_admin,1,1,1,1
+access_os_memory_admin,southbrook.os.memory (admin),model_southbrook_os_memory,group_os_admin,1,1,1,1
+access_os_agent_admin,southbrook.os.agent (admin),model_southbrook_os_agent,group_os_admin,1,1,1,1
+access_os_tool_admin,southbrook.os.tool (admin),model_southbrook_os_tool,group_os_admin,1,1,1,1

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <!-- Root app menu. Top-level menus are invisible without web_icon
+         (140x140 png) in Odoo 19. -->
+    <menuitem id="menu_os_kernel_root"
+              name="Southbrook OS"
+              web_icon="southbrook_os_kernel,static/description/icon.png"
+              groups="southbrook_os_kernel.group_os_viewer"
+              sequence="100"/>
+
+    <menuitem id="menu_os_ai_request"
+              name="AI Requests"
+              parent="menu_os_kernel_root"
+              action="action_os_ai_request"
+              groups="southbrook_os_kernel.group_os_viewer"
+              sequence="10"/>
+
+    <menuitem id="menu_os_switch"
+              name="Kill Switches"
+              parent="menu_os_kernel_root"
+              action="action_os_switch"
+              groups="southbrook_os_kernel.group_os_viewer"
+              sequence="20"/>
+
+    <menuitem id="menu_os_memory"
+              name="Shared Memory"
+              parent="menu_os_kernel_root"
+              action="action_os_memory"
+              groups="southbrook_os_kernel.group_os_viewer"
+              sequence="30"/>
+
+    <menuitem id="menu_os_agent"
+              name="Agents"
+              parent="menu_os_kernel_root"
+              action="action_os_agent"
+              groups="southbrook_os_kernel.group_os_viewer"
+              sequence="40"/>
+
+    <menuitem id="menu_os_tool"
+              name="Tools"
+              parent="menu_os_kernel_root"
+              action="action_os_tool"
+              groups="southbrook_os_kernel.group_os_viewer"
+              sequence="50"/>
+
+</odoo>

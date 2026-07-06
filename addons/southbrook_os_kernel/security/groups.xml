@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  OS Kernel groups, module category "Southbrook OS".
+
+  Odoo 19 REMOVED `res.groups.category_id` (verified against
+  odoo/addons/base/models/res_groups.py in this instance's own source tree
+  — the field is gone, not merely deprecated). The v19-correct mechanism
+  for grouping security groups under a named category (as seen on the
+  Settings > Users > Groups list and the "Application accesses" tab) is an
+  intermediate `res.groups.privilege` record carrying `category_id`, with
+  each `res.groups` record pointing at that privilege via `privilege_id`
+  (see `addons/sales_team/security/sales_team_security.xml` upstream for
+  the canonical pattern this file mirrors).
+
+  `group_os_viewer.implied_ids -> base.group_user` and
+  `group_os_admin.implied_ids -> group_os_viewer` are both the SAFE
+  direction (a new record's own implied_ids pointing outward). This is NOT
+  the documented trap (odoo19_base_group_user_implied_ids_trap), which is
+  specifically about writing TO `base.group_user`'s implied_ids from a
+  downstream module so that base.group_user implies a new group — that
+  direction silently no-ops. Here it is the reverse: our new groups declare
+  what they themselves imply, which is the normal and correct usage.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="module_category_southbrook_os" model="ir.module.category">
+            <field name="name">Southbrook OS</field>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="privilege_os_kernel" model="res.groups.privilege">
+            <field name="name">OS Kernel</field>
+            <field name="sequence">1</field>
+            <field name="category_id" ref="module_category_southbrook_os"/>
+        </record>
+
+        <record id="group_os_viewer" model="res.groups">
+            <field name="name">Viewer</field>
+            <field name="sequence">10</field>
+            <field name="privilege_id" ref="privilege_os_kernel"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">
+                Read-only access to the OS Kernel registries (switches,
+                AI request ledger, shared memory, agents, tools).
+            </field>
+        </record>
+
+        <record id="group_os_admin" model="res.groups">
+            <field name="name">Admin</field>
+            <field name="sequence">20</field>
+            <field name="privilege_id" ref="privilege_os_kernel"/>
+            <field name="implied_ids" eval="[(4, ref('group_os_viewer'))]"/>
+            <field name="comment">
+                Full read/write/create/unlink on the OS Kernel registries.
+            </field>
+        </record>
+
+    </data>
+</odoo>

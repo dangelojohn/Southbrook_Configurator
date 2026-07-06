@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_os_agent_search" model="ir.ui.view">
+        <field name="name">southbrook.os.agent.search</field>
+        <field name="model">southbrook.os.agent</field>
+        <field name="arch" type="xml">
+            <search string="Agents">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="feature_key"/>
+                <filter name="enabled" string="Enabled" domain="[('enabled', '=', True)]"/>
+                <filter name="disabled" string="Disabled" domain="[('enabled', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_os_agent_list" model="ir.ui.view">
+        <field name="name">southbrook.os.agent.list</field>
+        <field name="model">southbrook.os.agent</field>
+        <field name="arch" type="xml">
+            <list string="Agents">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="feature_key"/>
+                <field name="enabled" widget="boolean_toggle"/>
+                <field name="daily_call_budget"/>
+                <field name="daily_token_budget"/>
+                <field name="calls_today"/>
+                <field name="tokens_today"/>
+                <field name="last_run_at"/>
+                <field name="last_status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_os_agent_form" model="ir.ui.view">
+        <field name="name">southbrook.os.agent.form</field>
+        <field name="model">southbrook.os.agent</field>
+        <field name="arch" type="xml">
+            <form string="Agent">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="feature_key"/>
+                            <field name="cron_id"/>
+                            <field name="enabled"/>
+                        </group>
+                        <group>
+                            <field name="daily_call_budget"/>
+                            <field name="daily_token_budget"/>
+                            <field name="calls_today" readonly="1"/>
+                            <field name="tokens_today" readonly="1"/>
+                            <field name="budget_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="last_run_at"/>
+                        <field name="last_status"/>
+                    </group>
+                    <group string="Purpose">
+                        <field name="purpose" nolabel="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_os_agent" model="ir.actions.act_window">
+        <field name="name">Agents</field>
+        <field name="res_model">southbrook.os.agent</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No agents registered yet.</p>
+            <p>Agents link a feature_key to a daily call/token budget the kernel enforces.</p>
+        </field>
+    </record>
+
+</odoo>
