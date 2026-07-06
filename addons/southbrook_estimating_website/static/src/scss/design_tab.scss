@@ -4,6 +4,12 @@
 // clientWidth/Height (kitchen_canvas.esm.js:130), so the host must carry a
 // definite height. We do NOT load the configurator's kitchen_configurator.scss
 // (backend-scoped); these rules give the reused canvas its box in the portal.
+//
+// 2026-07-06 — parity pass: camera-view toolbar, room-dimension inputs,
+// cost summary, inventory panel + selected-cabinet detail. Own
+// `.o_owl_design3d_*` class namespace throughout (not `.o_sbk_*`) so this
+// bundle never collides with kitchen_configurator.scss if both ever load
+// on the same page.
 .o_owl_design3d {
     display: flex;
     flex-direction: column;
@@ -11,6 +17,7 @@
     .o_owl_design3d_toolbar {
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: 12px;
         padding: 6px 4px 10px;
         font-size: 13px;
@@ -24,6 +31,54 @@
         opacity: 0.75;
     }
 
+    .o_owl_design3d_meta {
+        opacity: 0.75;
+    }
+
+    .o_owl_design3d_room_dims {
+        display: flex;
+        gap: 10px;
+        margin-left: auto;
+    }
+
+    .o_owl_design3d_dim {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--sb-ink-dim, #6b6157);
+
+        input {
+            width: 4.2rem;
+            padding: 0.25rem 0.4rem;
+            border: 1px solid var(--sb-rule, #ddd6c9);
+            border-radius: var(--sb-radius-sm, 4px);
+            font-family: var(--sb-font-sans, inherit);
+            font-size: 0.85rem;
+            color: var(--sb-ink, #2c2620);
+            background: var(--sb-paper, #fff);
+
+            &:focus-visible {
+                outline: 2px solid var(--sb-sky, #3b82f6);
+                outline-offset: 1px;
+            }
+        }
+    }
+
+    .o_owl_design3d_body {
+        display: flex;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .o_owl_design3d_stage_col {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
     .o_owl_design3d_stage {
         position: relative;
         width: 100%;
@@ -32,11 +87,281 @@
         border: 1px solid rgba(0, 0, 0, 0.08);
         border-radius: 6px;
         overflow: hidden;
+        transition: box-shadow 120ms ease;
+
+        &.is-drag-hover {
+            box-shadow: inset 0 0 0 2px var(--sb-sky, #3b82f6);
+        }
 
         .o_sbk_canvas3d {
             display: block;
             width: 100%;
             height: 100%;
         }
+    }
+
+    // ── Camera-view toolbar ─────────────────────────────────────────
+    .o_owl_design3d_viewbar {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 3px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid var(--sb-rule, #ddd6c9);
+        border-radius: var(--sb-radius, 6px);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    }
+
+    .o_owl_design3d_viewbtn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--sb-ink, #2c2620);
+        cursor: pointer;
+        line-height: 1;
+
+        &:hover {
+            background: var(--sb-hl, #f2ede3);
+        }
+
+        &.is-active {
+            background: var(--sb-walnut, #6b4a2f);
+            color: var(--sb-paper, #fff);
+        }
+    }
+
+    .o_owl_design3d_viewicon {
+        font-size: 13px;
+    }
+
+    .o_owl_design3d_viewkey {
+        font-size: 8px;
+        opacity: 0.75;
+    }
+
+    .o_owl_design3d_viewsep {
+        width: 1px;
+        align-self: stretch;
+        margin: 2px 3px;
+        background: var(--sb-rule, #ddd6c9);
+    }
+
+    // ── Discoverability hint ────────────────────────────────────────
+    .o_owl_design3d_hint {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 4px 10px;
+        background: rgba(0, 0, 0, 0.62);
+        color: #fff;
+        font-family: var(--sb-font-sans, inherit);
+        font-size: 11px;
+        border-radius: 999px;
+        white-space: nowrap;
+        pointer-events: none;
+    }
+
+    // ── Cost / quantity summary ─────────────────────────────────────
+    .o_owl_design3d_summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        padding: 6px 10px;
+        font-family: var(--sb-font-sans, inherit);
+        font-size: 12px;
+        color: var(--sb-ink-dim, #6b6157);
+        border: 1px solid var(--sb-rule, #ddd6c9);
+        border-radius: var(--sb-radius, 6px);
+    }
+
+    .o_owl_design3d_summary_total {
+        margin-left: auto;
+        color: var(--sb-ink, #2c2620);
+    }
+
+    // ── Inventory panel ─────────────────────────────────────────────
+    .o_owl_design3d_inventory {
+        flex: 0 0 260px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .o_owl_design3d_inv_head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+
+        h4 { margin: 0; font-size: 13px; }
+    }
+
+    .o_owl_design3d_inv_count {
+        font-size: 11px;
+        color: var(--sb-ink-dim, #6b6157);
+    }
+
+    .o_owl_design3d_inv_cat {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+
+        select {
+            padding: 0.25rem 0.4rem;
+            border: 1px solid var(--sb-rule, #ddd6c9);
+            border-radius: var(--sb-radius-sm, 4px);
+            background: var(--sb-paper, #fff);
+        }
+    }
+
+    .o_owl_design3d_inv_search {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+
+        input {
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 0.3rem 0.5rem;
+            border: 1px solid var(--sb-rule, #ddd6c9);
+            border-radius: var(--sb-radius-sm, 4px);
+            font-size: 0.82rem;
+        }
+
+        button {
+            background: transparent;
+            border: none;
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+            color: var(--sb-ink-dim, #6b6157);
+        }
+    }
+
+    .o_owl_design3d_inv_draghint {
+        font-size: 11px;
+        color: var(--sb-ink-dim, #6b6157);
+    }
+
+    .o_owl_design3d_prod_list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+
+    .o_owl_design3d_prod_row {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1px;
+        padding: 6px 8px;
+        border: 1px solid var(--sb-rule, #ddd6c9);
+        border-radius: var(--sb-radius-sm, 4px);
+        background: var(--sb-paper, #fff);
+        cursor: grab;
+        text-align: left;
+        // Touch-drag needs the browser to let touchmove reach JS instead
+        // of scrolling the list once a drag is confirmed over the stage.
+        touch-action: none;
+
+        &:hover {
+            border-color: var(--sb-walnut, #6b4a2f);
+        }
+
+        &.is-touch-dragging {
+            border-color: var(--sb-walnut, #6b4a2f);
+            box-shadow: 0 0 0 2px var(--sb-sky, #3b82f6);
+        }
+    }
+
+    .o_owl_design3d_prod_name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--sb-ink, #2c2620);
+    }
+
+    .o_owl_design3d_prod_meta {
+        font-size: 11px;
+        color: var(--sb-ink-dim, #6b6157);
+    }
+
+    .o_owl_design3d_prod_price {
+        font-size: 11px;
+        color: var(--sb-walnut-d, #4a3320);
+    }
+
+    .o_owl_design3d_inv_empty {
+        font-size: 11px;
+        color: var(--sb-ink-dim, #6b6157);
+        padding: 6px 2px;
+    }
+
+    // ── Selected-cabinet detail panel ───────────────────────────────
+    .o_owl_design3d_detail {
+        padding: 8px 10px;
+        border: 1px solid var(--sb-rule, #ddd6c9);
+        border-radius: var(--sb-radius, 6px);
+        background: var(--sb-hl, #f2ede3);
+    }
+
+    .o_owl_design3d_detail_head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        h4 { margin: 0; font-size: 12px; }
+
+        button {
+            background: transparent;
+            border: none;
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+            color: var(--sb-ink-dim, #6b6157);
+
+            &:hover { color: var(--sb-ink, #2c2620); }
+        }
+    }
+
+    .o_owl_design3d_detail_name {
+        margin: 4px 0 6px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .o_owl_design3d_detail_spec {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2px 8px;
+        margin: 0;
+        font-size: 11px;
+
+        dt { color: var(--sb-ink-dim, #6b6157); }
+        dd { margin: 0; color: var(--sb-ink, #2c2620); }
+    }
+}
+
+// Mobile: stack the inventory below the canvas rather than beside it.
+@media (max-width: 900px) {
+    .o_owl_design3d .o_owl_design3d_body {
+        flex-direction: column;
+    }
+
+    .o_owl_design3d .o_owl_design3d_inventory {
+        flex: 1 1 auto;
     }
 }

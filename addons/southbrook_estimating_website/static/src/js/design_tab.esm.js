@@ -3,6 +3,26 @@
  * SPDX-License-Identifier: LGPL-3.0-only
  *
  * 2026-07-03 T1/T2 — Order Builder "3D Design" tab.
+ * 2026-07-06 — parity pass against the standalone Kitchen 3D
+ * Configurator's "Kitchen Designs" screen (E2E comparison on order
+ * #1381). Adds: numbered camera-view shortcuts (1-6 + R) with the
+ * SAME key mapping as kitchen_configurator.js's _onKeyDown, an
+ * on-canvas discoverable hint bar, editable room Width/Depth/Height,
+ * a portal-safe cabinet inventory panel with type filter + search +
+ * drag-to-add, a read-only "selected cabinet" detail panel (SKU /
+ * price / material, × to deselect), and a live cost/quantity summary.
+ * "Save as my default" is intentionally NOT ported — that's a rep
+ * convenience for reusing room dims across many quotes; a portal
+ * customer has exactly one order and no "my defaults" concept.
+ *
+ * 2026-07-06 (follow-up) — touch support for the inventory drag-to-add
+ * (native HTML5 DnD events never fire on iOS/Android touch), an
+ * empty-state hint pointing first-time users at the inventory panel,
+ * and a toast stack (reusing the exact `.o_owl_toast*` markup/SCSS
+ * portal_root.scss already defines for OrderBuilder) for add/error
+ * confirmation. Cabinet select/move/room-resize gestures inside
+ * KitchenCanvas itself are still mouse-only — that's a shared-component
+ * gap (kitchen_canvas.esm.js's own pointer pipeline), out of scope here.
  *
  * A portal parent that drives the standalone Configurator's KitchenCanvas
  * OWL engine (reused verbatim from southbrook_kitchen_3d_configurator's
@@ -16,13 +36,17 @@
  * KitchenViewport Preview). Drag-moves persist to
  * kitchen.design.line.x_position_in via .../design-3d/move — in-bounds
  * (never touches sale.order/MO; positions ride the existing design→order
- * reconcile cron).
+ * reconcile cron). Room-dimension edits persist via .../design-3d/room;
+ * inventory adds persist via .../design-3d/add — same cron bridge, same
+ * ownership + sudo() pattern, no new write path onto sale.order/MO.
  *
  * We deliberately do NOT reuse the backend parent kitchen_configurator.js
  * (it uses useService("action"), whose service is absent from
  * web.assets_frontend). This component is that parent's portal-safe twin.
  */
-import { Component, onMounted, useState, xml } from "@odoo/owl";
+import {
+    Component, onMounted, onWillUnmount, onWillUpdateProps, useRef, useState, xml,
+} from "@odoo/owl";
 import { KitchenCanvas } from "@southbrook_kitchen_3d_configurator/js/canvas/kitchen_canvas.esm";
 
 // Plain JSON-RPC fetch — no @web service dependency, matching the portal
@@ -46,6 +70,33 @@ async function rpcCall(url, params = {}) {
     return j.result;
 }
 
+// Same key→view mapping as kitchen_configurator.js's _onKeyDown, so a
+// rep who already knows the backend shortcuts feels no discontinuity
+// switching to the portal tab.
+const VIEW_KEY_MAP = { "1": "iso", "2": "top", "3": "front",
+                        "4": "left", "5": "right", "6": "persp" };
+const VIEW_BUTTONS = [
+    { key: "iso",   num: "1", icon: "⬡", label: "Isometric" },
+    { key: "top",   num: "2", icon: "▦", label: "Top / Plan" },
+    { key: "front", num: "3", icon: "▮", label: "Front" },
+    { key: "left",  num: "4", icon: "◧", label: "Left side" },
+    { key: "right", num: "5", icon: "◨", label: "Right side" },
+    { key: "persp", num: "6", icon: "◉", label: "Perspective / orbit" },
+];
+const CATEGORY_LABELS = { all: "All", base: "Base", wall: "Wall",
+                           tall: "Tall", other: "Other" };
+function categoryOf(cabinetType) {
+    if (cabinetType === "base" || cabinetType === "wall" || cabinetType === "tall") {
+        return cabinetType;
+    }
+    return "other";
+}
+const MATERIAL_LABELS = {
+    white_melamine: "White Melamine", grey_melamine: "Grey Melamine",
+    maple_veneer: "Maple Veneer", oak_veneer: "Oak Veneer",
+    painted_mdf: "Painted MDF", thermoplastic: "Thermoplastic",
+};
+
 export class KitchenDesignTab extends Component {
     static components = { KitchenCanvas };
     static template = xml`
@@ -57,17 +108,167 @@ export class KitchenDesignTab extends Component {
                 <span class="o_owl_design3d_status text-danger"
                       t-elif="state.error" t-esc="state.error"/>
                 <span class="o_owl_design3d_meta" t-else="">
-                    <t t-esc="state.items.length"/> cabinets · drag to arrange
+                    <t t-esc="state.items.length"/> cabinets
                     <t t-if="state.saving"> · saving…</t>
                 </span>
+                <div class="o_owl_design3d_room_dims">
+                    <label class="o_owl_design3d_dim">
+                        <span>W</span>
+                        <input type="number" min="72" max="600" step="6"
+                               t-att-value="state.room.width_in"
+                               t-on-change="(ev) => this._changeRoom('width_in', ev.target.value)"/>
+                    </label>
+                    <label class="o_owl_design3d_dim">
+                        <span>D</span>
+                        <input type="number" min="72" max="600" step="6"
+                               t-att-value="state.room.depth_in"
+                               t-on-change="(ev) => this._changeRoom('depth_in', ev.target.value)"/>
+                    </label>
+                    <label class="o_owl_design3d_dim">
+                        <span>H</span>
+                        <input type="number" min="84" max="144" step="6"
+                               t-att-value="state.room.height_in"
+                               t-on-change="(ev) => this._changeRoom('height_in', ev.target.value)"/>
+                    </label>
+                </div>
             </div>
-            <div class="o_owl_design3d_stage">
-                <KitchenCanvas items="state.items"
-                               room="state.room"
-                               view="'iso'"
-                               selected="state.selected"
-                               onSelectItem.bind="_onSelectItem"
-                               onMoveItem.bind="_onMoveItem"/>
+            <div class="o_owl_design3d_body">
+                <div class="o_owl_design3d_stage_col">
+                    <div class="o_owl_design3d_stage" t-ref="stage"
+                         t-att-class="'o_owl_design3d_stage' + (state.dragHover ? ' is-drag-hover' : '')"
+                         t-on-dragover="_onCanvasDragOver"
+                         t-on-dragleave="_onCanvasDragLeave"
+                         t-on-drop="_onCanvasDrop">
+                        <KitchenCanvas items="state.items"
+                                       room="state.room"
+                                       view="state.view"
+                                       selected="state.selected"
+                                       draggedProduct="state.draggedProduct"
+                                       dragHover="state.dragHover"
+                                       onSelectItem.bind="_onSelectItem"
+                                       onMoveItem.bind="_onMoveItem"
+                                       onResizeRoom.bind="_onResizeRoom"
+                                       onViewChange.bind="_onViewChange"
+                                       onReady.bind="_onCanvasReady"/>
+                        <div class="o_owl_design3d_viewbar" role="toolbar" aria-label="Camera view">
+                            <button t-foreach="viewButtons" t-as="vb" t-key="vb.key"
+                                    type="button"
+                                    t-att-class="'o_owl_design3d_viewbtn' + (state.view === vb.key ? ' is-active' : '')"
+                                    t-att-aria-pressed="state.view === vb.key"
+                                    t-att-title="vb.label + ' (' + vb.num + ')'"
+                                    t-on-click="() => this._setView(vb.key)">
+                                <span class="o_owl_design3d_viewicon" t-esc="vb.icon"/>
+                                <span class="o_owl_design3d_viewkey" t-esc="vb.num"/>
+                            </button>
+                            <div class="o_owl_design3d_viewsep"/>
+                            <button type="button" class="o_owl_design3d_viewbtn"
+                                    title="Reset to Isometric (R)"
+                                    t-on-click="() => this._setView('iso')">
+                                <span class="o_owl_design3d_viewicon">⌂</span>
+                                <span class="o_owl_design3d_viewkey">R</span>
+                            </button>
+                        </div>
+                        <div class="o_owl_design3d_hint">
+                            <t t-if="!state.loading &amp;&amp; !state.items.length">no cabinets yet — drag one in from the panel on the right to get started</t>
+                            <t t-elif="state.view === 'iso' || state.view === 'top'">drag cabinet to move · drag ● to resize room · click select · 1-6 views</t>
+                            <t t-elif="state.view === 'persp'">drag cabinet to move · drag empty space to orbit · scroll to zoom · R reset</t>
+                            <t t-else="">scroll to zoom · click select · switch to Iso/Top/Persp to move cabinets</t>
+                        </div>
+                    </div>
+                    <div class="o_owl_design3d_summary">
+                        <span class="o_owl_design3d_summary_item">
+                            <strong t-esc="summary.baseCount"/> base
+                        </span>
+                        <span class="o_owl_design3d_summary_item">
+                            <strong t-esc="summary.wallCount"/> wall
+                        </span>
+                        <span t-if="summary.fillerCost" class="o_owl_design3d_summary_item">
+                            + <strong t-esc="_money(summary.fillerCost)"/> filler
+                        </span>
+                        <span class="o_owl_design3d_summary_item o_owl_design3d_summary_total">
+                            Total <strong t-esc="_money(summary.total)"/>
+                        </span>
+                    </div>
+                </div>
+                <aside class="o_owl_design3d_inventory">
+                    <div class="o_owl_design3d_inv_head">
+                        <h4>Cabinet Inventory</h4>
+                        <span class="o_owl_design3d_inv_count"
+                              t-esc="filteredProducts.length + ' / ' + state.products.length"/>
+                    </div>
+                    <label class="o_owl_design3d_inv_cat">
+                        <span>Type</span>
+                        <select t-on-change="(ev) => state.inventoryCategory = ev.target.value">
+                            <option t-foreach="Object.keys(categoryLabels)" t-as="cat" t-key="cat"
+                                    t-att-value="cat"
+                                    t-att-selected="state.inventoryCategory === cat ? 'selected' : ''"
+                                    t-esc="categoryLabels[cat]"/>
+                        </select>
+                    </label>
+                    <div class="o_owl_design3d_inv_search">
+                        <input type="search" placeholder="Search name, SKU, type…"
+                               t-att-value="state.inventorySearch"
+                               t-on-input="(ev) => state.inventorySearch = ev.target.value"/>
+                        <button t-if="state.inventorySearch" type="button"
+                                aria-label="Clear search"
+                                t-on-click="() => state.inventorySearch = ''">×</button>
+                    </div>
+                    <div t-if="filteredProducts.length" class="o_owl_design3d_inv_draghint">
+                        ↔ drag a product into the scene to add it
+                    </div>
+                    <div class="o_owl_design3d_prod_list">
+                        <button t-foreach="filteredProducts" t-as="product" t-key="product.product_id"
+                                type="button"
+                                draggable="true"
+                                t-att-class="'o_owl_design3d_prod_row' + (state.touchDragProduct &amp;&amp; state.touchDragProduct.product_id === product.product_id ? ' is-touch-dragging' : '')"
+                                t-on-dragstart="(ev) => this._onProductDragStart(ev, product)"
+                                t-on-dragend="_onProductDragEnd"
+                                t-on-touchstart="(ev) => this._onProductTouchStart(ev, product)"
+                                t-att-title="'Drag onto scene to add ' + product.name">
+                            <span class="o_owl_design3d_prod_name" t-esc="product.name"/>
+                            <span class="o_owl_design3d_prod_meta"
+                                  t-esc="product.sku + ' · ' + product.width_in + '″'"/>
+                            <span class="o_owl_design3d_prod_price" t-esc="_money(product.price)"/>
+                        </button>
+                        <div t-if="!filteredProducts.length &amp;&amp; state.products.length"
+                             class="o_owl_design3d_inv_empty">
+                            No products match "<t t-esc="state.inventorySearch"/>".
+                        </div>
+                    </div>
+                    <div t-if="state.selected" class="o_owl_design3d_detail">
+                        <div class="o_owl_design3d_detail_head">
+                            <h4>Selected Cabinet</h4>
+                            <button type="button" aria-label="Deselect" title="Deselect"
+                                    t-on-click="_deselect">×</button>
+                        </div>
+                        <p class="o_owl_design3d_detail_name" t-esc="state.selected.product_name"/>
+                        <dl class="o_owl_design3d_detail_spec">
+                            <dt>SKU</dt><dd t-esc="state.selected.sku || '—'"/>
+                            <dt>Type</dt><dd t-esc="state.selected.cabinet_type"/>
+                            <dt>Material</dt><dd t-esc="_materialLabel(state.selected.material)"/>
+                            <dt>Dimensions</dt>
+                            <dd>
+                                <t t-esc="state.selected.width_in"/>"W ×
+                                <t t-esc="state.selected.height_in"/>"H ×
+                                <t t-esc="state.selected.depth_in"/>"D
+                            </dd>
+                            <dt>Price</dt><dd t-esc="_money(state.selected.price)"/>
+                        </dl>
+                    </div>
+                </aside>
+            </div>
+            <!-- Reuses the exact toast markup/classes portal_root.scss
+                 already styles for OrderBuilder's own toast stack —
+                 no new CSS needed. -->
+            <div class="o_owl_toast_stack" role="status" aria-live="polite"
+                 t-if="state.toasts.length">
+                <div t-foreach="state.toasts" t-as="toast" t-key="toast.id"
+                     t-attf-class="o_owl_toast o_owl_toast_{{ toast.kind }}">
+                    <span class="o_owl_toast_text" t-esc="toast.text"/>
+                    <button type="button" class="o_owl_toast_close"
+                            aria-label="Dismiss"
+                            t-on-click="() => this._dismissToast(toast.id)">×</button>
+                </div>
             </div>
         </div>
     `;
@@ -84,12 +285,121 @@ export class KitchenDesignTab extends Component {
             error: null,
             saving: false,
             items: [],
-            room: { width_in: 12, depth_in: 24, height_in: 96 },
+            // 2026-07-06 — matches the portal's own new-design server
+            // default (_PORTAL_NEW_DESIGN_ROOM in controllers/main.py)
+            // so even the brief pre-_load() loading frame agrees with
+            // what a first-ever design actually resolves to.
+            room: { width_in: 96, depth_in: 72, height_in: 96 },
             selected: null,
             designId: null,
+            // 2026-07-06 — default camera preset is #6 (persp — the
+            // two-wall corner/isometric room view), not #1 (iso).
+            // Camera view is never persisted server-side (there's no
+            // saved-view field on southbrook.kitchen.design), so this
+            // is simply which preset every tab load starts on.
+            view: "persp",
+            products: [],
+            inventoryCategory: "all",
+            inventorySearch: "",
+            draggedProduct: null,
+            dragHover: false,
+            // touchDragProduct mirrors draggedProduct but only for the
+            // touch path — kept separate so a stray touchend after a
+            // completed mouse-DnD sequence can never clear the wrong one.
+            touchDragProduct: null,
+            toasts: [],
         });
+        this.viewButtons = VIEW_BUTTONS;
+        this.categoryLabels = CATEGORY_LABELS;
+        this._canvasApi = null;
         this._lastPayloadVersion = this.props.payloadVersion || 0;
-        onMounted(() => this._load());
+        this._toastSeq = 0;
+        this._toastTimers = new Set();      // audit A16 — cancel on unmount
+        this._roomSaveSeq = 0;              // audit A6 — last-write-wins guard
+        this._itemsMutSeq = 0;              // audit A7 — reload/add race guard
+        this._lastAdd = null;               // audit A9 — hybrid double-add guard
+        this._stageRef = useRef("stage");
+        this._onKeyDown = this._onKeyDown.bind(this);
+        this._onTouchMove = this._onTouchMove.bind(this);
+        this._onTouchEnd = this._onTouchEnd.bind(this);
+
+        onMounted(() => {
+            this._load();
+            this._loadCatalog();
+            window.addEventListener("keydown", this._onKeyDown);
+        });
+        // Audit A8 — honor the payloadVersion contract: OrderBuilder bumps
+        // it after autosaves; a change while this tab stays mounted must
+        // re-fetch so the design reseeds from the updated order lines.
+        // (Currently the tab is destroyed/remounted on every tab switch,
+        // which masked this, but the prop's contract shouldn't depend on
+        // that architecture holding.)
+        onWillUpdateProps((next) => {
+            const v = next.payloadVersion || 0;
+            if (v !== this._lastPayloadVersion) {
+                this._lastPayloadVersion = v;
+                this._load();
+            }
+        });
+        onWillUnmount(() => {
+            window.removeEventListener("keydown", this._onKeyDown);
+            this._detachTouchListeners();
+            for (const t of this._toastTimers) clearTimeout(t);
+            this._toastTimers.clear();
+        });
+    }
+
+    // ─── Toast helpers (same shape as portal_boot.esm.js's _pushToast /
+    // _dismissToast — reuses portal_root.scss's .o_owl_toast* styling,
+    // no new CSS needed) ──────────────────────────────────────────────
+    _pushToast(text, kind = "success", ttl = 3000) {
+        this._toastSeq += 1;
+        const id = this._toastSeq;
+        this.state.toasts.push({ id, text, kind });
+        const timer = setTimeout(() => {
+            this._toastTimers.delete(timer);
+            const idx = this.state.toasts.findIndex((t) => t.id === id);
+            if (idx >= 0) this.state.toasts.splice(idx, 1);
+        }, ttl);
+        this._toastTimers.add(timer);
+    }
+
+    _dismissToast(id) {
+        const idx = this.state.toasts.findIndex((t) => t.id === id);
+        if (idx >= 0) this.state.toasts.splice(idx, 1);
+    }
+
+    get summary() {
+        let baseCount = 0, wallCount = 0, fillerCost = 0, total = 0;
+        for (const item of this.state.items) {
+            const price = Number(item.price || 0) * Number(item.quantity || 1);
+            total += price;
+            if (item.cabinet_type === "base") baseCount += 1;
+            else if (item.cabinet_type === "wall") wallCount += 1;
+            else if (item.cabinet_type === "filler") fillerCost += price;
+        }
+        return { baseCount, wallCount, fillerCost, total };
+    }
+
+    get filteredProducts() {
+        const cat = this.state.inventoryCategory;
+        const q = (this.state.inventorySearch || "").trim().toLowerCase();
+        return (this.state.products || []).filter((p) => {
+            if (cat !== "all" && categoryOf(p.cabinet_type) !== cat) return false;
+            if (!q) return true;
+            return (p.name || "").toLowerCase().includes(q)
+                || (p.sku || "").toLowerCase().includes(q)
+                || (p.cabinet_type || "").toLowerCase().includes(q)
+                || (p.material || "").toLowerCase().includes(q);
+        });
+    }
+
+    _money(v) {
+        return `$${Number(v || 0).toFixed(2)}`;
+    }
+
+    _materialLabel(k) {
+        return MATERIAL_LABELS[k] || k || "—";
     }
 
     async _load() {
@@ -100,6 +410,11 @@ export class KitchenDesignTab extends Component {
         }
         this.state.loading = true;
         this.state.error = null;
+        // Audit A7 — snapshot the mutation counter: if an add commits
+        // while this fetch is in flight, this response was read before
+        // that add and would silently drop it from local state; re-fetch
+        // instead of applying the stale snapshot.
+        const mutAtStart = this._itemsMutSeq;
         try {
             const payload = await rpcCall(
                 `/southbrook/api/order/${encodeURIComponent(this.props.orderId)}/design-3d`,
@@ -108,6 +423,9 @@ export class KitchenDesignTab extends Component {
             if (payload && payload.error) {
                 this.state.error = payload.error;
                 return;
+            }
+            if (mutAtStart !== this._itemsMutSeq) {
+                return this._load();
             }
             this.state.designId = payload.design_id;
             this.state.room = payload.room || this.state.room;
@@ -119,10 +437,105 @@ export class KitchenDesignTab extends Component {
         }
     }
 
+    async _loadCatalog() {
+        if (!this.props.orderId) return;
+        try {
+            const payload = await rpcCall(
+                `/southbrook/api/order/${encodeURIComponent(this.props.orderId)}/design-3d/catalog`,
+                {},
+            );
+            if (payload && !payload.error) {
+                this.state.products = payload.products || [];
+            }
+        } catch (e) {
+            // Non-fatal: the canvas itself still works without the
+            // inventory panel populated; just leave it empty.
+        }
+    }
+
+    // ─── Camera view ────────────────────────────────────────────────────
+    _onCanvasReady(api) {
+        this._canvasApi = api;
+    }
+
+    _setView(key) {
+        this.state.view = key;
+        if (this._canvasApi) this._canvasApi.setView(key);
+    }
+
+    _onViewChange(key) {
+        this.state.view = key;
+    }
+
+    _onKeyDown(e) {
+        const tag = (e.target && e.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
+            e.target?.isContentEditable) return;
+        const k = e.key;
+        if (e.metaKey || e.ctrlKey) return;
+        if (VIEW_KEY_MAP[k]) { e.preventDefault(); this._setView(VIEW_KEY_MAP[k]); return; }
+        if (k === "r" || k === "R") { e.preventDefault(); this._setView("iso"); }
+    }
+
+    // ─── Room dimensions ────────────────────────────────────────────────
+    async _changeRoom(field, rawValue) {
+        const val = parseFloat(rawValue);
+        if (!Number.isFinite(val)) return;
+        this.state.room = { ...this.state.room, [field]: val };
+        await this._persistRoom();
+    }
+
+    // KitchenCanvas → drag-handle room-width resize. inFlight=true fires
+    // continuously during the drag (local-only, no persistence); the
+    // final inFlight=false call is the commit.
+    async _onResizeRoom(newWidthIn, inFlight) {
+        this.state.room = { ...this.state.room, width_in: newWidthIn };
+        if (inFlight) return;
+        await this._persistRoom();
+    }
+
+    async _persistRoom() {
+        if (!this.props.orderId) return;
+        // Audit A6 — last-write-wins: overlapping saves (resize commit
+        // then a quick field edit) can resolve out of order; only the
+        // newest request may apply its echoed room to state.
+        this._roomSaveSeq += 1;
+        const seq = this._roomSaveSeq;
+        this.state.saving = true;
+        try {
+            const res = await rpcCall(
+                `/southbrook/api/order/${encodeURIComponent(this.props.orderId)}/design-3d/room`,
+                {
+                    width_in: this.state.room.width_in,
+                    depth_in: this.state.room.depth_in,
+                    height_in: this.state.room.height_in,
+                },
+            );
+            if (seq !== this._roomSaveSeq) return;
+            if (res && res.room) {
+                this.state.room = res.room;
+            } else if (res && res.error) {
+                this.state.error = res.error;
+            }
+        } catch (e) {
+            if (seq === this._roomSaveSeq) {
+                this.state.error = e?.message || String(e);
+            }
+        } finally {
+            if (seq === this._roomSaveSeq) {
+                this.state.saving = false;
+            }
+        }
+    }
+
     // KitchenCanvas → cabinet clicked. Highlight (T1). A parent-level
     // Order-Lines bridge is a later tier.
     _onSelectItem(item) {
         this.state.selected = item || null;
+    }
+
+    _deselect() {
+        this.state.selected = null;
     }
 
     // KitchenCanvas → cabinet dragged (X-axis). Persist to the design line
@@ -147,6 +560,159 @@ export class KitchenDesignTab extends Component {
         } catch (e) {
             this.state.error = e?.message || String(e);
             await this._load();
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    // ─── Inventory drag-and-drop-add ────────────────────────────────────
+    _onProductDragStart(ev, product) {
+        if (ev.dataTransfer) {
+            ev.dataTransfer.effectAllowed = "copy";
+            ev.dataTransfer.setData(
+                "application/x-sbk-product",
+                JSON.stringify({ product_id: product.product_id }),
+            );
+            ev.dataTransfer.setData("text/plain", String(product.product_id));
+        }
+        this.state.draggedProduct = product;
+    }
+
+    _onProductDragEnd() {
+        this.state.draggedProduct = null;
+        this.state.dragHover = false;
+    }
+
+    _onCanvasDragOver(ev) {
+        if (!ev.dataTransfer) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = "copy";
+        if (!this.state.dragHover) this.state.dragHover = true;
+    }
+
+    _onCanvasDragLeave(ev) {
+        if (ev.currentTarget && ev.currentTarget.contains(ev.relatedTarget)) return;
+        this.state.dragHover = false;
+    }
+
+    async _onCanvasDrop(ev) {
+        ev.preventDefault();
+        this.state.dragHover = false;
+        const product = this.state.draggedProduct;
+        this.state.draggedProduct = null;
+        if (!product) return;
+        await this._addProductAt(product, ev);
+    }
+
+    // ─── Touch fallback for the inventory drag-to-add ──────────────────
+    // iOS/Android never fire the HTML5 dragstart/dragover/drop events
+    // _onProductDragStart/_onCanvasDrop rely on for mouse/trackpad, so
+    // touch needs its own path to the SAME _addProductAt endpoint.
+    _onProductTouchStart(ev, product) {
+        // Audit A15 — a second finger while a touch-drag is already in
+        // progress would silently re-target the drag; first touch wins.
+        if (this.state.touchDragProduct) return;
+        this.state.touchDragProduct = product;
+        this.state.draggedProduct = product;   // reuse dragHover highlight
+        document.addEventListener("touchmove", this._onTouchMove, { passive: false });
+        document.addEventListener("touchend", this._onTouchEnd);
+        document.addEventListener("touchcancel", this._onTouchEnd);
+    }
+
+    _stageContainsPoint(clientX, clientY) {
+        const el = this._stageRef.el;
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        return clientX >= rect.left && clientX <= rect.right &&
+               clientY >= rect.top && clientY <= rect.bottom;
+    }
+
+    _onTouchMove(ev) {
+        if (!this.state.touchDragProduct) return;
+        const touch = ev.touches[0];
+        if (!touch) return;
+        // Only take over scrolling once we know this touch is actually
+        // dragging a product over the stage — otherwise a tap-and-scroll
+        // on the inventory list itself would get stuck.
+        const over = this._stageContainsPoint(touch.clientX, touch.clientY);
+        if (over) ev.preventDefault();
+        this.state.dragHover = over;
+    }
+
+    async _onTouchEnd(ev) {
+        this._detachTouchListeners();
+        const product = this.state.touchDragProduct;
+        this.state.touchDragProduct = null;
+        this.state.draggedProduct = null;
+        this.state.dragHover = false;
+        if (!product) return;
+        const touch = ev.changedTouches && ev.changedTouches[0];
+        if (!touch || !this._stageContainsPoint(touch.clientX, touch.clientY)) return;
+        await this._addProductAt(product, { clientX: touch.clientX, clientY: touch.clientY });
+    }
+
+    _detachTouchListeners() {
+        document.removeEventListener("touchmove", this._onTouchMove);
+        document.removeEventListener("touchend", this._onTouchEnd);
+        document.removeEventListener("touchcancel", this._onTouchEnd);
+    }
+
+    // Shared by the mouse-DnD drop handler and the touch fallback —
+    // evLike only needs clientX/clientY (all computeDropX/ndcFromEvent
+    // actually read), so a plain {clientX, clientY} object from a touch
+    // point works exactly like a real DragEvent here.
+    async _addProductAt(product, evLike) {
+        if (!this.props.orderId) return;
+        // Audit A9 — on hybrid touch+mouse hardware (Surface-class, some
+        // Android WebViews) one physical gesture can fire BOTH the HTML5
+        // drop path and the touch path; suppress the echo.
+        const now = performance.now();
+        if (this._lastAdd &&
+            this._lastAdd.pid === product.product_id &&
+            now - this._lastAdd.t < 700) {
+            return;
+        }
+        this._lastAdd = { pid: product.product_id, t: now };
+        const dropX = this._canvasApi?.computeDropX(evLike) ?? null;
+        this.state.saving = true;
+        try {
+            const res = await rpcCall(
+                `/southbrook/api/order/${encodeURIComponent(this.props.orderId)}/design-3d/add`,
+                {
+                    product_id: product.product_id,
+                    x_position_in: dropX,
+                },
+            );
+            if (res && res.error) {
+                this.state.error = res.error;
+                this._pushToast(`Couldn't add ${product.name}: ${res.error}`, "error");
+            } else if (res && res.item) {
+                // Audit A7 — mark the mutation so an in-flight _load()
+                // snapshot from before this add re-fetches instead of
+                // clobbering it out of local state.
+                this._itemsMutSeq += 1;
+                this.state.items = [...this.state.items, res.item];
+                this.state.selected = res.item;
+                // Audit A1/A5 — the server now clamps/append-computes
+                // x_position_in, so `required` is always sane; when the
+                // room must grow to fit, PERSIST the new width (it was
+                // local-only before, so any reload re-clipped the
+                // cabinet that triggered the expansion).
+                const required = res.item.x_position_in + res.item.width_in;
+                if (Number.isFinite(required) &&
+                    required > this.state.room.width_in) {
+                    this.state.room = {
+                        ...this.state.room,
+                        width_in: Math.ceil(required / 6) * 6,
+                    };
+                    await this._persistRoom();
+                }
+                this._pushToast(`Added ${res.item.product_name}`, "success");
+            }
+        } catch (e) {
+            const msg = e?.message || String(e);
+            this.state.error = msg;
+            this._pushToast(`Couldn't add ${product.name}: ${msg}`, "error");
         } finally {
             this.state.saving = false;
         }

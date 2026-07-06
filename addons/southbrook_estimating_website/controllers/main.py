@@ -24,6 +24,8 @@ the logged-in partner OR the partner's parent (dealer org).
 """
 import json
 import logging
+import math
+import time
 
 from odoo import fields, http
 from odoo.exceptions import AccessError, MissingError
@@ -2244,6 +2246,17 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         design = self._southbrook_get_or_create_design(order)
         return self._southbrook_design_payload(design)
 
+    # 2026-07-06 — portal-scoped "new design" defaults. The shared
+    # southbrook.kitchen.design model's own field defaults (12in W ×
+    # 24in D — a placeholder, not a usable room) stay untouched so the
+    # standalone Kitchen 3D Configurator app's own new-design flow
+    # (which already has its own walk-in/explicit-customer defaults,
+    # see kitchen_design.py) is unaffected. This portal route passes
+    # its own sane starting room explicitly instead.
+    _PORTAL_NEW_DESIGN_ROOM = {
+        "room_width_in": 96.0, "room_depth_in": 72.0, "room_height_in": 96.0,
+    }
+
     def _southbrook_get_or_create_design(self, order):
         """Find (or create + seed) the southbrook.kitchen.design linked to
         this order. Runs under sudo() because portal customers hold no ACL
@@ -2257,6 +2270,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 "partner_id": order.partner_id.id if order.partner_id else False,
                 "sale_order_id": order.id,
                 "state": "draft",
+                **self._PORTAL_NEW_DESIGN_ROOM,
             })
         # Seed only when no configurator-origin lines exist yet, so a
         # user's persisted drag edits are preserved on re-open.
@@ -2329,10 +2343,13 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             lambda l: l.origin == "configurator"
         ):
             prod = line.product_id
+            tmpl = prod.product_tmpl_id
             items.append({
                 "id":            prod.id,
                 "product_id":    prod.id,
                 "product_name":  prod.display_name,
+                "sku":           tmpl.default_code or "",
+                "material":      tmpl.southbrook_material or "",
                 "layout_key":    line.layout_key,
                 "cabinet_type":  line.cabinet_type,
                 "width_in":      line.width_in,
@@ -2389,16 +2406,326 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             return {"error": "no_matching_line"}
         vals = {}
         if x_position_in is not None:
-            vals["x_position_in"] = float(x_position_in)
+            vals["x_position_in"] = self._sb_design_coord(x_position_in)
         if y_position_in is not None:
-            vals["y_position_in"] = float(y_position_in)
+            vals["y_position_in"] = self._sb_design_coord(y_position_in)
         if z_position_in is not None:
-            vals["z_position_in"] = float(z_position_in)
+            vals["z_position_in"] = self._sb_design_coord(z_position_in)
         if rotation_deg is not None:
-            vals["rotation_deg"] = float(rotation_deg) % 360.0
+            vals["rotation_deg"] = self._sb_design_coord(rotation_deg) % 360.0
+        vals = {k: v for k, v in vals.items() if v is not None}
         if vals:
             line.write(vals)
         return {"ok": True, "id": line.id}
+
+    # 2026-07-06 audit A4 — coordinate sanitizer shared by the design-3d
+    # write routes. float("1e400") parses to inf (and "nan" to NaN)
+    # WITHOUT raising, and Python's json.dumps then emits the
+    # non-standard Infinity/NaN tokens, which break strict JSON.parse()
+    # for every subsequent loader of the design payload (portal AND the
+    # backend Kitchen 3D Configurator reading the same rows). Reject
+    # non-finite, clamp to the physically meaningful envelope.
+    _DESIGN_COORD_MAX = 2400.0   # 200 ft — far beyond any real kitchen
+
+    def _sb_design_coord(self, raw):
+        """Coerce a client-supplied coordinate to a finite, clamped
+        float; None when unusable."""
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(val):
+            return None
+        return max(-self._DESIGN_COORD_MAX, min(self._DESIGN_COORD_MAX, val))
+
+    # ------------------------------------------------------------------
+    # 2026-07-06 — "3D Design" tab parity pass. Three additive routes,
+    # all following the exact ownership + sudo() pattern already
+    # established by southbrook_api_design_3d_move above: portal
+    # customers hold no ACL on southbrook.kitchen.design(.line), so
+    # every write happens under sudo() AFTER _southbrook_resolve_order
+    # confirms the caller owns the order. None of these touch
+    # sale.order / MO — the design→order reconcile cron remains the
+    # only bridge, unchanged.
+    # ------------------------------------------------------------------
+
+    # Sane real-world clamps. The standalone Kitchen 3D Configurator's
+    # own topbar inputs allow min="12" (inches) on width/depth, which
+    # is a legacy artifact (nobody designs a 1ft-wide kitchen) — this
+    # portal-facing route enforces the geometry southbrook.room.
+    # validate_geometry already treats as a sane lower bound elsewhere
+    # in this addon, rather than copying that oddity.
+    _DESIGN_ROOM_MIN = {"width_in": 72.0, "depth_in": 72.0, "height_in": 84.0}
+    _DESIGN_ROOM_MAX = {"width_in": 600.0, "depth_in": 600.0, "height_in": 144.0}
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/design-3d/room",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_design_3d_room(self, order_id, width_in=None,
+                                       depth_in=None, height_in=None, **kw):
+        """Persist room Width/Depth/Height edits from the portal's 3D
+        Design tab. Clamped server-side regardless of what the client
+        sent — the client applies the same clamps for immediate
+        feedback, but the server is the source of truth."""
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        Design = request.env["southbrook.kitchen.design"].sudo()
+        design = Design.search([("sale_order_id", "=", order.id)], limit=1)
+        if not design:
+            return {"error": "no_design"}
+        vals = {}
+        for field, raw in (("width_in", width_in), ("depth_in", depth_in),
+                            ("height_in", height_in)):
+            if raw is None:
+                continue
+            try:
+                val = float(raw)
+            except (TypeError, ValueError):
+                continue
+            lo, hi = self._DESIGN_ROOM_MIN[field], self._DESIGN_ROOM_MAX[field]
+            vals["room_" + field] = max(lo, min(hi, val))
+        if vals:
+            design.write(vals)
+        return {
+            "ok": True,
+            "room": {
+                "width_in":  design.room_width_in,
+                "depth_in":  design.room_depth_in,
+                "height_in": design.room_height_in,
+            },
+        }
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/design-3d/catalog",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_design_3d_catalog(self, order_id, **kw):
+        """Portal-safe cabinet catalog for the 3D Design tab's inventory
+        panel — every southbrook_is_cabinet product, priced through the
+        order's own pricelist (never raw list_price) so a dropped
+        cabinet's price matches what the quote will actually charge.
+        Read-only; no sale.order / design write."""
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        Template = request.env["product.template"].sudo()
+        templates = Template.search([
+            ("southbrook_is_cabinet", "=", True),
+            ("sale_ok", "=", True),
+        ], order="default_code, name")
+        pricelist = order.pricelist_id
+        partner_id = order.partner_id.id if order.partner_id else None
+        products = []
+        for tmpl in templates:
+            variant = tmpl.product_variant_id
+            # 2026-07-06 audit A13 — product_variant_id is only set when
+            # the template resolves to exactly ONE live variant. Emitting
+            # tmpl.id in its place would put a product.template id in a
+            # field /design-3d/add browses as product.product (independent
+            # id sequences → ID-space confusion). Multi-variant cabinet
+            # templates (dynamic-variant configurator SKUs) are added via
+            # the configurator flow, not this catalog — skip them.
+            if not variant:
+                continue
+            price = tmpl.list_price
+            if pricelist:
+                try:
+                    price = pricelist.with_context(
+                        partner_id=partner_id,
+                    )._get_product_price(variant, 1.0)
+                except Exception:                       # noqa: BLE001
+                    _logger.warning(
+                        "design-3d/catalog: pricelist %s could not price "
+                        "%s, falling back to list_price",
+                        pricelist.id, tmpl.default_code, exc_info=True,
+                    )
+            products.append({
+                "product_id":   variant.id,
+                "sku":          tmpl.default_code or "",
+                "name":         tmpl.display_name,
+                "cabinet_type": tmpl.southbrook_cabinet_type or "base",
+                "material":     tmpl.southbrook_material or "",
+                "width_in":     tmpl.southbrook_width_in,
+                "height_in":    tmpl.southbrook_height_in,
+                "depth_in":     tmpl.southbrook_depth_in,
+                "price":        price,
+            })
+        return {"products": products}
+
+    # 2026-07-06 audit A10 — in-process sliding-window rate limiter for
+    # the record-creating /design-3d/add route, mirroring the established
+    # pattern in southbrook_room_capture/controllers/main.py
+    # (_RATE_BUCKETS / _rate_limit_check; per-worker, keyed on user id —
+    # same documented per-worker caveat). Generous default: a busy design
+    # session adds cabinets in bursts, but nothing legitimate reaches
+    # hundreds of creates per hour.
+    _DESIGN_ADD_WINDOW_SEC = 3600
+    _DESIGN_ADD_LIMIT_DEFAULT = 240
+    _DESIGN_ADD_BUCKETS = {}   # uid -> (window_head_ts, count)
+
+    def _sb_design_add_rate_ok(self):
+        uid = request.env.user.id
+        if not uid:
+            return True
+        try:
+            limit = int(request.env["ir.config_parameter"].sudo().get_param(
+                "southbrook_estimating_website.design_add_rate_limit",
+                str(self._DESIGN_ADD_LIMIT_DEFAULT)))
+        except Exception:                           # noqa: BLE001
+            limit = self._DESIGN_ADD_LIMIT_DEFAULT
+        limit = max(1, min(limit, 10_000))
+        now = int(time.time())
+        buckets = self._DESIGN_ADD_BUCKETS
+        if len(buckets) >= 4096:
+            # Bounded scratch data; crude trim is fine per-worker.
+            buckets.clear()
+        head, cnt = buckets.get(uid, (now, 0))
+        if now - head > self._DESIGN_ADD_WINDOW_SEC:
+            buckets[uid] = (now, 1)
+            return True
+        if cnt + 1 > limit:
+            return False
+        buckets[uid] = (head, cnt + 1)
+        return True
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/design-3d/add",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_design_3d_add(self, order_id, product_id,
+                                      x_position_in=None, **kw):
+        """Add a cabinet from the inventory panel into the scene. Only
+        southbrook_is_cabinet products can be dropped — this is a plain
+        catalog pick (a fixed, already-priced SKU), not the attribute-
+        configurator combination flow, so the hard config-rule guard
+        added to sale_order.action_confirm doesn't apply here; there is
+        no free attribute combination to validate."""
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        if not self._sb_design_add_rate_ok():
+            return {"error": "rate_limited"}
+        # 2026-07-06 audit A3 — product_id arrives as raw JSON; guard the
+        # int() coercion like every other client input in these routes.
+        try:
+            product_id = int(product_id)
+        except (TypeError, ValueError):
+            return {"error": "not_a_cabinet"}
+        Product = request.env["product.product"].sudo()
+        product = Product.browse(product_id).exists()
+        # 2026-07-06 audit A12 — browse() bypasses active-record
+        # filtering, so also require what the /catalog domain requires
+        # (active + sale_ok); an archived/discontinued cabinet must not
+        # be addable by remembered id. Same error token as the
+        # nonexistent-id case — no new existence oracle.
+        if (not product or not product.active or not product.sale_ok
+                or not product.product_tmpl_id.southbrook_is_cabinet):
+            return {"error": "not_a_cabinet"}
+        Design = request.env["southbrook.kitchen.design"].sudo()
+        design = Design.search([("sale_order_id", "=", order.id)], limit=1)
+        if not design:
+            return {"error": "no_design"}
+        tmpl = product.product_tmpl_id
+        pricelist = order.pricelist_id
+        price = tmpl.list_price
+        if pricelist:
+            try:
+                price = pricelist.with_context(
+                    partner_id=order.partner_id.id if order.partner_id else None,
+                )._get_product_price(product, 1.0)
+            except Exception:                       # noqa: BLE001
+                pass
+        # 2026-07-06 audit A1/A4 — sanitize the drop position (finite +
+        # clamped, shared _sb_design_coord). No/unusable position means
+        # "append at the end of the current run", computed from the real
+        # lines — NOT the backend configurator's 1e6 sort-sentinel: that
+        # sentinel only works there because its _recomputeLayoutFromItems
+        # re-packs positions afterwards, which this portal route never
+        # does, so storing 1e6 raw would park the cabinet a million
+        # inches away and balloon the client's auto-expanded room width.
+        x_val = self._sb_design_coord(x_position_in)
+        if x_val is None:
+            run_lines = design.cabinet_line_ids.filtered(
+                lambda l: l.origin == "configurator"
+            )
+            x_val = min(
+                max(((l.x_position_in or 0.0) + (l.width_in or 0.0)
+                     for l in run_lines), default=0.0),
+                self._DESIGN_COORD_MAX,
+            )
+        cabinet_type = tmpl.southbrook_cabinet_type or "base"
+        z_val = 0.0
+        if cabinet_type == "wall":
+            wall_lines = design.cabinet_line_ids.filtered(
+                lambda l: l.origin == "configurator" and l.cabinet_type == "wall"
+            )
+            z_val = wall_lines[:1].z_position_in if wall_lines else 54.0
+        layout_key = "%s-add-%d-%d" % (cabinet_type, product.id, design.id)
+        # A prior drop of the same product could already have this
+        # layout_key from an earlier request (double-submit); make the
+        # key unique per call so re-adding the same SKU never collides.
+        existing_keys = design.cabinet_line_ids.mapped("layout_key")
+        suffix = 0
+        base_key = layout_key
+        while layout_key in existing_keys:
+            suffix += 1
+            layout_key = "%s-%d" % (base_key, suffix)
+        Line = request.env["southbrook.kitchen.design.line"].sudo()
+        line = Line.create({
+            "design_id":     design.id,
+            "product_id":    product.id,
+            "quantity":      1,
+            "price_unit":    price,
+            "cabinet_type":  cabinet_type,
+            "width_in":      tmpl.southbrook_width_in or 24.0,
+            "height_in":     tmpl.southbrook_height_in or (
+                30.0 if cabinet_type == "wall" else 34.5),
+            "depth_in":      tmpl.southbrook_depth_in or (
+                12.0 if cabinet_type == "wall" else 24.0),
+            "x_position_in": x_val,
+            "y_position_in": 0.0,
+            "z_position_in": z_val,
+            "pinned":        False,
+            "rotation_deg":  0.0,
+            "layout_key":    layout_key,
+            "origin":        "configurator",
+        })
+        return {"ok": True, "item": {
+            "id":            product.id,
+            "product_id":    product.id,
+            "product_name":  product.display_name,
+            "sku":           tmpl.default_code or "",
+            "material":      tmpl.southbrook_material or "",
+            "layout_key":    line.layout_key,
+            "cabinet_type":  line.cabinet_type,
+            "width_in":      line.width_in,
+            "height_in":     line.height_in,
+            "depth_in":      line.depth_in,
+            "x_position_in": line.x_position_in,
+            "y_position_in": line.y_position_in,
+            "z_position_in": line.z_position_in,
+            "rotation_deg":  line.rotation_deg,
+            "pinned":        line.pinned,
+            "price":         line.price_unit,
+            "quantity":      line.quantity,
+        }}
 
     def _southbrook_order_signature(self, order):
         """Cheap server-side change-detection signature for the order
