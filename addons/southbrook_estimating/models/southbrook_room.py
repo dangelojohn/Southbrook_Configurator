@@ -132,6 +132,34 @@ class SouthbrookRoom(models.Model):
     layout_complete = fields.Boolean(compute="_compute_summary", store=True)
     has_plumbing = fields.Boolean(compute="_compute_summary", store=True)
 
+    # M3 (2026-07-06) — visibility for cabinets on the order that aren't
+    # yet placed on a wall. wall.used_mm only counts sale.order.line rows
+    # whose wall_id is set (the Room Layout drag UI assigns it), so
+    # cabinets added straight into the Order Lines tab are invisible to
+    # per-wall capacity and every wall reads "0 used (mm)" even though the
+    # order has cabinets. This surfaces the count so "0 used" is no longer
+    # misleading — the rep can see N cabinets still need placing on a wall.
+    unplaced_cabinet_count = fields.Integer(
+        compute="_compute_unplaced_cabinets", store=False,
+        string="Cabinets not yet placed on a wall")
+
+    @api.depends(
+        "order_id.order_line",
+        "order_id.order_line.wall_id",
+        "order_id.order_line.product_uom_qty",
+    )
+    def _compute_unplaced_cabinets(self):
+        for rec in self:
+            count = 0
+            for line in (rec.order_id.order_line if rec.order_id else []):
+                tmpl = line.product_id.product_tmpl_id
+                # southbrook_is_cabinet flags configurable cabinet products;
+                # read (not depend) since it effectively never changes.
+                if (tmpl and getattr(tmpl, "southbrook_is_cabinet", False)
+                        and not line.wall_id):
+                    count += 1
+            rec.unplaced_cabinet_count = count
+
     @api.depends(
         "layout_shape", "wall_ids", "wall_ids.length_mm",
         "constraint_ids", "constraint_ids.constraint_type",

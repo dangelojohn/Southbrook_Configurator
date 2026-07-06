@@ -129,6 +129,9 @@ def _serialize_room(room):
         "total_linear_mm": room.total_linear_mm,
         "wall_count": room.wall_count,
         "constraint_count": room.constraint_count,
+        # M3 (2026-07-06) — N cabinets on the order not yet placed on a
+        # wall, so the client can explain why a wall reads "0 used (mm)".
+        "unplaced_cabinet_count": room.unplaced_cabinet_count,
         "walls": walls,
     }
 
