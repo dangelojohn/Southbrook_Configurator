@@ -10,6 +10,7 @@
         <field name="purchase_ok">True</field>
         <field name="list_price">180.00</field>
         <field name="southbrook_is_cabinet">True</field>
+        <field name="categ_id" ref="product.product_category_goods"/>
         <field name="southbrook_cabinet_type">base</field>
         <field name="southbrook_width_in">24</field>
         <field name="southbrook_height_in">34.5</field>
@@ -27,6 +28,7 @@
         <field name="purchase_ok">True</field>
         <field name="list_price">210.00</field>
         <field name="southbrook_is_cabinet">True</field>
+        <field name="categ_id" ref="product.product_category_goods"/>
         <field name="southbrook_cabinet_type">base</field>
         <field name="southbrook_width_in">24</field>
         <field name="southbrook_height_in">34.5</field>
@@ -44,6 +46,7 @@
         <field name="purchase_ok">True</field>
         <field name="list_price">195.00</field>
         <field name="southbrook_is_cabinet">True</field>
+        <field name="categ_id" ref="product.product_category_goods"/>
         <field name="southbrook_cabinet_type">base</field>
         <field name="southbrook_width_in">30</field>
         <field name="southbrook_height_in">34.5</field>
@@ -61,6 +64,7 @@
         <field name="purchase_ok">True</field>
         <field name="list_price">120.00</field>
         <field name="southbrook_is_cabinet">True</field>
+        <field name="categ_id" ref="product.product_category_goods"/>
         <field name="southbrook_cabinet_type">wall</field>
         <field name="southbrook_width_in">24</field>
         <field name="southbrook_height_in">30</field>
@@ -78,6 +82,7 @@
         <field name="purchase_ok">True</field>
         <field name="list_price">150.00</field>
         <field name="southbrook_is_cabinet">True</field>
+        <field name="categ_id" ref="product.product_category_goods"/>
         <field name="southbrook_cabinet_type">wall</field>
         <field name="southbrook_width_in">24</field>
         <field name="southbrook_height_in">30</field>
@@ -95,6 +100,7 @@
         <field name="purchase_ok">True</field>
         <field name="list_price">380.00</field>
         <field name="southbrook_is_cabinet">True</field>
+        <field name="categ_id" ref="product.product_category_goods"/>
         <field name="southbrook_cabinet_type">tall</field>
         <field name="southbrook_width_in">24</field>
         <field name="southbrook_height_in">84</field>
@@ -112,6 +118,7 @@
         <field name="purchase_ok">True</field>
         <field name="list_price">35.00</field>
         <field name="southbrook_is_cabinet">True</field>
+        <field name="categ_id" ref="product.product_category_goods"/>
         <field name="southbrook_cabinet_type">filler</field>
         <field name="southbrook_width_in">3</field>
         <field name="southbrook_height_in">34.5</field>

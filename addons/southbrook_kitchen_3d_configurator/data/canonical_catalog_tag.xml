@@ -11,6 +11,21 @@
   These are re-applied on every -u (noupdate="0") — a Studio user or
   accidental UI edit that clears one of them is auto-healed.
 
+    * categ_id — deliberately NOT a per-record field here. It is a
+      generic Odoo classification field an operator may legitimately
+      change (accounting/reporting), not a structural invariant of
+      this module — force-resetting it on every -u would be exactly
+      the clobber-class the dimensions split below exists to avoid.
+      Instead, the <function> block at the end of this file backfills
+      product.product_category_goods ONLY where categ_id is NULL
+      (none of the canonical templates ever had it set by
+      southbrook_estimating's data/product_templates.xml — it isn't
+      required at the Python field level in Odoo 19, only on the
+      product form view — which left NULL-category products that
+      blanked the Cabinet Products kanban, found 2026-07-05).
+      Runs on install + every -u; idempotent; never overwrites an
+      operator's explicit category.
+
   Per-template DIMENSIONS live in the sibling file
   canonical_catalog_dimensions.xml with noupdate="1" so runtime edits
   survive -u. Before the split, dimension writes shipped in this file
@@ -132,5 +147,24 @@
     in a separate "surface product" catalog gated by a distinct
     flag (e.g. southbrook_is_surface).
   -->
+
+  <!-- categ_id NULL-only backfill (see header). <function> elements
+       execute on install AND every -u regardless of noupdate (same
+       mechanism as security/groups.xml's user sweep). Domain-scoped
+       to cabinet-tagged templates with NO category, so an operator's
+       explicit recategorization is never touched. Covers both the
+       canonical southbrook_estimating templates and this module's
+       own demo cabinets in one pass. -->
+  <!-- NOTE: the model= attribute on the first <value> is REQUIRED —
+       convert.py only injects `obj` (= env[model].browse) into a
+       value's eval context when that value node itself carries
+       model=; the enclosing <function>'s model does not propagate. -->
+  <function model="product.template" name="write">
+    <value model="product.template" eval="obj().search([
+        ('southbrook_is_cabinet', '=', True),
+        ('categ_id', '=', False),
+    ]).ids"/>
+    <value eval="{'categ_id': ref('product.product_category_goods')}"/>
+  </function>
 
 </odoo>
