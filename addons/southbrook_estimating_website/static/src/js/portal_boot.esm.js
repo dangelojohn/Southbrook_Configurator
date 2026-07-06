@@ -199,6 +199,141 @@ class OrderTitlebar extends Component {
 }
 
 // ----------------------------------------------------------------------
+// CustomerPanel — capture panel added 2026-07-06.
+//
+// Sits directly under OrderTitlebar. In customer mode it renders a
+// small read-only summary of who the order is for (a customer viewing
+// their own order must never be able to re-point it to a different
+// contact). In dealer/staff mode it becomes a compact identify-the-
+// customer form: when the order is still bound to the logged-in
+// employee's own contact (partner_is_self) or an internal user
+// (partner_is_internal), it surfaces a warning plus an editable
+// Name / Email / Phone form that posts to the set-customer endpoint
+// and then reloads the order so the titlebar + this panel pick up the
+// resolved partner.
+// ----------------------------------------------------------------------
+
+class CustomerPanel extends Component {
+    static template = xml`
+        <div class="o_owl_titlebar o_owl_customer_panel">
+            <h2 class="o_owl_titlebar_heading" style="font-size:1rem;margin:0 0 6px 0;">
+                Customer
+            </h2>
+
+            <t t-if="props.mode === 'customer'">
+                <div class="o_owl_customer_readonly">
+                    <div t-if="props.order.partner_name">
+                        <strong t-esc="props.order.partner_name"/>
+                    </div>
+                    <div t-if="props.order.partner_email" t-esc="props.order.partner_email"/>
+                    <div t-if="props.order.partner_phone" t-esc="props.order.partner_phone"/>
+                </div>
+            </t>
+
+            <t t-else="">
+                <p t-if="props.order.partner_is_self || props.order.partner_is_internal"
+                   class="o_owl_customer_warning">
+                    ⚠ No customer identified — this order is not tied to a real
+                    customer yet. Enter who this kitchen is for.
+                </p>
+
+                <div t-else="" class="o_owl_customer_current">
+                    <div t-if="props.order.partner_name">
+                        <strong t-esc="props.order.partner_name"/>
+                    </div>
+                    <div t-if="props.order.partner_email" t-esc="props.order.partner_email"/>
+                    <div t-if="props.order.partner_phone" t-esc="props.order.partner_phone"/>
+                </div>
+
+                <div class="o_owl_customer_form">
+                    <input type="text"
+                           placeholder="Customer name"
+                           t-att-value="state.name"
+                           t-on-input="_onNameInput"/>
+                    <input type="email"
+                           placeholder="Email"
+                           t-att-value="state.email"
+                           t-on-input="_onEmailInput"/>
+                    <input type="text"
+                           placeholder="Phone"
+                           t-att-value="state.phone"
+                           t-on-input="_onPhoneInput"/>
+                    <button class="o_owl_btn o_owl_btn_primary"
+                            t-on-click="_onSave"
+                            t-att-disabled="state.saving">
+                        <t t-if="state.saving">Saving…</t>
+                        <t t-else="">Save customer</t>
+                    </button>
+                    <div t-if="state.error" class="o_owl_customer_error" t-esc="state.error"/>
+                </div>
+            </t>
+        </div>
+    `;
+    static props = {
+        order: Object,
+        orderId: String,
+        mode: { type: String, optional: true },
+        reload: Function,
+    };
+
+    setup() {
+        const o = this.props.order || {};
+        this.state = useState({
+            name: o.partner_is_self ? "" : (o.partner_name || ""),
+            email: o.partner_email || "",
+            phone: o.partner_phone || "",
+            saving: false,
+            error: "",
+        });
+    }
+
+    _onNameInput(ev) {
+        this.state.name = ev.target.value;
+    }
+
+    _onEmailInput(ev) {
+        this.state.email = ev.target.value;
+    }
+
+    _onPhoneInput(ev) {
+        this.state.phone = ev.target.value;
+    }
+
+    async _onSave() {
+        const name = (this.state.name || "").trim();
+        const email = (this.state.email || "").trim();
+        if (!name && !email) {
+            this.state.error = "Enter at least a name or an email.";
+            return;
+        }
+        this.state.saving = true;
+        this.state.error = "";
+        try {
+            const result = await rpcJsonCall(
+                "/my/southbrook/order-builder/"
+                + this.props.orderId
+                + "/set-customer",
+                {
+                    name: name,
+                    email: email,
+                    phone: this.state.phone || "",
+                },
+            );
+            if (result && result.ok) {
+                await this.props.reload();
+                this.state.error = "";
+            } else {
+                this.state.error = (result && result.error) || "Save failed.";
+            }
+        } catch (err) {
+            this.state.error = err.message || "Save failed.";
+        } finally {
+            this.state.saving = false;
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
 // StagePipeline — T2C7.
 //
 // 5 stages with clip-path arrow shapes, mapping order.state to the
@@ -3136,6 +3271,14 @@ const TEMPLATE = xml`
             <IllustrativeBanner show="state.order.seed_mode === 'illustrative'"/>
             <OrderTitlebar order="state.order"
                            mode="props.mode || 'dealer'"/>
+            <!-- 2026-07-06 — Customer capture panel. Read-only in
+                 customer mode; editable identify-the-customer form in
+                 dealer/staff mode. Reuses the root's _loadOrder so the
+                 titlebar + this panel refresh together after a save. -->
+            <CustomerPanel order="state.order"
+                           orderId="props.orderId"
+                           mode="props.mode || 'dealer'"
+                           reload="() => this._loadOrder()"/>
             <StagePipeline order="state.order"
                            mode="props.mode || 'dealer'"/>
 
@@ -3682,6 +3825,7 @@ class OrderBuilder extends Component {
     static components = {
         IllustrativeBanner,
         OrderTitlebar,
+        CustomerPanel,
         StagePipeline,
         ProductionApprovalStrip,
         HeaderStrip,

@@ -172,20 +172,36 @@ class SouthbrookRoomChatSession(models.Model):
     def _save_followup_lead(self, customer, draft):
         self.ensure_one()
         order = self.order_id
-        partner = order.partner_id
         Inquiry = self.env["southbrook.agent.inquiry"].sudo()
 
-        # Enrich the customer's own contact — backfill BLANKS only, never
-        # overwrite existing identity.
+        # 2026-07-06 — capture the REAL customer instead of trusting
+        # order.partner_id. Previously this backfilled/attached everything
+        # onto whatever partner the order already carried — which is the
+        # logged-in employee (e.g. Administrator) whenever a customer chats
+        # against a staff-created order, so no real customer was ever
+        # created. Resolve-or-create the customer from the chat-captured
+        # name/email/phone/address (unverified public submission → never
+        # mutate a matched existing contact), then re-point the order onto
+        # that customer when it's currently tied to an internal/employee
+        # contact (or the acting session user) rather than a real customer.
         addr_vals = Inquiry._partner_address_vals(customer)
-        partner_updates = {}
-        if not partner.phone and customer.get("phone"):
-            partner_updates["phone"] = customer["phone"]
-        for key in ("street", "city", "zip", "country_id", "state_id"):
-            if addr_vals.get(key) and not partner[key]:
-                partner_updates[key] = addr_vals[key]
-        if partner_updates:
-            partner.sudo().write(partner_updates)
+        resolve_vals = {
+            "name": customer.get("name"),
+            "email": customer.get("email"),
+            "phone": customer.get("phone"),
+        }
+        resolve_vals.update(addr_vals)
+        partner = self.env["res.partner"].sudo()._southbrook_resolve_customer(
+            resolve_vals, trusted=False)
+
+        cur = order.partner_id
+        cur_is_employee = bool(
+            cur.user_ids and any(not u.share for u in cur.user_ids))
+        if partner and cur.id != partner.id and (
+            not cur or cur_is_employee
+            or cur.id == self.env.user.partner_id.id
+        ):
+            order.sudo().write({"partner_id": partner.id})
 
         # Description — assemble plain text, convert to safe HTML (the
         # crm.lead.description field is Html).

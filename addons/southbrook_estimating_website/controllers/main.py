@@ -874,6 +874,47 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             "/my/southbrook/order-builder/%s" % order.id
         )
 
+    # ==================================================================
+    # Customer identity capture (2026-07-06).
+    #
+    # The Order Builder is a staff/dealer tool — the logged-in user
+    # (an employee, e.g. Administrator) builds an order ON BEHALF OF a
+    # customer, so the order MUST be tied to a distinct, captured
+    # customer contact, never the employee's own partner. This endpoint
+    # takes the customer's details from the Order Builder's Customer
+    # panel, find-or-creates the res.partner (via the shared
+    # _southbrook_resolve_customer resolver), and re-points the order.
+    # ==================================================================
+    @http.route(
+        "/my/southbrook/order-builder/<int:order_id>/set-customer",
+        type="json",
+        auth="user",
+        website=True,
+    )
+    def southbrook_set_order_customer(self, order_id, **kw):
+        order = self._southbrook_resolve_order(order_id)  # access-checked
+        name = (kw.get("name") or "").strip()
+        email = (kw.get("email") or "").strip()
+        if not name and not email:
+            return {"ok": False,
+                    "error": "Enter the customer's name or email."}
+        vals = {
+            k: (kw.get(k) or "").strip()
+            for k in ("name", "email", "phone", "street", "street2",
+                      "city", "zip", "function")
+        }
+        vals["is_company"] = bool(kw.get("is_company"))
+        partner = request.env["res.partner"].sudo()._southbrook_resolve_customer(
+            vals, trusted=True)
+        order.sudo().write({"partner_id": partner.id})
+        return {
+            "ok": True,
+            "partner_id": partner.id,
+            "partner_name": partner.name,
+            "partner_email": partner.email or "",
+            "partner_phone": partner.phone or "",
+        }
+
     @http.route(
         ["/my/southbrook/order-builder",
          "/my/southbrook/order-builder/<int:order_id>"],
@@ -3567,6 +3608,17 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 "version":        getattr(order, "version", 1),
                 "partner_id":     partner.id,
                 "partner_name":   partner.name,
+                # Customer identity (2026-07-06): surfaced so the Order
+                # Builder can show WHO the order is for and prefill the
+                # capture form. A partner that is just the logged-in
+                # employee (internal user) is flagged so the UI can prompt
+                # the rep to identify the real customer.
+                "partner_email":  partner.email or "",
+                "partner_phone":  partner.phone or "",
+                "partner_is_self": bool(
+                    partner.id == request.env.user.partner_id.id),
+                "partner_is_internal": bool(
+                    partner.user_ids and not all(u.share for u in partner.user_ids)),
                 "via":            via,
                 "channel":        channel,
                 "channel_label":  channel_label,
