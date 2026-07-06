@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.28.12.0",
+    "version": "19.0.29.1.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -185,6 +185,14 @@
             # portal page; pairs with views/design_system_chrome.xml
             # which inlines the anti-FOUC guard).
             "southbrook_estimating_website/static/src/js/sb_theme_toggle.esm.js",
+            # 2026-07-06 — public homepage hero: interactive 3D sample
+            # preview (a non-persisting, backend-free Three.js toy that
+            # teases the real Order Builder). Self-mounts on
+            # .o_sb_sample3d_host (the homepage hero card) and no-ops on
+            # every other frontend page. Uses the vendored window.THREE +
+            # THREE.OrbitControls loaded above (lines ~75-76), so it must
+            # come after them — it does. No imports; independent bootstrap.
+            "southbrook_estimating_website/static/src/js/sample_3d_widget.esm.js",
         ],
     },
     "installable": True,
