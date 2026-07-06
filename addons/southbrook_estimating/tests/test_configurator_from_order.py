@@ -39,26 +39,59 @@ class TestConfiguratorFromOrder(TransactionCase):
         cls.order = cls.env["sale.order"].create({
             "partner_id": cls.partner.id})
 
-    def test_action_config_start_does_not_force_preset_selection(self):
-        """Regression: the order-launched wizard action must not carry
-        allow_preset_selection=True in its context — that's what put an
-        always-empty 'Preset' field on the same screen as the (working)
-        template picker."""
+    def test_action_config_start_opens_the_template_picker(self):
+        """C1 fix: the header button now opens the plain template-picker
+        transient (not the configurator's virtual-record picker), scoped to
+        this order. The picker's product_tmpl_id is a plain Many2one, so it
+        can never render greyed like the delegated field did."""
         action = self.order.action_config_start()
-        ctx = action.get("context") or {}
-        self.assertFalse(
-            ctx.get("allow_preset_selection"),
-            "action_config_start must not force allow_preset_selection; "
-            "got context: %r" % ctx,
-        )
-
-    def test_action_config_start_returns_a_wizard_action(self):
-        action = self.order.action_config_start()
-        self.assertEqual(action.get("res_model"), "product.configurator.sale")
+        self.assertEqual(
+            action.get("res_model"), "southbrook.config.template.picker")
+        self.assertEqual(action.get("target"), "new")
         self.assertEqual(
             (action.get("context") or {}).get("default_order_id"),
             self.order.id,
         )
+
+    def test_picker_configure_drives_full_flow_to_a_real_step(self):
+        """C1 fix — the coverage the prior fix lacked: don't just check the
+        action dict, actually DRIVE the flow. Pick a template on the picker,
+        Configure, and assert the configurator opens on a REAL (persisted)
+        record with the template set and order attached, and that advancing
+        one step reaches a genuine config step (not the virtual-record dead
+        end)."""
+        picker = self.env["southbrook.config.template.picker"].create({
+            "order_id": self.order.id,
+            "product_tmpl_id": self.tmpl.id,
+        })
+        action = picker.action_configure()
+        self.assertEqual(action.get("res_model"), "product.configurator.sale")
+        res_id = action.get("res_id")
+        self.assertTrue(res_id, "Configure must open a REAL (persisted) "
+                        "wizard record, not a virtual one (res_id was falsy)")
+        wizard = self.env["product.configurator.sale"].browse(res_id)
+        self.assertTrue(wizard.exists())
+        self.assertEqual(wizard.product_tmpl_id, self.tmpl)
+        self.assertEqual(wizard.order_id, self.order)
+        self.assertTrue(wizard.config_session_id,
+                        "the config session must be created on the real record")
+        # Advancing must engage the real config pipeline and leave 'select'.
+        wizard.action_next_step()
+        self.assertNotEqual(
+            wizard.state, "select",
+            "action_next_step from the picker-launched wizard must advance "
+            "into a real configuration step",
+        )
+
+    def test_picker_template_is_required(self):
+        """The picker can't be submitted without a template — enforced at
+        the model level (required=True), so the greyed-picker dead end
+        (submit with no template) is structurally impossible here."""
+        field = self.env["southbrook.config.template.picker"]._fields[
+            "product_tmpl_id"]
+        self.assertTrue(field.required)
+        # and the domain limits to configurable templates only
+        self.assertIn(("config_ok", "=", True), field.domain)
 
     def test_wizard_create_without_template_raises_friendly_error(self):
         """Regression: this is the exact failure mode the QA report

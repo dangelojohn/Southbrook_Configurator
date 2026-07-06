@@ -58,7 +58,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.7.4.1",
+    "version": "19.0.7.5.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -193,6 +193,8 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # must load after that addon is installed (depends list already
         # guarantees this).
         "views/product_configurator_wizard_view.xml",
+        # C1 fix: plain template-picker dialog for the header Configure button
+        "views/config_template_picker_views.xml",
         # A1 (2026-06-18) — Prodboard cabinet-archetype taxonomy seed.
         # Loads after security so the access rules exist when the seed
         # creates archetype records. Idempotent.

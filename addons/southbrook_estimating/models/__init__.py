@@ -19,6 +19,7 @@ from . import sale_order_line
 from . import product_config_line
 from . import product_config_session
 from . import product_configurator
+from . import config_template_picker
 from . import product_template
 from . import mrp_bom
 from . import southbrook_order_analytics

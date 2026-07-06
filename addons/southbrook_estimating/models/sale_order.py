@@ -194,38 +194,34 @@ class SaleOrder(models.Model):
                 order.pricelist_id = resolved.id
 
     # ------------------------------------------------------------------
-    # QA Bug 1 fix (2026-07-04): action_config_start (product_configurator_
-    # sale/models/sale.py) launches the "Configure Product" wizard for a
-    # brand-new order line with allow_preset_selection=True hardcoded into
-    # its own context dict — with_context() can't override that, since the
-    # base method rebuilds the dict itself and always wins. That flag
-    # forces an always-empty "Preset" field onto the same "Select
-    # Template" screen where no template has been chosen yet (its domain
-    # is [('product_tmpl_id', '=', product_tmpl_id)], guaranteed empty
-    # while product_tmpl_id is unset) — very likely why testers never
-    # notice/use the (already-working) template picker before clicking
-    # Next, which then hits product.config.session's product_tmpl_id
-    # NOT NULL constraint on Odoo's implicit pre-button-call save,
-    # surfacing as a raw, uncaught ValidationError.
+    # C1 fix (2026-07-06): the "Configure Product" header button.
     #
-    # Presets only make sense once a template is already known — the
-    # OTHER two entry points (reconfigure_product on sale.order.line, and
-    # product.template.configure_product) are for an EXISTING line/
-    # product and correctly leave preset selection available. For a
-    # brand-new line there's nothing to preset from yet, so this override
-    # re-implements action_config_start with just that one flag changed.
-    # See models/product_configurator.py for the companion defensive
-    # guard (friendly error if a wizard somehow still reaches create()
-    # without a template).
+    # The stock OCA flow (product_configurator_sale/models/sale.py) opens
+    # the product.configurator wizard on a VIRTUAL (unsaved) record. On that
+    # record `product_tmpl_id` is a delegated (_inherits product.config.
+    # session) field, which the Odoo 19 web client renders disabled/greyed —
+    # the user can't pick a template and Next raises the create() guard. The
+    # earlier (2026-07-04) attempt only flipped allow_preset_selection and
+    # only asserted on the returned action dict — it never rendered the view,
+    # so the greyed picker survived QA. Confirmed on the dev stack: the
+    # picker is visible & editable & non-empty at the ORM level, so the fault
+    # is purely the client rendering of the delegated field on a virtual
+    # record. And a template-less wizard can't be pre-created (config.session
+    # product_tmpl_id is NOT NULL), so the virtual record is unavoidable via
+    # that path.
+    #
+    # So we bypass the configurator's own picker: open a small transient
+    # (southbrook.config.template.picker) whose product_tmpl_id is a PLAIN
+    # Many2one (no delegation → nothing to grey). On confirm it hands off to
+    # product.template.create_config_wizard(...) — the proven path used by
+    # every other entry point, which persists a real wizard with the template
+    # pre-set, so the greyed-virtual-record problem cannot recur. The
+    # create() guard in models/product_configurator.py remains as a backstop.
     def action_config_start(self):
-        configurator_obj = self.env["product.configurator.sale"]
-        ctx = dict(
-            self.env.context,
-            default_order_id=self.id,
-            wizard_model="product.configurator.sale",
-            allow_preset_selection=False,
+        self.ensure_one()
+        return self.env["southbrook.config.template.picker"].action_open_for_order(
+            self.id
         )
-        return configurator_obj.with_context(**ctx).get_wizard_action()
 
     # ------------------------------------------------------------------
     # QA follow-up (2026-07-05): hard config-rule validation, shared

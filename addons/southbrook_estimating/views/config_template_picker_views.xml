@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- C1 fix: plain template-picker dialog for the "Configure Product" header
+     button. See models/config_template_picker.py for the root cause. -->
+<odoo>
+
+    <record id="view_config_template_picker_form" model="ir.ui.view">
+        <field name="name">southbrook.config.template.picker.form</field>
+        <field name="model">southbrook.config.template.picker</field>
+        <field name="arch" type="xml">
+            <form string="Configure Product">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Choose a cabinet to configure</h2>
+                    </div>
+                    <group>
+                        <field name="order_id" invisible="1"/>
+                        <field name="product_tmpl_id"
+                               options="{'no_create': True, 'no_open': True}"/>
+                    </group>
+                    <p class="text-muted">
+                        Pick a template, then click Configure to set its
+                        dimensions, door, finish, hardware and accessories.
+                    </p>
+                </sheet>
+                <footer>
+                    <button name="action_configure" type="object"
+                            string="Configure" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>
