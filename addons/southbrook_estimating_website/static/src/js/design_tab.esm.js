@@ -24,6 +24,22 @@
  * KitchenCanvas itself are still mouse-only — that's a shared-component
  * gap (kitchen_canvas.esm.js's own pointer pipeline), out of scope here.
  *
+ * 2026-07-06 (enrichment pass) — remaining kitchen_configurator.js
+ * surface ported to the portal-appropriate subset: zoom +/- (keys and
+ * buttons, kitchen_canvas.esm.js's existing api.zoomBy), ←/→ arrow-key
+ * cabinet cycling (SAME selectable-order algorithm as the backend's
+ * _cycleSelection — base cabinets first, then wall, each left-to-right,
+ * wraps), a Width input + product-swap select + Remove (×) on the
+ * detail panel (new /design-3d/swap + /design-3d/remove routes, and
+ * /design-3d/move now also accepts width_in), a BOM-readiness warning
+ * (text only — the backend's "Open BoM →" deep-link targets a
+ * backend-only view, not ported), a channel/pricing badge (hidden for
+ * the default retail case, matching the backend's own suppression
+ * rule), and a dimension ruler overlay along the room width. Still NOT
+ * ported: "Save as my default" (no portal equivalent — one order, no
+ * "my defaults" concept) and the customer picker (the order's partner
+ * is fixed; the backend hides this for portal users too).
+ *
  * A portal parent that drives the standalone Configurator's KitchenCanvas
  * OWL engine (reused verbatim from southbrook_kitchen_3d_configurator's
  * canvas/* modules, now also loaded into web.assets_frontend) inside the
@@ -96,6 +112,8 @@ const MATERIAL_LABELS = {
     maple_veneer: "Maple Veneer", oak_veneer: "Oak Veneer",
     painted_mdf: "Painted MDF", thermoplastic: "Thermoplastic",
 };
+// Same fixed tick set as kitchen_configurator.js's o_sbk_ruler.
+const RULER_MARKS = [0, 24, 48, 72, 96, 120, 144];
 
 export class KitchenDesignTab extends Component {
     static components = { KitchenCanvas };
@@ -110,6 +128,14 @@ export class KitchenDesignTab extends Component {
                 <span class="o_owl_design3d_meta" t-else="">
                     <t t-esc="state.items.length"/> cabinets
                     <t t-if="state.saving"> · saving…</t>
+                </span>
+                <!-- Suppressed for the default retail/no-channel case,
+                     matching kitchen_configurator.js's own topbar rule
+                     ("so it doesn't clutter the topbar"). -->
+                <span t-if="state.channel &amp;&amp; state.channel.channel !== 'retail'"
+                      class="o_owl_design3d_channel_badge"
+                      t-att-title="'Pricelist: ' + (state.channel.pricelist_name || '')">
+                    <t t-esc="state.channel.channel_label"/>
                 </span>
                 <div class="o_owl_design3d_room_dims">
                     <label class="o_owl_design3d_dim">
@@ -167,12 +193,34 @@ export class KitchenDesignTab extends Component {
                                 <span class="o_owl_design3d_viewicon">⌂</span>
                                 <span class="o_owl_design3d_viewkey">R</span>
                             </button>
+                            <div class="o_owl_design3d_viewsep"/>
+                            <button type="button" class="o_owl_design3d_viewbtn"
+                                    title="Zoom in (+)"
+                                    t-on-click="() => this._zoomBy(0.9)">
+                                <span class="o_owl_design3d_viewicon">+</span>
+                            </button>
+                            <button type="button" class="o_owl_design3d_viewbtn"
+                                    title="Zoom out (-)"
+                                    t-on-click="() => this._zoomBy(1.1)">
+                                <span class="o_owl_design3d_viewicon">−</span>
+                            </button>
+                        </div>
+                        <!-- Dimension ruler along the room width — visual
+                             parity with kitchen_configurator.js's
+                             o_sbk_ruler; ticks that exceed the current
+                             room width simply don't render. -->
+                        <div class="o_owl_design3d_ruler">
+                            <t t-foreach="rulerMarks" t-as="mark" t-key="mark">
+                                <span t-if="mark &lt;= state.room.width_in" class="o_owl_design3d_mark">
+                                    <t t-esc="mark"/> in
+                                </span>
+                            </t>
                         </div>
                         <div class="o_owl_design3d_hint">
                             <t t-if="!state.loading &amp;&amp; !state.items.length">no cabinets yet — drag one in from the panel on the right to get started</t>
-                            <t t-elif="state.view === 'iso' || state.view === 'top'">drag cabinet to move · drag ● to resize room · click select · 1-6 views</t>
-                            <t t-elif="state.view === 'persp'">drag cabinet to move · drag empty space to orbit · scroll to zoom · R reset</t>
-                            <t t-else="">scroll to zoom · click select · switch to Iso/Top/Persp to move cabinets</t>
+                            <t t-elif="state.view === 'iso' || state.view === 'top'">drag cabinet to move · drag ● to resize room · click select · ←/→ cycle · 1-6 views · +/- zoom</t>
+                            <t t-elif="state.view === 'persp'">drag cabinet to move · drag empty space to orbit · scroll to zoom · ←/→ cycle · R reset</t>
+                            <t t-else="">scroll to zoom · click select · ←/→ cycle · switch to Iso/Top/Persp to move cabinets</t>
                         </div>
                     </div>
                     <div class="o_owl_design3d_summary">
@@ -238,20 +286,41 @@ export class KitchenDesignTab extends Component {
                     <div t-if="state.selected" class="o_owl_design3d_detail">
                         <div class="o_owl_design3d_detail_head">
                             <h4>Selected Cabinet</h4>
-                            <button type="button" aria-label="Deselect" title="Deselect"
-                                    t-on-click="_deselect">×</button>
+                            <div class="o_owl_design3d_detail_actions">
+                                <button type="button" class="o_owl_design3d_detail_remove"
+                                        aria-label="Remove this cabinet" title="Remove cabinet"
+                                        t-on-click="_removeSelectedCabinet">🗑</button>
+                                <button type="button" aria-label="Deselect" title="Deselect"
+                                        t-on-click="_deselect">×</button>
+                            </div>
                         </div>
                         <p class="o_owl_design3d_detail_name" t-esc="state.selected.product_name"/>
+                        <div t-if="state.selected.bom_available === false" class="o_owl_design3d_bom_warn">
+                            ⚠ No BOM defined — this item can't be manufactured until
+                            a Bill of Materials exists for it.
+                        </div>
+                        <div class="o_owl_design3d_edit_grid">
+                            <label class="o_owl_design3d_edit_field">
+                                <span>Product</span>
+                                <select t-on-change="(ev) => this._swapSelectedProduct(ev.target.value)">
+                                    <option t-foreach="sameTypeProducts" t-as="p" t-key="p.product_id"
+                                            t-att-value="p.product_id"
+                                            t-att-selected="p.product_id === state.selected.product_id ? 'selected' : ''"
+                                            t-esc="p.name + ' — ' + p.width_in + ' in'"/>
+                                </select>
+                            </label>
+                            <label class="o_owl_design3d_edit_field">
+                                <span>Width (in)</span>
+                                <input type="number" min="6" max="48" step="3"
+                                       t-att-value="state.selected.width_in"
+                                       t-on-change="(ev) => this._updateSelectedWidth(ev.target.value)"/>
+                            </label>
+                        </div>
                         <dl class="o_owl_design3d_detail_spec">
                             <dt>SKU</dt><dd t-esc="state.selected.sku || '—'"/>
-                            <dt>Type</dt><dd t-esc="state.selected.cabinet_type"/>
+                            <dt>Height</dt><dd t-esc="state.selected.height_in + ' in'"/>
+                            <dt>Depth</dt><dd t-esc="state.selected.depth_in + ' in'"/>
                             <dt>Material</dt><dd t-esc="_materialLabel(state.selected.material)"/>
-                            <dt>Dimensions</dt>
-                            <dd>
-                                <t t-esc="state.selected.width_in"/>"W ×
-                                <t t-esc="state.selected.height_in"/>"H ×
-                                <t t-esc="state.selected.depth_in"/>"D
-                            </dd>
                             <dt>Price</dt><dd t-esc="_money(state.selected.price)"/>
                         </dl>
                     </div>
@@ -308,9 +377,11 @@ export class KitchenDesignTab extends Component {
             // completed mouse-DnD sequence can never clear the wrong one.
             touchDragProduct: null,
             toasts: [],
+            channel: null,
         });
         this.viewButtons = VIEW_BUTTONS;
         this.categoryLabels = CATEGORY_LABELS;
+        this.rulerMarks = RULER_MARKS;
         this._canvasApi = null;
         this._lastPayloadVersion = this.props.payloadVersion || 0;
         this._toastSeq = 0;
@@ -394,6 +465,12 @@ export class KitchenDesignTab extends Component {
         });
     }
 
+    get sameTypeProducts() {
+        if (!this.state.selected) return [];
+        const type = this.state.selected.cabinet_type;
+        return (this.state.products || []).filter((p) => p.cabinet_type === type);
+    }
+
     _money(v) {
         return `$${Number(v || 0).toFixed(2)}`;
     }
@@ -430,6 +507,7 @@ export class KitchenDesignTab extends Component {
             this.state.designId = payload.design_id;
             this.state.room = payload.room || this.state.room;
             this.state.items = payload.items || [];
+            this.state.channel = payload.channel || null;
         } catch (e) {
             this.state.error = e?.message || String(e);
         } finally {
@@ -474,7 +552,41 @@ export class KitchenDesignTab extends Component {
         const k = e.key;
         if (e.metaKey || e.ctrlKey) return;
         if (VIEW_KEY_MAP[k]) { e.preventDefault(); this._setView(VIEW_KEY_MAP[k]); return; }
-        if (k === "r" || k === "R") { e.preventDefault(); this._setView("iso"); }
+        if (k === "r" || k === "R") { e.preventDefault(); this._setView("iso"); return; }
+        if (k === "+" || k === "=") { e.preventDefault(); this._zoomBy(0.9); return; }
+        if (k === "-" || k === "_") { e.preventDefault(); this._zoomBy(1.1); return; }
+        if (k === "ArrowLeft" || k === "ArrowRight") {
+            e.preventDefault();
+            this._cycleSelection(k === "ArrowRight" ? 1 : -1);
+        }
+    }
+
+    _zoomBy(factor) {
+        this._canvasApi?.zoomBy(factor);
+    }
+
+    // Same selectable-order algorithm as kitchen_configurator.js's
+    // _cycleSelection: base cabinets first, then wall, each sorted
+    // left-to-right by x_position_in; fillers/panels aren't selectable
+    // this way (nothing to edit on them). Wraps in both directions.
+    _cycleSelection(dir) {
+        const selectable = (this.state.items || [])
+            .filter((it) => it.cabinet_type === "base" || it.cabinet_type === "wall")
+            .sort((a, b) => {
+                if (a.cabinet_type !== b.cabinet_type) {
+                    return a.cabinet_type === "base" ? -1 : 1;
+                }
+                return (a.x_position_in || 0) - (b.x_position_in || 0);
+            });
+        if (!selectable.length) return;
+        let idx = -1;
+        if (this.state.selected) {
+            idx = selectable.findIndex(
+                (it) => it.layout_key === this.state.selected.layout_key,
+            );
+        }
+        idx = ((idx + dir) % selectable.length + selectable.length) % selectable.length;
+        this.state.selected = selectable[idx];
     }
 
     // ─── Room dimensions ────────────────────────────────────────────────
@@ -536,6 +648,94 @@ export class KitchenDesignTab extends Component {
 
     _deselect() {
         this.state.selected = null;
+    }
+
+    async _removeSelectedCabinet() {
+        const sel = this.state.selected;
+        if (!sel || !sel.layout_key || !this.props.orderId) return;
+        this.state.saving = true;
+        try {
+            const res = await rpcCall(
+                `/southbrook/api/order/${encodeURIComponent(this.props.orderId)}/design-3d/remove`,
+                { layout_key: sel.layout_key },
+            );
+            if (res && res.error) {
+                this.state.error = res.error;
+                this._pushToast(`Couldn't remove ${sel.product_name}: ${res.error}`, "error");
+                return;
+            }
+            this._itemsMutSeq += 1;   // audit A7 pattern — mark the mutation
+            this.state.items = this.state.items.filter(
+                (it) => it.layout_key !== sel.layout_key,
+            );
+            this.state.selected = null;
+            this._pushToast(`Removed ${sel.product_name}`, "success");
+        } catch (e) {
+            const msg = e?.message || String(e);
+            this.state.error = msg;
+            this._pushToast(`Couldn't remove ${sel.product_name}: ${msg}`, "error");
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    async _updateSelectedWidth(rawValue) {
+        const sel = this.state.selected;
+        if (!sel || !sel.layout_key || !this.props.orderId) return;
+        const v = parseFloat(rawValue);
+        if (!Number.isFinite(v) || v < 6 || v > 48) return;
+        this.state.saving = true;
+        try {
+            const res = await rpcCall(
+                `/southbrook/api/order/${encodeURIComponent(this.props.orderId)}/design-3d/move`,
+                { layout_key: sel.layout_key, width_in: v },
+            );
+            if (res && res.error) {
+                this.state.error = res.error;
+                return;
+            }
+            const width_in = (res && res.width_in) ?? v;
+            this.state.items = this.state.items.map((it) =>
+                it.layout_key === sel.layout_key ? { ...it, width_in } : it,
+            );
+            this.state.selected = { ...sel, width_in };
+        } catch (e) {
+            this.state.error = e?.message || String(e);
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    async _swapSelectedProduct(rawProductId) {
+        const sel = this.state.selected;
+        if (!sel || !sel.layout_key || !this.props.orderId) return;
+        const pid = parseInt(rawProductId, 10);
+        if (!Number.isFinite(pid)) return;
+        this.state.saving = true;
+        try {
+            const res = await rpcCall(
+                `/southbrook/api/order/${encodeURIComponent(this.props.orderId)}/design-3d/swap`,
+                { layout_key: sel.layout_key, product_id: pid },
+            );
+            if (res && res.error) {
+                this.state.error = res.error;
+                this._pushToast(`Couldn't swap product: ${res.error}`, "error");
+                return;
+            }
+            if (res && res.item) {
+                this.state.items = this.state.items.map((it) =>
+                    it.layout_key === sel.layout_key ? res.item : it,
+                );
+                this.state.selected = res.item;
+                this._pushToast(`Swapped to ${res.item.product_name}`, "success");
+            }
+        } catch (e) {
+            const msg = e?.message || String(e);
+            this.state.error = msg;
+            this._pushToast(`Couldn't swap product: ${msg}`, "error");
+        } finally {
+            this.state.saving = false;
+        }
     }
 
     // KitchenCanvas → cabinet dragged (X-axis). Persist to the design line

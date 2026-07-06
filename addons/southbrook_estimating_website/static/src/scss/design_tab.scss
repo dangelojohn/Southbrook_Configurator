@@ -35,6 +35,17 @@
         opacity: 0.75;
     }
 
+    .o_owl_design3d_channel_badge {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--sb-hl, #f2ede3);
+        color: var(--sb-walnut-d, #4a3320);
+        font-family: var(--sb-font-sans, inherit);
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
     .o_owl_design3d_room_dims {
         display: flex;
         gap: 10px;
@@ -154,6 +165,26 @@
         align-self: stretch;
         margin: 2px 3px;
         background: var(--sb-rule, #ddd6c9);
+    }
+
+    // ── Dimension ruler (visual parity with kitchen_configurator.js's
+    // o_sbk_ruler — ticks along the room width, top-of-stage) ───────
+    .o_owl_design3d_ruler {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        gap: 8px;
+        pointer-events: none;
+    }
+
+    .o_owl_design3d_mark {
+        font-family: var(--sb-font-sans, inherit);
+        font-size: 9px;
+        color: rgba(0, 0, 0, 0.45);
+        background: rgba(255, 255, 255, 0.7);
+        padding: 1px 4px;
+        border-radius: 3px;
     }
 
     // ── Discoverability hint ────────────────────────────────────────
@@ -337,10 +368,63 @@
         }
     }
 
+    .o_owl_design3d_detail_actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .o_owl_design3d_detail_remove {
+        font-size: 0.85rem !important;
+
+        &:hover { color: var(--sb-alert, #a83a2b) !important; }
+    }
+
     .o_owl_design3d_detail_name {
         margin: 4px 0 6px;
         font-size: 12px;
         font-weight: 600;
+    }
+
+    .o_owl_design3d_bom_warn {
+        margin: 0 0 8px;
+        padding: 6px 8px;
+        border-radius: var(--sb-radius-sm, 4px);
+        background: rgba(168, 58, 43, 0.1);
+        color: var(--sb-alert, #a83a2b);
+        font-family: var(--sb-font-sans, inherit);
+        font-size: 11px;
+        line-height: 1.4;
+    }
+
+    .o_owl_design3d_edit_grid {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 0 0 8px;
+    }
+
+    .o_owl_design3d_edit_field {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 11px;
+        color: var(--sb-ink-dim, #6b6157);
+
+        select, input {
+            padding: 0.3rem 0.4rem;
+            border: 1px solid var(--sb-rule, #ddd6c9);
+            border-radius: var(--sb-radius-sm, 4px);
+            font-family: var(--sb-font-sans, inherit);
+            font-size: 0.8rem;
+            color: var(--sb-ink, #2c2620);
+            background: var(--sb-paper, #fff);
+
+            &:focus-visible {
+                outline: 2px solid var(--sb-sky, #3b82f6);
+                outline-offset: 1px;
+            }
+        }
     }
 
     .o_owl_design3d_detail_spec {

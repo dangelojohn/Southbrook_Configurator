@@ -2333,6 +2333,31 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 "origin":        "configurator",
             })
 
+    # 2026-07-06 (enrichment pass) — same compact shape as the standalone
+    # Kitchen 3D Configurator's _channel_meta, but the portal already
+    # knows its own order's partner + pricelist directly — no partner_id
+    # param / _resolve_pricelist lookup needed.
+    _CHANNEL_LABELS = {
+        "retail": "Retail", "dealer": "Dealer -50%",
+        "tradesperson": "Contractor", "kd": "KD",
+        "bigbox": "Big-Box", "refacing": "Refacing",
+    }
+
+    def _southbrook_design_channel(self, order):
+        partner = order.partner_id
+        pricelist = order.pricelist_id
+        channel = (partner and getattr(partner, "channel", False)) or "retail"
+        suffix = ""
+        if channel == "tradesperson" and partner:
+            tier = getattr(partner, "tradesperson_tier", False)
+            if tier:
+                suffix = " T%s" % tier
+        return {
+            "channel":        channel,
+            "channel_label":  self._CHANNEL_LABELS.get(channel, channel.title()) + suffix,
+            "pricelist_name": (pricelist and pricelist.display_name) or "",
+        }
+
     def _southbrook_design_payload(self, design):
         """KitchenCanvas payload: room dims + one flat item per
         configurator-origin design line (mirrors the configurator's
@@ -2350,6 +2375,12 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 "product_name":  prod.display_name,
                 "sku":           tmpl.default_code or "",
                 "material":      tmpl.southbrook_material or "",
+                # 2026-07-06 — BOM-readiness parity with the backend's
+                # detail-drawer warning ("No BOM defined... can't be
+                # manufactured until a Bill of Materials exists"). No
+                # "Open BoM" deep-link ported — that view is backend-
+                # only; portal shows the fact, not the internal action.
+                "bom_available": bool(tmpl.southbrook_bom_available),
                 "layout_key":    line.layout_key,
                 "cabinet_type":  line.cabinet_type,
                 "width_in":      line.width_in,
@@ -2370,6 +2401,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 "depth_in":  design.room_depth_in,
                 "height_in": design.room_height_in,
             },
+            "channel": self._southbrook_design_channel(design.sale_order_id),
             "items": items,
         }
 
@@ -2381,8 +2413,11 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     )
     def southbrook_api_design_3d_move(self, order_id, layout_key,
                                       x_position_in=None, y_position_in=None,
-                                      z_position_in=None, rotation_deg=None, **kw):
-        """Persist a drag-move to the order's design line. Portal-safe:
+                                      z_position_in=None, rotation_deg=None,
+                                      width_in=None, **kw):
+        """Persist a drag-move (or a width-edit — same "write one field
+        on my own design line" shape, added 2026-07-06 for the detail
+        panel's Width input) to the order's design line. Portal-safe:
         order ownership is enforced via _southbrook_resolve_order, then the
         write runs under sudo() (portal customers hold no ACL on
         southbrook.kitchen.design). Writes ONLY kitchen.design.line — the
@@ -2413,10 +2448,15 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             vals["z_position_in"] = self._sb_design_coord(z_position_in)
         if rotation_deg is not None:
             vals["rotation_deg"] = self._sb_design_coord(rotation_deg) % 360.0
+        if width_in is not None:
+            # Same 6-48in envelope the backend's own Width input enforces.
+            w = self._sb_design_coord(width_in)
+            if w is not None:
+                vals["width_in"] = max(6.0, min(48.0, w))
         vals = {k: v for k, v in vals.items() if v is not None}
         if vals:
             line.write(vals)
-        return {"ok": True, "id": line.id}
+        return {"ok": True, "id": line.id, "width_in": line.width_in}
 
     # 2026-07-06 audit A4 — coordinate sanitizer shared by the design-3d
     # write routes. float("1e400") parses to inf (and "nan" to NaN)
@@ -2564,18 +2604,21 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             })
         return {"products": products}
 
-    # 2026-07-06 audit A10 — in-process sliding-window rate limiter for
-    # the record-creating /design-3d/add route, mirroring the established
-    # pattern in southbrook_room_capture/controllers/main.py
-    # (_RATE_BUCKETS / _rate_limit_check; per-worker, keyed on user id —
-    # same documented per-worker caveat). Generous default: a busy design
-    # session adds cabinets in bursts, but nothing legitimate reaches
-    # hundreds of creates per hour.
+    # 2026-07-06 audit A10, generalized 2026-07-06 (enrichment pass) —
+    # in-process sliding-window rate limiter shared by every route that
+    # mutates the design's cabinet SET (add/remove/swap — not /move,
+    # which fires on every drag-commit and doesn't create/destroy
+    # records), mirroring the established pattern in
+    # southbrook_room_capture/controllers/main.py (_RATE_BUCKETS /
+    # _rate_limit_check; per-worker, keyed on user id — same documented
+    # per-worker caveat). Generous default: a busy design session adds/
+    # swaps/removes cabinets in bursts, but nothing legitimate reaches
+    # hundreds of these per hour.
     _DESIGN_ADD_WINDOW_SEC = 3600
     _DESIGN_ADD_LIMIT_DEFAULT = 240
     _DESIGN_ADD_BUCKETS = {}   # uid -> (window_head_ts, count)
 
-    def _sb_design_add_rate_ok(self):
+    def _sb_design_mutate_rate_ok(self):
         uid = request.env.user.id
         if not uid:
             return True
@@ -2620,7 +2663,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             return {"error": "not_found"}
         except AccessError:
             return {"error": "forbidden"}
-        if not self._sb_design_add_rate_ok():
+        if not self._sb_design_mutate_rate_ok():
             return {"error": "rate_limited"}
         # 2026-07-06 audit A3 — product_id arrives as raw JSON; guard the
         # int() coercion like every other client input in these routes.
@@ -2713,6 +2756,122 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             "product_name":  product.display_name,
             "sku":           tmpl.default_code or "",
             "material":      tmpl.southbrook_material or "",
+            "bom_available": bool(tmpl.southbrook_bom_available),
+            "layout_key":    line.layout_key,
+            "cabinet_type":  line.cabinet_type,
+            "width_in":      line.width_in,
+            "height_in":     line.height_in,
+            "depth_in":      line.depth_in,
+            "x_position_in": line.x_position_in,
+            "y_position_in": line.y_position_in,
+            "z_position_in": line.z_position_in,
+            "rotation_deg":  line.rotation_deg,
+            "pinned":        line.pinned,
+            "price":         line.price_unit,
+            "quantity":      line.quantity,
+        }}
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/design-3d/remove",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_design_3d_remove(self, order_id, layout_key, **kw):
+        """Remove a cabinet from the scene — the missing symmetry to
+        /add. Portal-safe: same resolve-order-then-sudo pattern; deletes
+        ONLY the southbrook.kitchen.design.line row, never sale.order/MO."""
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        if not self._sb_design_mutate_rate_ok():
+            return {"error": "rate_limited"}
+        if not layout_key:
+            return {"error": "no_layout_key"}
+        Design = request.env["southbrook.kitchen.design"].sudo()
+        design = Design.search([("sale_order_id", "=", order.id)], limit=1)
+        if not design:
+            return {"error": "no_design"}
+        line = design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator" and l.layout_key == layout_key
+        )[:1]
+        if not line:
+            return {"error": "no_matching_line"}
+        line.unlink()
+        return {"ok": True}
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/design-3d/swap",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_design_3d_swap(self, order_id, layout_key, product_id, **kw):
+        """Swap the product on an existing design line for a different
+        SKU of the same cabinet_type — mirrors the backend detail
+        drawer's product-swap select. Keeps position + custom width (a
+        user-dialed-in width shouldn't reset just because the SKU
+        changed); recomputes price + canonical height/depth from the
+        new product, same pricelist-resolution path as /add."""
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        if not self._sb_design_mutate_rate_ok():
+            return {"error": "rate_limited"}
+        if not layout_key:
+            return {"error": "no_layout_key"}
+        try:
+            product_id = int(product_id)
+        except (TypeError, ValueError):
+            return {"error": "not_a_cabinet"}
+        Product = request.env["product.product"].sudo()
+        product = Product.browse(product_id).exists()
+        if (not product or not product.active or not product.sale_ok
+                or not product.product_tmpl_id.southbrook_is_cabinet):
+            return {"error": "not_a_cabinet"}
+        Design = request.env["southbrook.kitchen.design"].sudo()
+        design = Design.search([("sale_order_id", "=", order.id)], limit=1)
+        if not design:
+            return {"error": "no_design"}
+        line = design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator" and l.layout_key == layout_key
+        )[:1]
+        if not line:
+            return {"error": "no_matching_line"}
+        tmpl = product.product_tmpl_id
+        # Same cabinet_type only — swapping a base for a wall cabinet
+        # mid-run would silently break the run's Z-alignment logic.
+        new_type = tmpl.southbrook_cabinet_type or "base"
+        if new_type != line.cabinet_type:
+            return {"error": "type_mismatch"}
+        pricelist = order.pricelist_id
+        price = tmpl.list_price
+        if pricelist:
+            try:
+                price = pricelist.with_context(
+                    partner_id=order.partner_id.id if order.partner_id else None,
+                )._get_product_price(product, 1.0)
+            except Exception:                       # noqa: BLE001
+                pass
+        line.write({
+            "product_id":  product.id,
+            "price_unit":  price,
+            "height_in":   tmpl.southbrook_height_in or line.height_in,
+            "depth_in":    tmpl.southbrook_depth_in or line.depth_in,
+        })
+        return {"ok": True, "item": {
+            "id":            product.id,
+            "product_id":    product.id,
+            "product_name":  product.display_name,
+            "sku":           tmpl.default_code or "",
+            "material":      tmpl.southbrook_material or "",
+            "bom_available": bool(tmpl.southbrook_bom_available),
             "layout_key":    line.layout_key,
             "cabinet_type":  line.cabinet_type,
             "width_in":      line.width_in,
