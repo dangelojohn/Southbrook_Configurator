@@ -105,6 +105,10 @@
 .o_sb_sample3d_card {
   padding: 0;
   overflow: hidden;
+  // 2026-07-06 — drop the walnut card background + brown drop-shadow so
+  // the 3D demo sits clean, with no dark brown frame around it.
+  background: transparent;
+  box-shadow: none;
 }
 
 .o_sb_sample3d_host {

@@ -44,12 +44,17 @@ const IDLE_MS = 30000;   // 30s kiosk idle reset
 
 // Camera presets — mirror the real configurator's 1-6 views, approximated
 // on this widget's single perspective camera (no separate ortho camera).
+// The corner has walls on -Z (back) and -X (left); the room is OPEN on
+// +X and +Z. Every camera must sit in that open quadrant (or straight
+// above) — a camera at -X/-Z would look THROUGH a wall (the "left view
+// through the wall" bug). "Left" now frames the left wall from the open
+// right-front; "right" frames the run's right side from the open right.
 const VIEWS = {
-    iso:   { pos: [115, 108, 140], target: [0, 40, -8] },
+    iso:   { pos: [115, 105, 140], target: [0, 40, -8] },
     top:   { pos: [0, 300, 0.001], target: [0, 0, -8] },
-    front: { pos: [0, 58, 205],    target: [0, 46, -22] },
-    left:  { pos: [-205, 60, 70],  target: [-10, 44, -18] },
-    right: { pos: [205, 60, 70],   target: [10, 44, -18] },
+    front: { pos: [0, 52, 190],    target: [0, 44, -28] },
+    left:  { pos: [150, 56, 120],  target: [-34, 42, -20] },
+    right: { pos: [196, 58, 55],   target: [6, 42, -26] },
     persp: { pos: [128, 100, 148], target: [0, 45, 0] },
 };
 // Same glyphs + numbering as the backend/portal view toolbar.
@@ -316,6 +321,14 @@ function buildScene(host) {
         color: 0xdedad0, roughness: 0.6 }));
     const kickMat = track(new THREE.MeshStandardMaterial({
         color: 0xe3e0d8, roughness: 0.8 }));
+    // Shared blueprint wireframe material — flat (unlit) BLUE lines, used
+    // for every surface (cabinets, walls, floor) while Wireframe is on.
+    const WIRE_BLUE = 0x2f6fd6;
+    const wireMat = track(new THREE.MeshBasicMaterial({
+        color: WIRE_BLUE, wireframe: true }));
+    // Room surfaces that switch to wireframe; decorative bits hidden then.
+    const roomWireTargets = [floor, backWall, leftWall];
+    const roomHideInWire = [bbBack, bbLeft, backsplash, windowFrame, windowGlow];
 
     const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
@@ -392,11 +405,20 @@ function buildScene(host) {
         }
     }
 
-    // Apply / remove wireframe + dimension label for one cabinet.
+    // Apply / remove wireframe + dimension label for one cabinet. The box
+    // swaps to the shared blue wireframe material (its own solid material
+    // is stashed for restore); decor is hidden and the edge outline goes
+    // blue too, for a clean blueprint look.
     function styleCabinet(mesh, wf) {
-        mesh.material.wireframe = wf;
+        if (wf) {
+            if (!mesh.userData.solidMat) mesh.userData.solidMat = mesh.material;
+            mesh.material = wireMat;
+        } else if (mesh.userData.solidMat) {
+            mesh.material = mesh.userData.solidMat;
+        }
         mesh.children.forEach((ch) => {
             if (ch.userData.decor) ch.visible = !wf;
+            if (ch.userData.edge) ch.material.color.set(wf ? WIRE_BLUE : 0xc9c3b4);
         });
         const existing = mesh.children.find((ch) => ch.userData.isLabel);
         if (wf && !existing) {
@@ -409,6 +431,20 @@ function buildScene(host) {
             if (existing.userData.tex) { try { existing.userData.tex.dispose(); } catch (_e) { /* noop */ } }
             if (existing.material) { try { existing.material.dispose(); } catch (_e) { /* noop */ } }
         }
+    }
+
+    // Walls + floor go blue wireframe too; decorative room bits (baseboards,
+    // backsplash, window) hide in that mode.
+    function styleRoom(wf) {
+        roomWireTargets.forEach((m) => {
+            if (wf) {
+                if (!m.userData.solidMat) m.userData.solidMat = m.material;
+                m.material = wireMat;
+            } else if (m.userData.solidMat) {
+                m.material = m.userData.solidMat;
+            }
+        });
+        roomHideInWire.forEach((m) => { m.visible = !wf; });
     }
 
     function createCabinet(type, x, z) {
@@ -450,6 +486,7 @@ function buildScene(host) {
 
     function applyWireframe(on) {
         wireframe = on;
+        styleRoom(on);
         placed.forEach((m) => styleCabinet(m, on));
         if (wireBtn) {
             wireBtn.textContent = on ? "Solid" : "Wireframe";
