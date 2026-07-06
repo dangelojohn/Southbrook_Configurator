@@ -45,14 +45,22 @@ M4 (catalog-wide BoM generator)
   ``southbrook_is_cabinet=True`` product.template with no 'normal' BoM
   yet and CREATES one with real, non-empty ``bom_line_ids`` (panel
   materials + real Marathon hardware SKUs). Never mutates or deletes an
-  existing BoM. Idempotent. Wired to a nightly ``ir.cron``
-  (``cron_southbrook_catalog_bom_generator``) that can also be run
-  manually from Settings > Technical > Automation > Scheduled Actions.
+  existing BoM, and never creates an empty one — ``config_ok=True``
+  (per-variant-configured) templates are skipped unconditionally rather
+  than built from a template-level midpoint fallback. Idempotent. Wired
+  to a nightly ``ir.cron`` (``cron_southbrook_catalog_bom_generator``)
+  that can also be run manually from Settings > Technical > Automation >
+  Scheduled Actions.
+* ``mrp.bom._southbrook_cleanup_empty_catalog_boms()`` — one-time (but
+  repeatable/idempotent) cleanup for the empty ``KitchenAutoSeed-*`` /
+  ``CatalogAutoBOM-*`` template-level stubs the above defect left behind
+  on the 12 ``config_ok=True`` templates; refuses to delete any BoM
+  referenced by an ``mrp.production``.
 """,
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.1.5.0",
+    "version": "19.0.1.5.1",
     "depends": [
         "mrp",
         "sale",

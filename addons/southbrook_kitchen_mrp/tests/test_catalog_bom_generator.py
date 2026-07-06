@@ -7,7 +7,17 @@ Verifies mrp.bom._southbrook_generate_catalog_boms():
     real Marathon hardware SKUs) and a pure filler/accessory (minimal
     sensible single-panel BoM, per the task's ambiguity guard),
   * is idempotent (re-running creates nothing new),
-  * never mutates a template that already has a BoM (empty stub or not).
+  * never mutates a template that already has a BoM (empty stub or not),
+  * NEVER creates a BoM (empty or otherwise) for a config_ok=True
+    (per-variant-configured) template — see the confirmed prod defect
+    documented in mrp_bom_catalog.py's module docstring.
+
+Also verifies mrp.bom._southbrook_cleanup_empty_catalog_boms():
+  * deletes an empty, auto-seeded (KitchenAutoSeed-*/CatalogAutoBOM-*)
+    stub BoM,
+  * refuses to delete one referenced by an mrp.production,
+  * never touches an empty BoM that isn't auto-seeded (hand-built),
+  * is idempotent.
 """
 from odoo.tests.common import TransactionCase, tagged
 
@@ -155,4 +165,130 @@ class TestCatalogBomGenerator(TransactionCase):
         self.assertFalse(
             boms.bom_line_ids,
             "generator must never mutate an existing BoM's lines",
+        )
+
+    # ------------------------------------------------------------------
+    # config_ok=True — never create a BoM at all, empty or otherwise
+    # ------------------------------------------------------------------
+    def test_configurable_template_gets_no_bom_not_even_empty(self):
+        """The confirmed prod defect: SB-BASE-1DR et al are config_ok=True
+        catalog templates whose real per-cabinet dimensions are chosen
+        per-VARIANT at config time. The template-level scalar dims are
+        only ever a midpoint fallback, so the generator must hard-skip
+        these — never build a BoM from that fallback, and CERTAINLY
+        never leave an empty stub sitting on them (an empty template-
+        level BoM is worse than none: any MO against any variant would
+        find it and silently produce zero components)."""
+        tmpl = self._new_cabinet_template(
+            "M4 Test Configurable Base", "base", 24.0, 34.5, 24.0,
+            "M4-CFG-BASE",
+        )
+        tmpl.write({"config_ok": True})
+        self.assertFalse(self._normal_boms(tmpl))
+
+        result = self.Bom._southbrook_generate_catalog_boms()
+
+        self.assertFalse(
+            self._normal_boms(tmpl),
+            "config_ok template must end up with NO BoM at all — not "
+            "an empty one",
+        )
+        self.assertGreaterEqual(result["skipped_configurable"], 1)
+        # Not double-counted as an "empty build" skip — it was never
+        # attempted.
+        self.assertEqual(
+            len([d for d in result["details"] if d["template_id"] == tmpl.id]),
+            0,
+        )
+
+    def test_configurable_accessory_also_gets_no_bom(self):
+        """Same guard for the config_ok accessory family (SB-ACCESSORY),
+        which would otherwise take the single-panel minimal-BoM branch
+        and materialize a (wrong, midpoint-dimensioned) line."""
+        tmpl = self._new_cabinet_template(
+            "M4 Test Configurable Accessory", "panel", 3.0, 34.5, 0.75,
+            "M4-CFG-ACCESSORY",
+        )
+        tmpl.write({"config_ok": True})
+
+        self.Bom._southbrook_generate_catalog_boms()
+
+        self.assertFalse(self._normal_boms(tmpl))
+
+    # ------------------------------------------------------------------
+    # Cleanup — remove empty auto-seeded stubs, refuse in-use ones
+    # ------------------------------------------------------------------
+    def _new_empty_stub(self, tmpl, code):
+        return self.Bom.create({
+            "product_tmpl_id": tmpl.id,
+            "type": "normal",
+            "product_qty": 1.0,
+            "code": code,
+            "bom_line_ids": [],
+        })
+
+    def test_cleanup_deletes_empty_stub_but_refuses_in_use_one(self):
+        tmpl_orphan = self._new_cabinet_template(
+            "M4 Test Orphan Empty Stub", "base", 24.0, 34.5, 24.0,
+            "M4-CLEANUP-ORPHAN",
+        )
+        orphan_stub = self._new_empty_stub(
+            tmpl_orphan, "KitchenAutoSeed-M4-CLEANUP-ORPHAN"
+        )
+
+        tmpl_inuse = self._new_cabinet_template(
+            "M4 Test In-Use Empty Stub", "base", 24.0, 34.5, 24.0,
+            "M4-CLEANUP-INUSE",
+        )
+        inuse_stub = self._new_empty_stub(
+            tmpl_inuse, "CatalogAutoBOM-M4-CLEANUP-INUSE"
+        )
+        variant = tmpl_inuse.product_variant_ids[:1]
+        self.env["mrp.production"].create({
+            "product_id": variant.id,
+            "product_qty": 1.0,
+            "bom_id": inuse_stub.id,
+        })
+
+        result = self.Bom._southbrook_cleanup_empty_catalog_boms()
+
+        self.assertFalse(orphan_stub.exists(), "orphaned empty stub deleted")
+        self.assertTrue(
+            inuse_stub.exists(),
+            "empty stub referenced by an mrp.production must be refused",
+        )
+        self.assertEqual(result["deleted"], 1)
+        self.assertEqual(len(result["refused_in_use"]), 1)
+        self.assertEqual(result["refused_in_use"][0]["bom_id"], inuse_stub.id)
+
+    def test_cleanup_never_deletes_non_autoseeded_empty_bom(self):
+        """An empty BoM without one of the two known auto-seed code
+        prefixes is presumed hand-built (or Hermes-applied) and must
+        never be touched, even though it's empty."""
+        tmpl = self._new_cabinet_template(
+            "M4 Test Hand-Built Empty Stub", "base", 24.0, 34.5, 24.0,
+            "M4-CLEANUP-HANDBUILT",
+        )
+        hand_built = self._new_empty_stub(tmpl, "HandBuiltPlaceholder")
+
+        result = self.Bom._southbrook_cleanup_empty_catalog_boms()
+
+        self.assertTrue(hand_built.exists())
+        self.assertEqual(result["deleted"], 0)
+        self.assertEqual(result["refused_in_use"], [])
+
+    def test_cleanup_idempotent(self):
+        tmpl = self._new_cabinet_template(
+            "M4 Test Cleanup Idempotent", "base", 24.0, 34.5, 24.0,
+            "M4-CLEANUP-IDEMPOTENT",
+        )
+        self._new_empty_stub(tmpl, "KitchenAutoSeed-M4-CLEANUP-IDEMPOTENT")
+
+        first = self.Bom._southbrook_cleanup_empty_catalog_boms()
+        self.assertEqual(first["deleted"], 1)
+
+        second = self.Bom._southbrook_cleanup_empty_catalog_boms()
+        self.assertEqual(
+            second["deleted"], 0,
+            "second run must find nothing left to delete",
         )

@@ -43,6 +43,57 @@ substrate, counted 1-unit-per-panel (not per real sheet/area) — flagged
 in the module README and the delivery report rather than guessing a real
 SKU, supplier, or unit of measure that isn't in any of the source
 artifacts.
+
+PROD DEFECT (confirmed 2026-07-06) — empty catalog BoMs on config_ok
+templates
+--------------------------------------------------------------------
+The 12 catalog templates that are ``config_ok=True`` (SB-BASE-1DR,
+SB-BASE-2DR, SB-WALL-1DR, SB-WALL-2DR, SB-DRAWER, SB-SINK-BASE,
+SB-TALL-OVEN, SB-TALL-PANTRY, SB-CORNER, SB-VANITY, SB-ACCESSORY, and
+``worktop`` — the 11 tagged via
+southbrook_kitchen_3d_configurator/data/canonical_catalog_tag.xml plus
+``worktop`` itself, deliberately left untagged there) ended up with a
+template-level ``mrp.bom`` carrying ZERO ``bom_line_ids`` on prod.
+
+Root cause, confirmed by reading both BoM-seeding paths side by side:
+these are exactly the templates a customer/rep pushes through the 3D
+configurator's "Create Quotation" action, so
+``kitchen_design._ensure_kitchen_bom`` gets there FIRST and creates its
+known-empty ``KitchenAutoSeed-*`` stub (``bom_line_ids: []`` by design —
+see that method's own comment). When
+``_southbrook_generate_catalog_boms`` later runs, its "skip if a normal
+BoM already exists" guard (correct in isolation — never mutate a
+pre-existing BoM) treats that empty stub as "already handled" and moves
+on, so the hazardous empty BoM is never replaced with a real one and
+never flagged. Fixed-dimension, non-configurable cabinets (B24, W24, T24,
+FP3, etc. from demo_cabinets.xml) never go through that quote flow, so
+they had no pre-existing BoM and the generator built them correctly —
+matching the observed prod split (fixed cabinets: real lines;
+config_ok cabinets: empty).
+
+NOTE: this is NOT this generator directly manufacturing an empty BoM —
+_southbrook_build_cabinet_bom already refused to create with zero
+bom_line_vals before this fix, and still does (belt-and-suspenders). The
+actual gap is that this generator's own scope should never have included
+config_ok=True templates in the first place: those 12 templates DO carry
+non-zero template-level ``southbrook_width_in`` / ``_height_in`` /
+``_depth_in`` scalars (a MIDPOINT of the width envelope, per
+canonical_catalog_dimensions.xml's own comment — "this template-level
+scalar is a fallback the configurator uses when no variant is picked"),
+so ``_compute_panel_dimensions`` would happily return real-looking panel
+tuples from that midpoint fallback. Building a template-level BoM from a
+midpoint that isn't what any real customer chose is exactly the "invent
+a nominal dimension for a configurable cabinet" trap — wrong for a
+different, subtler reason than "empty". Configurable products get their
+real, correctly-dimensioned BoM per-VARIANT at config time via
+``kitchen_design._ensure_kitchen_bom`` / the config-session flow — that
+path is correct and untouched. This generator now hard-skips every
+``config_ok=True`` template up front (``skipped_configurable``) rather
+than attempting to build from template-scalar fallback dimensions, and
+separately refuses to ever CREATE a BoM that would materialize zero
+lines (``skipped_empty``) for the non-configurable remainder. See
+``_southbrook_cleanup_empty_catalog_boms`` below for removing the 12
+empty stubs already sitting on prod.
 """
 import logging
 
@@ -103,14 +154,46 @@ class MrpBom(models.Model):
         configurator catalog — B24, DB24, SB30, FP3 filler, etc. — incl.
         accessories/fillers) that has no 'normal'-type mrp.bom yet, and
         CREATES one with real, non-empty bom_line_ids. Never touches a
-        template that already has a normal BoM (of any origin).
+        template that already has a normal BoM (of any origin), and never
+        creates an empty one — see the module docstring's "PROD DEFECT"
+        section for the confirmed root cause of the 12 empty catalog BoMs.
+
+        Three categories are skipped without creating anything:
+          * ``skipped_existing_bom`` — a normal-type BoM already exists
+            (hand-built, Hermes-applied, or a 3D-configurator stub —
+            empty or not; never mutated or deleted here).
+          * ``skipped_configurable`` — ``config_ok=True``. These
+            templates' real dimensions are chosen per-VARIANT at config
+            time (``kitchen_design._ensure_kitchen_bom`` / the
+            config-session flow); the only dims available at the
+            template level are a midpoint fallback, and building a BoM
+            from that would be inventing a nominal dimension for a
+            genuinely configurable cabinet. Skipped unconditionally,
+            never attempted.
+          * ``skipped_empty`` — belt-and-suspenders: the non-configurable
+            build path genuinely produced zero materializable lines
+            (should not happen for real catalog data; see
+            ``_southbrook_build_cabinet_bom``).
 
         Idempotent — safe to re-run; the second pass finds every BoM
-        created by the first pass and skips those templates again.
+        created by the first pass (now covered by skipped_existing_bom)
+        and skips those templates again.
 
-        Returns ``{"created": int, "skipped": int, "details": [...]}``.
+        Returns ``{"created": int, "skipped": int, "skipped_existing_bom":
+        int, "skipped_configurable": int, "skipped_empty": int, "details":
+        [...]}``. ``skipped`` is the sum of the three specific counters,
+        kept for callers (e.g. the nightly cron log line) that only care
+        about the total.
         """
         Template = self.env["product.template"].sudo()
+        empty_result = {
+            "created": 0,
+            "skipped": 0,
+            "skipped_existing_bom": 0,
+            "skipped_configurable": 0,
+            "skipped_empty": 0,
+            "details": [],
+        }
         if "southbrook_is_cabinet" not in Template._fields:
             # southbrook_kitchen_3d_configurator (owner of the flag) isn't
             # installed in this database. Nothing is in scope — this is
@@ -121,30 +204,45 @@ class MrpBom(models.Model):
                 "field not present (southbrook_kitchen_3d_configurator not "
                 "installed) — nothing to do."
             )
-            return {"created": 0, "skipped": 0, "details": []}
+            return empty_result
 
         templates = Template.with_context(active_test=False).search(
             [("southbrook_is_cabinet", "=", True)]
         )
 
         created = 0
-        skipped = 0
+        skipped_existing_bom = 0
+        skipped_configurable = 0
+        skipped_empty = 0
         details = []
         for tmpl in templates:
             # Fast path — a normal-type BoM already exists (hand-built,
-            # Hermes-applied, or the 3D-configurator's own stub). Never
-            # touch it. active_test=False so an archived normal BoM still
-            # counts (mirrors _ensure_kitchen_bom's own guard).
+            # Hermes-applied, or the 3D-configurator's own stub, empty or
+            # not). Never touch it. active_test=False so an archived
+            # normal BoM still counts (mirrors _ensure_kitchen_bom's own
+            # guard).
             existing = tmpl.with_context(active_test=False).bom_ids.filtered(
                 lambda b: b.type == "normal"
             )
             if existing:
-                skipped += 1
+                skipped_existing_bom += 1
+                continue
+
+            # config_ok=True — the template's own scalar dims are a
+            # midpoint fallback, not what any real customer configured.
+            # Never build a template-level BoM from that; the real BoM
+            # is created per-variant elsewhere. getattr-defensive: some
+            # databases may not have product_configurator's config_ok
+            # field merged in yet, though southbrook_is_cabinet already
+            # implies southbrook_estimating (and hence product_
+            # configurator) is installed.
+            if getattr(tmpl, "config_ok", False):
+                skipped_configurable += 1
                 continue
 
             bom = self._southbrook_build_cabinet_bom(tmpl)
             if not bom:
-                skipped += 1
+                skipped_empty += 1
                 continue
 
             created += 1
@@ -155,14 +253,122 @@ class MrpBom(models.Model):
                 "line_count": len(bom.bom_line_ids),
             })
 
+        skipped = skipped_existing_bom + skipped_configurable + skipped_empty
         _logger.info(
-            "Southbrook catalog BoM generator: created=%s skipped=%s",
-            created, skipped,
+            "Southbrook catalog BoM generator: created=%s "
+            "skipped_existing_bom=%s skipped_configurable=%s "
+            "skipped_empty=%s",
+            created, skipped_existing_bom, skipped_configurable,
+            skipped_empty,
         )
-        return {"created": created, "skipped": skipped, "details": details}
+        return {
+            "created": created,
+            "skipped": skipped,
+            "skipped_existing_bom": skipped_existing_bom,
+            "skipped_configurable": skipped_configurable,
+            "skipped_empty": skipped_empty,
+            "details": details,
+        }
+
+    @api.model
+    def _southbrook_cleanup_empty_catalog_boms(self):
+        """One-time (repeatable) cleanup for the empty catalog BoMs.
+
+        Prod carries 12 template-level ``mrp.bom`` records on
+        ``config_ok=True`` cabinet templates with ZERO ``bom_line_ids`` —
+        see the module docstring's "PROD DEFECT" section for the
+        confirmed root cause (``kitchen_design._ensure_kitchen_bom``'s
+        known-empty ``KitchenAutoSeed-*`` stub, created before this
+        generator ever saw the template, which then treated the empty
+        stub as "already handled").
+
+        This method finds every EMPTY (``bom_line_ids`` falsy),
+        normal-type ``mrp.bom`` on a ``southbrook_is_cabinet=True``
+        template whose ``code`` marks it as machine-autoseeded by one of
+        the two known auto-stub paths — ``CatalogAutoBOM-*`` (this
+        generator; should be unreachable after the fix above, but cheap
+        to also cover) or ``KitchenAutoSeed-*``
+        (``kitchen_design._ensure_kitchen_bom``, the actual source of the
+        12 empties on prod) — and unlinks it, UNLESS it is referenced by
+        any ``mrp.production`` (confirmed or not — an MO pointing at it
+        means it is "in use", not orphaned, and must never be deleted
+        out from under a production order).
+
+        A hand-built or Hermes-applied BoM never carries either code
+        prefix, so this can never delete real shop-authored data even if
+        it happens to be empty.
+
+        Idempotent — a second run finds nothing left to delete.
+
+        Returns ``{"deleted": int, "deleted_details": [...],
+        "refused_in_use": [...]}``.
+        """
+        Bom = self.env["mrp.bom"].sudo()
+        Production = self.env["mrp.production"].sudo()
+        Template = self.env["product.template"].sudo()
+
+        if "southbrook_is_cabinet" not in Template._fields:
+            _logger.info(
+                "Southbrook catalog BoM cleanup: southbrook_is_cabinet "
+                "field not present — nothing to do."
+            )
+            return {"deleted": 0, "deleted_details": [], "refused_in_use": []}
+
+        AUTOSEED_PREFIXES = ("CatalogAutoBOM-", "KitchenAutoSeed-")
+
+        candidates = Bom.with_context(active_test=False).search([
+            ("type", "=", "normal"),
+            ("bom_line_ids", "=", False),
+            ("product_tmpl_id.southbrook_is_cabinet", "=", True),
+        ])
+        candidates = candidates.filtered(
+            lambda b: (b.code or "").startswith(AUTOSEED_PREFIXES)
+        )
+
+        deleted = 0
+        deleted_details = []
+        refused_in_use = []
+        for bom in candidates:
+            in_use_count = Production.search_count([("bom_id", "=", bom.id)])
+            if in_use_count:
+                refused_in_use.append({
+                    "bom_id": bom.id,
+                    "template_id": bom.product_tmpl_id.id,
+                    "template": bom.product_tmpl_id.display_name,
+                    "code": bom.code,
+                    "production_count": in_use_count,
+                })
+                continue
+
+            deleted_details.append({
+                "bom_id": bom.id,
+                "template_id": bom.product_tmpl_id.id,
+                "template": bom.product_tmpl_id.display_name,
+                "code": bom.code,
+            })
+            bom.unlink()
+            deleted += 1
+
+        _logger.info(
+            "Southbrook catalog BoM cleanup: deleted=%s refused_in_use=%s",
+            deleted, len(refused_in_use),
+        )
+        return {
+            "deleted": deleted,
+            "deleted_details": deleted_details,
+            "refused_in_use": refused_in_use,
+        }
 
     def _southbrook_build_cabinet_bom(self, tmpl):
         """Build ONE real mrp.bom for a single cabinet template.
+
+        Caller (``_southbrook_generate_catalog_boms``) only invokes this
+        for templates that already passed the ``config_ok`` and
+        "no existing BoM" guards, so ``tmpl`` here is always a
+        non-configurable, BoM-less cabinet — but this method still
+        builds ``bom_line_vals`` FIRST and only calls ``Bom.create()`` if
+        it ends up non-empty, as a second, independent line of defense:
+        never create the BoM record at all if nothing would end up on it.
 
         Returns the created mrp.bom, or an empty recordset if there was
         genuinely nothing sensible to put on it (defensive guard — should
