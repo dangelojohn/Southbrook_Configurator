@@ -354,23 +354,56 @@ class SouthbrookKitchenDesign(models.Model):
         return self.sale_order_id.action_quotation_send()
 
     # ── Computed ────────────────────────────────────────────────────────────────
+    # M1 fix (2026-07-06) — root cause: this compute only ever looked at
+    # cabinet_line_ids (the design's own drag-editor layout). When cabinets
+    # are added directly onto the linked sale.order's lines (bypassing
+    # "Generate Layout"), cabinet_line_ids stays empty and the summary card
+    # showed "0 cabinets / $0.00" even though the order itself has real
+    # cabinet lines. Fix: depend on the order's cabinet-product line fields
+    # too, and when the design has no configurator-authored lines of its
+    # own, fall back to summing the linked sale.order's cabinet product
+    # lines (southbrook_is_cabinet=True products only) so the summary is
+    # never simply wrong. Does NOT touch cabinet_line_ids, Generate Layout,
+    # or the drag-editor — this only affects the read-only summary fields.
     @api.depends(
         "cabinet_line_ids.quantity",
         "cabinet_line_ids.price_unit",
         "cabinet_line_ids.cabinet_type",
         "room_width_in",
+        "sale_order_id",
+        "sale_order_id.order_line.product_uom_qty",
+        "sale_order_id.order_line.price_subtotal",
+        "sale_order_id.order_line.product_id",
     )
     def _compute_totals(self):
         for design in self:
             lines = design.cabinet_line_ids
-            base_lines = lines.filtered(lambda l: l.cabinet_type == "base")
-            wall_lines = lines.filtered(lambda l: l.cabinet_type == "wall")
-            design.base_count      = sum(base_lines.mapped("quantity"))
-            design.wall_count      = sum(wall_lines.mapped("quantity"))
-            design.total_cabinets  = sum(lines.mapped("quantity"))
-            design.estimated_price = sum(
-                l.quantity * l.price_unit for l in lines
-            )
+            if lines:
+                base_lines = lines.filtered(lambda l: l.cabinet_type == "base")
+                wall_lines = lines.filtered(lambda l: l.cabinet_type == "wall")
+                design.base_count      = sum(base_lines.mapped("quantity"))
+                design.wall_count      = sum(wall_lines.mapped("quantity"))
+                design.total_cabinets  = sum(lines.mapped("quantity"))
+                design.estimated_price = sum(
+                    l.quantity * l.price_unit for l in lines
+                )
+            else:
+                # No configurator-origin cabinet lines yet — fall back to
+                # the linked order's own cabinet product lines so the
+                # summary card reflects reality instead of showing zero.
+                order_lines = design.sale_order_id.order_line.filtered(
+                    lambda l: l.product_id.product_tmpl_id.southbrook_is_cabinet
+                )
+                base_ol = order_lines.filtered(
+                    lambda l: l.product_id.product_tmpl_id.southbrook_cabinet_type == "base"
+                )
+                wall_ol = order_lines.filtered(
+                    lambda l: l.product_id.product_tmpl_id.southbrook_cabinet_type == "wall"
+                )
+                design.base_count      = sum(base_ol.mapped("product_uom_qty"))
+                design.wall_count      = sum(wall_ol.mapped("product_uom_qty"))
+                design.total_cabinets  = sum(order_lines.mapped("product_uom_qty"))
+                design.estimated_price = sum(order_lines.mapped("price_subtotal"))
             # Remainder: width minus base cabinet modules
             module_w = 24.0
             bp = design._find_cabinet_product("base", raise_if_missing=False)

@@ -9,3 +9,7 @@ from . import test_save_design_acl
 # the 5.6.7 UX pack: portal-partner autofill, walk-in singleton,
 # active field, unlink guard).
 from . import test_track_b_end_to_end
+
+# 2026-07-06 — M1 (design totals ignore order-added cabinet lines) and
+# M2 (reconcile cron can create a duplicate room) regression pins.
+from . import test_m1_m2_reconcile_fixes

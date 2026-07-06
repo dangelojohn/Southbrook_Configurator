@@ -133,21 +133,46 @@ class SouthbrookDesignReconcile(models.AbstractModel):
         Room = self.env["southbrook.room"]
         room = design.room_id
         if not room:
-            room = Room.sudo().create({
-                "order_id":              design.sale_order_id.id,
-                "name":                  design.name or "Kitchen",
-                "room_type":             "kitchen",
-                "layout_shape":          "straight",
-                "ceiling_height_mm":     int(round((design.room_height_in or 0) * IN_TO_MM)),
-                "unit_preference":       "imperial",
-                "sb_soffit_height_mm":   int(round((design.soffit_height_in or 0) * IN_TO_MM)),
-                "sb_wall_cab_top_alignment": design.wall_cab_top_alignment or "fixed_gap",
-                "sb_filler_strategy":    design.filler_strategy or "split",
-                "sb_design_state":       design.state,
-                "x_kitchen_image":       design.x_kitchen_image or False,
-            })
-            design.sudo().room_id = room.id
-            stats["created_rooms"] += 1
+            # M2 fix (2026-07-06) — root cause: this used to create a room
+            # gated only on `design.room_id`, never checking whether the
+            # design's own sale_order_id already has a room. A stray/
+            # abandoned design (default room_width_in=12 -> ~12in room)
+            # that later gains a sale_order_id matching an order that
+            # already has a real, wizard-built room ("Main Kitchen") would
+            # get a brand-new duplicate placeholder room instead of being
+            # linked to the one that's already there. Idempotency guard:
+            # reuse the order's existing room if one exists; only create
+            # when the order genuinely has none. Deliberately does NOT
+            # refresh the reused room's scalars here (unlike the "already
+            # bridged" branch below) — this room may belong to a design
+            # other than this one, and blindly overwriting its geometry
+            # with a stray design's defaults would trade one data-
+            # integrity bug for another.
+            existing_room = design.sale_order_id.room_ids[:1]
+            if existing_room:
+                room = existing_room
+                design.sudo().room_id = room.id
+                _logger.info(
+                    "[sb.rec_d] design id=%s reusing existing room id=%s "
+                    "on order id=%s instead of creating a duplicate",
+                    design.id, room.id, design.sale_order_id.id,
+                )
+            else:
+                room = Room.sudo().create({
+                    "order_id":              design.sale_order_id.id,
+                    "name":                  design.name or "Kitchen",
+                    "room_type":             "kitchen",
+                    "layout_shape":          "straight",
+                    "ceiling_height_mm":     int(round((design.room_height_in or 0) * IN_TO_MM)),
+                    "unit_preference":       "imperial",
+                    "sb_soffit_height_mm":   int(round((design.soffit_height_in or 0) * IN_TO_MM)),
+                    "sb_wall_cab_top_alignment": design.wall_cab_top_alignment or "fixed_gap",
+                    "sb_filler_strategy":    design.filler_strategy or "split",
+                    "sb_design_state":       design.state,
+                    "x_kitchen_image":       design.x_kitchen_image or False,
+                })
+                design.sudo().room_id = room.id
+                stats["created_rooms"] += 1
         else:
             # Refresh scalars — a designer editing the design after
             # a prior reconciliation must see updated room dims.
