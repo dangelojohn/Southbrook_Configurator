@@ -37,11 +37,22 @@ contract, GAP-05 / SYN-02):
   payload the cutting/nesting division consumes.
 * ``sb.cutlist.from_nesting_result(payload)`` accepts the nest result
   and flips state to ``nested`` plus stores yield + waste metadata.
+
+M4 (catalog-wide BoM generator)
+--------------------------------
+
+* ``mrp.bom._southbrook_generate_catalog_boms()`` — walks every
+  ``southbrook_is_cabinet=True`` product.template with no 'normal' BoM
+  yet and CREATES one with real, non-empty ``bom_line_ids`` (panel
+  materials + real Marathon hardware SKUs). Never mutates or deletes an
+  existing BoM. Idempotent. Wired to a nightly ``ir.cron``
+  (``cron_southbrook_catalog_bom_generator``) that can also be run
+  manually from Settings > Technical > Automation > Scheduled Actions.
 """,
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.1.4.1",
+    "version": "19.0.1.5.0",
     "depends": [
         "mrp",
         "sale",
@@ -72,6 +83,7 @@ contract, GAP-05 / SYN-02):
         "views/southbrook_kitchen_mrp_menus.xml",
         "views/mrp_production_form_redesign.xml",
         "reports/cabinet_label_report.xml",
+        "data/cron_catalog_bom_generator.xml",
     ],
     "installable": True,
     "application": False,
