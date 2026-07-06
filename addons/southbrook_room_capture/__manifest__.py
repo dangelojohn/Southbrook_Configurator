@@ -61,7 +61,7 @@ by southbrook_floor_traveler.
     "author": "Southbrook Cabinetry",
     "license": "LGPL-3",
     "category": "Website/eCommerce",
-    "version": "19.0.3.0.0",
+    "version": "19.0.3.0.1",
     "depends": [
         "southbrook_estimating",
         "southbrook_estimating_website",
