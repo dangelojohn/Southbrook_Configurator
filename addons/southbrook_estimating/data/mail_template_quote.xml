@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- Professional, branded customer quote email (2026-07-06).
+     A polished Southbrook-branded HTML email for sending a kitchen quote
+     to a customer. Uses the company logo (email-safe: Odoo rewrites
+     /web/image to an absolute URL when the mail is sent) and the Sky /
+     Walnut / Linen brand palette. Table-based + inline styles so it
+     renders in every email client. Set it as the template on the
+     quotation "Send by Email" action, or pick it from the composer. -->
+<odoo>
+    <data noupdate="1">
+
+        <record id="mail_template_southbrook_quote" model="mail.template">
+            <field name="name">Southbrook: Kitchen Quote</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="subject">Your Southbrook Cabinetry quote — {{ object.name }}</field>
+            <field name="email_from">{{ (object.user_id.email_formatted or object.company_id.email_formatted or user.email_formatted) }}</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="auto_delete" eval="False"/>
+            <field name="body_html" type="html">
+<div style="margin:0; padding:0; background:#f2ede3;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2ede3; padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px; background:#ffffff; border:1px solid #ddd6c9; border-radius:8px; overflow:hidden; font-family:Helvetica,Arial,sans-serif;">
+
+          <!-- Brand rule (echoes the logo blocks) -->
+          <tr><td style="height:5px; line-height:5px; font-size:0; background:#6b4a2f;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td style="width:52px; background:#6b4a2f; height:5px; line-height:5px; font-size:0;">&#160;</td>
+              <td style="background:#8ec5dd; height:5px; line-height:5px; font-size:0;">&#160;</td>
+            </tr></table>
+          </td></tr>
+
+          <!-- Logo header -->
+          <tr>
+            <td align="center" style="padding:28px 32px 8px 32px;">
+              <img t-attf-src="/web/image/res.company/{{ object.company_id.id }}/logo"
+                   alt="Southbrook Cabinetry" style="max-height:52px; height:auto; border:0; display:block;"/>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:12px 32px 4px 32px; color:#2c2620; font-size:15px; line-height:1.6;">
+              <p style="margin:0 0 14px 0;">Hello <t t-out="object.partner_id.name or 'there'"/>,</p>
+              <p style="margin:0 0 14px 0;">
+                Thank you for the opportunity to design your kitchen with Southbrook Cabinetry.
+                Your quote is ready to review — you can open it any time using the button below.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Quote summary card -->
+          <tr>
+            <td style="padding:8px 32px 4px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                     style="background:#f7f4ee; border:1px solid #ddd6c9; border-radius:6px;">
+                <tr>
+                  <td style="padding:16px 20px; color:#6b6157; font-size:13px; letter-spacing:.04em; text-transform:uppercase;">Quote</td>
+                  <td align="right" style="padding:16px 20px; color:#2c2620; font-size:16px; font-weight:bold;"><t t-out="object.name"/></td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 16px 20px; color:#6b6157; font-size:13px; letter-spacing:.04em; text-transform:uppercase;">Total</td>
+                  <td align="right" style="padding:0 20px 16px 20px; color:#6b4a2f; font-size:22px; font-weight:bold;">
+                    <t t-out="format_amount(object.amount_total, object.currency_id)"/>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CTA button (bulletproof, table-based) -->
+          <tr>
+            <td align="center" style="padding:22px 32px 8px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                <td align="center" style="border-radius:6px; background:#6b4a2f;">
+                  <a t-att-href="object.get_portal_url()"
+                     style="display:inline-block; padding:13px 30px; color:#ffffff; font-size:15px; font-weight:bold; text-decoration:none; border-radius:6px;">
+                    View Your Quote
+                  </a>
+                </td>
+              </tr></table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:8px 32px 22px 32px; color:#6b6157; font-size:14px; line-height:1.6;">
+              <p style="margin:0;">
+                Have a question or a change in mind? Just reply to this email and we'll take care of it.
+              </p>
+              <p style="margin:14px 0 0 0;">Warm regards,<br/>
+                <strong style="color:#2c2620;"><t t-out="object.user_id.name or object.company_id.name"/></strong><br/>
+                <span style="color:#8a8378;">Southbrook Cabinetry</span>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:18px 32px; background:#2c2620; color:#cfc7ba; font-size:12px; line-height:1.7;">
+              <strong style="color:#ffffff;"><t t-out="object.company_id.name"/></strong><br/>
+              <t t-if="object.company_id.street"><t t-out="object.company_id.street"/><t t-if="object.company_id.city">, <t t-out="object.company_id.city"/></t><br/></t>
+              <t t-if="object.company_id.phone">Tel: <t t-out="object.company_id.phone"/> &#160;·&#160; </t>
+              <t t-if="object.company_id.email"><a t-attf-href="mailto:{{ object.company_id.email }}" style="color:#8ec5dd; text-decoration:none;"><t t-out="object.company_id.email"/></a></t><br/>
+              <t t-if="object.company_id.website"><a t-att-href="object.company_id.website" style="color:#8ec5dd; text-decoration:none;"><t t-out="object.company_id.website"/></a></t>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>
+            </field>
+        </record>
+
+    </data>
+</odoo>
