@@ -53,14 +53,41 @@ shape, and (best-effort) writes one `southbrook.os.ai.request` row.
 
 ## Config parameters (`ir.config_parameter`)
 
+`os.ai.transport` selects one of three transports. **`http`** and
+**`anthropic`** each own a private set of endpoint/model params — they are
+deliberately NOT shared, so switching transports can never silently misroute
+a call at a stale endpoint left over from the other provider.
+
 | Key | Purpose | Default |
 |---|---|---|
-| `os.ai.transport` | `"mock"` (canned success, no network) or `"http"` | `"http"` |
+| `os.ai.transport` | `"mock"` / `"http"` (OpenAI-compatible) / `"anthropic"` (native Claude) | `"http"` |
+| `os.ai.api_key` | Auth token — `Authorization: Bearer` for http, `x-api-key` for anthropic | unset |
+| `os.ai.price_per_1k_prompt` | USD per 1k prompt tokens (both transports) | `0.0` |
+| `os.ai.price_per_1k_completion` | USD per 1k completion tokens (both transports) | `0.0` |
+
+**`http` transport (OpenAI-compatible):**
+
+| Key | Purpose | Default |
+|---|---|---|
 | `os.ai.endpoint` | Base URL; kernel calls `{endpoint}/chat/completions` | unset |
-| `os.ai.api_key` | Bearer token for the endpoint | unset |
 | `os.ai.default_model` | Model name when `run()`'s `model` arg is falsy | unset |
-| `os.ai.price_per_1k_prompt` | USD per 1k prompt tokens | `0.0` |
-| `os.ai.price_per_1k_completion` | USD per 1k completion tokens | `0.0` |
+
+**`anthropic` transport (native Claude Messages API):**
+
+| Key | Purpose | Default |
+|---|---|---|
+| `os.ai.anthropic_endpoint` | Full Messages API URL (rarely needs overriding) | `https://api.anthropic.com/v1/messages` |
+| `os.ai.anthropic_default_model` | Model name when `run()`'s `model` arg is falsy | `claude-sonnet-5` |
+
+The anthropic transport mirrors the wire format already proven in
+`southbrook_room_capture`/`southbrook_room_chat`: `system` is sent as a
+top-level field (any `role="system"` messages are extracted, not passed
+through), `max_tokens` is always set, `thinking` is disabled (Sonnet 5
+otherwise spends part of the budget on adaptive thinking), and no
+`temperature`/`top_p` is sent (Sonnet 5 rejects non-default sampling
+params). Only plain text content is extracted — this is a thin router, not
+a tool-calling agent; a feature needing tool-use should call the Messages
+API directly, as `southbrook_room_chat` already does.
 
 ## Kill-switch keys
 

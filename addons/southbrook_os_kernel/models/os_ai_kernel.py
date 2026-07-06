@@ -18,8 +18,21 @@ is absent. ``southbrook.os.agent`` ships in this same module, so in practice
 it is always present; the guard is deliberate defense-in-depth against
 partial registry states (mid-upgrade, module uninstall ordering) and keeps
 the kernel's never-raises contract independent of the budget subsystem.
+
+Two transports: ``"http"`` (OpenAI-compatible ``/chat/completions``, the
+default) and ``"anthropic"`` (native Anthropic Messages API). The Anthropic
+path mirrors the already-proven pattern in southbrook_room_capture /
+southbrook_room_chat: POST to /v1/messages with ``x-api-key`` +
+``anthropic-version`` headers, ``system`` as a top-level field (not a
+message role), ``max_tokens`` required, ``thinking: {"type": "disabled"}``
+(claude-sonnet-5 runs adaptive thinking by default which would otherwise
+eat into max_tokens), and no ``temperature``/``top_p`` (Sonnet 5 rejects
+non-default sampling params). Uses ``requests`` (already guarded above,
+already in Odoo 19's own base requirements.txt) rather than adding a new
+``httpx`` dependency to this near-leaf module.
 """
 import json
+import logging
 import time
 
 from odoo import api, models
@@ -28,6 +41,12 @@ try:
     import requests
 except ImportError:  # pragma: no cover - exercised via config, not import
     requests = None
+
+_logger = logging.getLogger(__name__)
+
+_ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+_ANTHROPIC_VERSION = "2023-06-01"
+_ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-5"
 
 
 class SouthbrookOsAiKernel(models.AbstractModel):
@@ -130,7 +149,6 @@ class SouthbrookOsAiKernel(models.AbstractModel):
         transport = self.env["ir.config_parameter"].sudo().get_param(
             "os.ai.transport", "http"
         )
-        provider = "openai_compat"
         model_name = model or None
         content = None
         tokens_prompt = 0
@@ -138,10 +156,20 @@ class SouthbrookOsAiKernel(models.AbstractModel):
         error = None
 
         if transport == "mock":
+            provider = "mock"
             content = "MOCK:" + feature
             tokens_prompt = 1
             tokens_completion = 1
+        elif transport == "anthropic":
+            provider = "anthropic"
+            try:
+                content, tokens_prompt, tokens_completion, error, model_name = (
+                    self._call_anthropic(messages, model, max_tokens, timeout)
+                )
+            except Exception as exc:
+                error = "transport_exception: %s" % exc
         else:
+            provider = "openai_compat"
             try:
                 content, tokens_prompt, tokens_completion, error = (
                     self._call_http(messages, model, temperature, max_tokens,
@@ -251,6 +279,145 @@ class SouthbrookOsAiKernel(models.AbstractModel):
         tokens_prompt = usage.get("prompt_tokens") or 0
         tokens_completion = usage.get("completion_tokens") or 0
         return content, tokens_prompt, tokens_completion, None
+
+    @staticmethod
+    def _content_to_text(content):
+        """Best-effort text extraction from a message's ``content``, which
+        may be a plain string or a list of Anthropic-style content blocks
+        (``[{"type": "text", "text": "..."}, ...]``). Never raises."""
+        if isinstance(content, list):
+            return "".join(
+                (b.get("text") or "") for b in content
+                if isinstance(b, dict) and b.get("type") == "text"
+            )
+        return str(content or "")
+
+    @classmethod
+    def _split_system(cls, messages):
+        """Pure helper: Anthropic's Messages API takes ``system`` as a
+        top-level string, not a message with role "system". Pulls any
+        system-role messages out of the list (joined if more than one) and
+        returns (system_str_or_none, remaining_messages)."""
+        system_parts = []
+        rest = []
+        for msg in messages or []:
+            if isinstance(msg, dict) and msg.get("role") == "system":
+                system_parts.append(cls._content_to_text(msg.get("content")))
+            else:
+                rest.append(msg)
+        system = "\n\n".join(p for p in system_parts if p) or None
+        return system, rest
+
+    def _call_anthropic(self, messages, model, max_tokens, timeout):
+        """Native Anthropic Messages API POST (see module docstring for the
+        wire-format quirks this mirrors from the already-proven
+        southbrook_room_capture/southbrook_room_chat implementation).
+
+        Returns (content, tokens_prompt, tokens_completion, error,
+        resolved_model). ``error`` is None on success; any failure returns a
+        description string and leaves content/tokens at their zero defaults
+        -- never raises. ``resolved_model`` is always populated (the model
+        actually requested, even on failure) so the caller can log an
+        accurate ledger row regardless of outcome.
+
+        Uses its OWN config params (os.ai.anthropic_endpoint /
+        os.ai.anthropic_default_model), deliberately NOT shared with the
+        "http" transport's os.ai.endpoint / os.ai.default_model -- sharing
+        those would silently misroute/mis-price a call if an admin switches
+        os.ai.transport without revisiting both sets of params.
+
+        Note: this kernel is a thin router, not a tool-calling agent -- only
+        text content blocks are extracted; a caller that needs tool-use or
+        refusal-detection semantics should call the Messages API directly
+        (as southbrook_room_chat already does), not through this shared
+        transport.
+        """
+        icp = self.env["ir.config_parameter"].sudo()
+        default_model = (
+            icp.get_param("os.ai.anthropic_default_model")
+            or _ANTHROPIC_DEFAULT_MODEL
+        )
+        resolved_model = model or default_model
+
+        if requests is None:
+            return (None, 0, 0,
+                    "transport_error: requests library not available",
+                    resolved_model)
+
+        api_key = icp.get_param("os.ai.api_key")
+        endpoint = icp.get_param("os.ai.anthropic_endpoint") or _ANTHROPIC_URL
+
+        if not api_key:
+            return (None, 0, 0,
+                    "transport_error: os.ai.api_key not configured",
+                    resolved_model)
+
+        system, rest_messages = self._split_system(messages)
+
+        payload = {
+            "model": resolved_model,
+            "max_tokens": max_tokens or 1024,
+            "messages": rest_messages,
+            # claude-sonnet-5 defaults to adaptive thinking, which would
+            # otherwise consume part of max_tokens for a plain routed call.
+            "thinking": {"type": "disabled"},
+        }
+        if system:
+            payload["system"] = system
+        # No temperature/top_p: Sonnet 5 rejects non-default sampling params.
+
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": _ANTHROPIC_VERSION,
+            "content-type": "application/json",
+        }
+
+        try:
+            resp = requests.post(
+                endpoint, json=payload, headers=headers, timeout=timeout,
+            )
+        except Exception as exc:
+            # Log the detail server-side only; the ledger/caller gets a
+            # static string (matches the proven room_chat/room_capture
+            # discipline of never echoing exception/body internals back).
+            _logger.warning(
+                "southbrook_os_kernel: Anthropic request failed: %s", exc
+            )
+            return (None, 0, 0, "transport_error: request_failed",
+                    resolved_model)
+
+        if resp.status_code != 200:
+            # Log status only -- never the body (could echo the prompt back).
+            _logger.warning(
+                "southbrook_os_kernel: Anthropic HTTP %s", resp.status_code
+            )
+            return (None, 0, 0,
+                    "transport_error: anthropic_http_%s" % resp.status_code,
+                    resolved_model)
+
+        try:
+            data = resp.json()
+        except Exception:
+            return (None, 0, 0, "transport_error: malformed response",
+                    resolved_model)
+
+        try:
+            blocks = data.get("content")
+            if not isinstance(blocks, list):
+                return (None, 0, 0, "transport_error: malformed response",
+                        resolved_model)
+            content = "".join(
+                (b.get("text") or "") for b in blocks
+                if isinstance(b, dict) and b.get("type") == "text"
+            )
+            usage = data.get("usage") or {}
+            tokens_prompt = usage.get("input_tokens") or 0
+            tokens_completion = usage.get("output_tokens") or 0
+        except Exception:
+            return (None, 0, 0, "transport_error: malformed response",
+                    resolved_model)
+
+        return content, tokens_prompt, tokens_completion, None, resolved_model
 
     # ------------------------------------------------------------------
     # Cost / helpers
