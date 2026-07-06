@@ -179,6 +179,14 @@ ENRICHMENT_FIELD_MAP = [
 
 HIGH_CONFIDENCE_THRESHOLD = 0.85
 
+# Fields that appear on customer-facing documents (quote/PDF). In demo mode
+# these are NEVER written to the product master — even to an empty value —
+# so mock/demo enrichment text can't reach a customer. (L3 fix 2026-07-06:
+# demo mode previously overwrote description_sale via a fake 0.9 confidence;
+# the confidence is now low, but this is the hard guarantee that demo text
+# can't leak even into a product whose description was blank.)
+CUSTOMER_VISIBLE_ENRICHMENT_FIELDS = ("name", "description_sale")
+
 # Marker stored on bom.code so we can identify Hermes-managed BOMs
 # without bolting a new field onto mrp.bom.
 HERMES_BOM_CODE_SUFFIX = "Hermes"
@@ -671,9 +679,18 @@ class HermesWizard(models.TransientModel):
         applied = []
         t = self.product_template_id
         confidence = self.confidence_score or 0.0
+        demo_mode = HermesService.is_demo_mode(self.env)
         for wizard_field, target_field, label in ENRICHMENT_FIELD_MAP:
             proposed = self[wizard_field]
             if not proposed:
+                continue
+            if demo_mode and target_field in CUSTOMER_VISIBLE_ENRICHMENT_FIELDS:
+                # Demo/mock text must never reach a customer-facing field,
+                # regardless of confidence or whether the target is empty.
+                _logger.info(
+                    "Demo mode: skipping customer-visible field %s "
+                    "(would have written mock enrichment text).", target_field
+                )
                 continue
             if not hasattr(t, target_field):
                 _logger.warning(

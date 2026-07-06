@@ -43,7 +43,13 @@ _TRUTHY_STRINGS = ("1", "true", "yes", "on")
 # Deterministic demo fixtures — see _demo_response().
 _DEMO_MANUFACTURER = "Southbrook Cabinetry (demo)"
 _DEMO_SOURCE_URL = "https://demo.local/hermes/mock"
-_DEMO_CONFIDENCE = 0.9
+# Demo/mock output is, by definition, NOT real research — it must read as
+# low-confidence so the wizard's HIGH_CONFIDENCE_THRESHOLD guard refuses to
+# overwrite any existing product-master value with it. (Was 0.9, which
+# defeated the guard and let "[DEMO] Mock enrichment..." permanently
+# overwrite description_sale — leaking onto customer quotes. See L3 fix
+# 2026-07-06 and the customer-visible-field skip in hermes_wizard.py.)
+_DEMO_CONFIDENCE = 0.3
 _DEMO_BOM_QTYS = (1.0, 2.0, 1.0)
 
 

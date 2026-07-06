@@ -136,6 +136,52 @@ class HermesDemoModeCase(TransactionCase):
         self.assertTrue(bom)
 
     # ================================================================
+    # (b2) L3 fix: demo mode must NEVER write customer-visible fields
+    #      (name, description_sale) onto the product master — mock text
+    #      like "[DEMO] Mock enrichment..." must not reach a quote.
+    # ================================================================
+    def test_demo_mode_does_not_touch_customer_visible_fields(self):
+        self.template.write({
+            "name": "Real Cabinet Name",
+            "description_sale": "Real sales description a customer sees.",
+            "description": False,  # empty internal note
+        })
+        self.ICP.set_param("southbrook_hermes_bom.demo_mode", "True")
+
+        action = self.template.action_hermes_research_and_build_bom()
+        wizard = self.env["hermes.wizard"].browse(action["res_id"])
+        wizard.action_collect_and_research()
+        self.assertEqual(wizard.state, "review")
+        # the proposed customer-visible fields DO carry the demo text...
+        self.assertIn("Demo", wizard.proposed_name)
+        self.assertIn("[DEMO]", wizard.proposed_short_description)
+
+        wizard.action_apply()
+
+        # ...but applying them must NOT overwrite the customer-facing fields.
+        self.assertEqual(
+            self.template.name, "Real Cabinet Name",
+            "demo mode must not overwrite the product name")
+        self.assertEqual(
+            self.template.description_sale,
+            "Real sales description a customer sees.",
+            "demo mode must not overwrite description_sale (the quote leak)")
+        # and the demo string must appear nowhere customer-facing
+        self.assertNotIn("[DEMO]", self.template.name or "")
+        self.assertNotIn("[DEMO]", self.template.description_sale or "")
+
+    def test_demo_confidence_is_below_high_threshold(self):
+        """Defense in depth: mock output must read as low-confidence so the
+        overwrite guard protects even non-empty fields."""
+        from odoo.addons.southbrook_hermes_bom.models.hermes_wizard import (
+            HIGH_CONFIDENCE_THRESHOLD,
+        )
+        from odoo.addons.southbrook_hermes_bom.services.hermes_service import (
+            _DEMO_CONFIDENCE,
+        )
+        self.assertLess(_DEMO_CONFIDENCE, HIGH_CONFIDENCE_THRESHOLD)
+
+    # ================================================================
     # (c) Production fail-closed unchanged: demo off + no key → raises.
     # ================================================================
     def test_demo_off_no_key_still_raises_userror(self):
