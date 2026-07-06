@@ -25,8 +25,8 @@ want S01381 reset to its original single line if it's a reference fixture. **[de
 | H1 | **FIXED (data, reversible).** Reference-checked all 6 dup templates: **0 order lines, 0 BoMs, no xml_id** each (runtime-created orphans, not seed). `catalog_expansion.build_catalog` is idempotent-by-name so it binds to the active keeper — archiving won't re-create. **Archived** ids 213/212/239/237/230/229 (active=False). Catalog now 46 configurable templates, **zero duplicate names**. Reversible (un-archive to restore). | ✅ FIXED (archived on prod) | live |
 | H2 | **Re-diagnosed — NOT a data duplicate.** There is only ONE `SB-BASE-2DR` template (id 39). The "$395 vs $560 same SKU" seen in the 3D inventory are **different variants of that one template** (`lst_price` = base 395 + attribute `price_extra`, ranging 395→705 across 10 variants). Expected variant pricing. The REAL issue: variants share the base `default_code` with no config suffix, so the 3D inventory list shows them as look-alike rows at different prices. → a 3D-inventory display/labeling fix (show the distinguishing config, or suffix variant codes), NOT a dedup. | RE-DIAGNOSED | OPEN |
 | H3 | **CONFIRMED: 52/52 templates have standard_price = $0.00.** Margin = (price−cost)/price = 100% when cost=0. Seed loaded `list_price` only, never `standard_price`. Fix = backfill cost — but the actual cost figures are business data (Price Master "cost" column / Cost×1.05 basis); **need the source cost numbers from you.** | CONFIRMED (needs cost data) | OPEN |
-| H4 | **Re-scoped — NOT all 52.** Data shows **46/52 templates DO have a `default_code`; only 6 are blank — and those 6 are exactly the duplicate records from H1.** So "blank for all 52 in the list" is a **list-view column issue** (column bound to a field that doesn't render the template ref), not missing data. Fixing H1 removes the blank-ref dup records; the list-view column is a separate small view fix. | RE-SCOPED | OPEN |
-| H5 | Customer picker surfaces **four contacts all named "C"** — test/junk partners. Data cleanup (archive/merge/rename). | CONFIRMED (data) | OPEN |
+| H4 | **✅ RESOLVED by H1.** After archiving the 6 blank-ref duplicates, **0 active config_ok templates lack a default_code** (verified on prod). The blank-SKU records were exactly the H1 dups. No separate fix needed. | ✅ RESOLVED (via H1) | live |
+| H5 | **Investigated: the 4 "C" contacts are test PORTAL-USER accounts** (`.test` emails, "cat"-prefixed, 0 orders, created 2026-06-02, linked to active `res.users` 177/179/181/182). Archiving the partners requires archiving the user accounts first. **Paused — awaiting go** (archiving login accounts is an account-layer change; safe + reversible since they're clearly test junk). | ⏸ needs go (account archive) | OPEN |
 
 ## MEDIUM — sync / workflow
 
@@ -46,6 +46,14 @@ want S01381 reset to its original single line if it's a reference fixture. **[de
 | L2 | "Top"/"Front" camera presets still show perspective distortion + crossed bounding-box wireframe, not clean orthographic/blueprint geometry. | OPEN |
 | L3 | **FIXED (code + data).** Two-layer code fix: `_DEMO_CONFIDENCE` 0.9→0.3 (mock output now correctly low-confidence, so the overwrite guard protects non-empty fields) + `_apply_enrichment` now NEVER writes customer-visible fields (`name`, `description_sale`) in demo mode even if empty. Tests added (green). **Data scrubbed on prod:** 1 product (id 38 — also an H1 dup) had 3 fields cleared; 1 draft order-line name reset. Post-scrub verify = 0 polluted records. Deploy: batched. | ✅ FIXED (dev-verified, data scrubbed) | deploy pending |
 | L4 | "Preview" button flashes a blank dark "Website Preview" screen before redirecting to the portal quote page. | OPEN |
+
+## PIN gate removal (added 2026-07-06 — not on original list)
+Operator PIN modal (`southbrook_qr_kit/operator_pin_modal.js`) auto-mounted on every
+backend+frontend page and hijacked the sales-order Customer field with a "No operator — tap
+to PIN in" full-page lock. Config kill-switch was already "0" but a stale bundle kept showing
+it. **Per decision: PIN system will NOT be implemented.** Removed the modal from both asset
+bundles + deleted the files (qr_kit 19.0.0.14.0), deployed → bundles regenerated, source file
+404s on prod. Dormant server route + param kept (harmless, test-covered). ✅ DONE + deployed.
 
 ## Fix order (John's stated priority)
 1. C1 Configure Product template-selection (full blocker)
