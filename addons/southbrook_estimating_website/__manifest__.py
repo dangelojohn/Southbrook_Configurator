@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.29.1.1",
+    "version": "19.0.30.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -37,6 +37,11 @@
         "views/homepage_template.xml",
         # 2026-06-15 — public commercial Odoo Projects landing page.
         "views/commercial_template.xml",
+        # 2026-07-06 — downloadable documentation PDFs (Features, Brochure,
+        # Quick Start Guide, User Manual) + A4 paperformat + report actions.
+        # Rendered publicly by controllers/docs.py; linked from the homepage
+        # Resources section.
+        "reports/southbrook_docs.xml",
         # G4 + G5 + G6 + G8 (2026-06-01) — branded auth pages
         # (login/signup chrome) + project-name field on signup.
         "views/auth_template.xml",

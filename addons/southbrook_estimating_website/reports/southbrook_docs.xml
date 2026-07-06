@@ -1,0 +1,952 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- 2026-07-06 — Downloadable Southbrook documentation PDFs. Content drafted
+       by tiered subagents (customer/user-facing), assembled into a branded QWeb
+       PDF shell (Sky/Walnut/Linen palette). Served publicly via controllers/docs.py
+       at /southbrook/docs/<slug>.pdf, linked from the homepage Resources section.
+       Reports bind to res.company only to give the PDF engine a res_id. -->
+  <record id="paperformat_sb_doc" model="report.paperformat">
+    <field name="name">Southbrook Document A4</field>
+    <field name="format">A4</field>
+    <field name="orientation">Portrait</field>
+    <field name="margin_top">14</field>
+    <field name="margin_bottom">14</field>
+    <field name="margin_left">15</field>
+    <field name="margin_right">15</field>
+    <field name="header_line" eval="False"/>
+    <field name="header_spacing">0</field>
+    <field name="dpi">96</field>
+  </record>
+  <template id="sb_doc_features">
+    <t t-call="web.html_container">
+      <div class="page sbd">
+        <style>
+  .sbd { color:#1a1814; font-family:'Helvetica Neue',Arial,sans-serif; font-size:10.5pt; line-height:1.55; }
+  .sbd-cover { padding:26px 0 20px; border-bottom:3px solid #6b3f2a; margin-bottom:22px; }
+  .sbd-mark { font-weight:700; letter-spacing:.22em; color:#6b3f2a; font-size:12pt; }
+  .sbd-mark .sub { color:#2b4f6b; }
+  .sbd-kicker { margin-top:26px; text-transform:uppercase; letter-spacing:.16em; font-size:8.5pt; color:#6b665e; }
+  .sbd-title { margin:4px 0 0; font-size:26pt; font-weight:600; color:#4a2b1d; line-height:1.1; }
+  .sbd-meta { margin-top:14px; font-size:9pt; color:#6b665e; }
+  .sbd-body h1 { font-size:17pt; font-weight:600; color:#6b3f2a; margin:6px 0 8px; padding-bottom:6px; border-bottom:1px solid #d8cfbf; }
+  .sbd-body h2 { font-size:13pt; font-weight:600; color:#2b4f6b; margin:18px 0 6px; }
+  .sbd-body h3 { font-size:11pt; font-weight:700; color:#1a1814; margin:12px 0 4px; }
+  .sbd-body p { margin:0 0 8px; }
+  .sbd-body ul, .sbd-body ol { margin:0 0 10px; padding-left:20px; }
+  .sbd-body li { margin:2px 0; }
+  .sbd-body strong { color:#4a2b1d; }
+  .sbd-body em { color:#2b4f6b; }
+  .sbd-body table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:9.5pt; }
+  .sbd-body th { background:#6b3f2a; color:#f4ede2; text-align:left; padding:6px 9px; }
+  .sbd-body td { border:1px solid #d8cfbf; padding:6px 9px; vertical-align:top; }
+  .sbd-body tr:nth-child(even) td { background:#fbf7ef; }
+  .sbd-chap { page-break-before: always; }
+  .sbd-footer { margin-top:26px; padding-top:8px; border-top:1px solid #d8cfbf; font-size:8pt; color:#6b665e; }
+</style>
+        <div class="sbd-cover">
+          <div class="sbd-mark">SOUTHBROOK <span class="sub">CABINETRY</span></div>
+          <div class="sbd-kicker">Southbrook Cabinetry</div>
+          <h1 class="sbd-title">Platform Features</h1>
+          <div class="sbd-meta">southbrookcabinetry.space</div>
+        </div>
+        <div class="sbd-body">
+<h1>Southbrook Kitchen Design &amp; Manufacturing Platform — Features Overview</h1>
+
+<h2>Design &amp; Visualization</h2>
+<ul>
+<li><strong>Room Capture from Photos</strong> — Take photos of your space and let AI analyze room dimensions, appliances, and layout to jumpstart your design.</li>
+<li><strong>Guided Design Chat</strong> — Describe your ideal kitchen in conversation with an AI assistant, who builds and updates your layout as you talk.</li>
+<li><strong>Live 3D Kitchen Configurator</strong> — See your cabinet design in full 3D detail as you build it; rotate, zoom, and explore the space from every angle.</li>
+<li><strong>Real-Time Visual Updates</strong> — Every choice (door style, finish, hardware) appears instantly in the 3D view so you know exactly what you're getting.</li>
+<li><strong>Room-First Workflow</strong> — Start by defining your space, not by choosing cabinets—the platform designs around your room, not the other way around.</li>
+</ul>
+
+<h2>Instant Pricing &amp; Quoting</h2>
+<ul>
+<li><strong>Live Price Updates</strong> — Watch your total price change in real time as you adjust cabinet series, finishes, hardware, and options.</li>
+<li><strong>Formal PDF Quotes in Under 5 Minutes</strong> — Generate a complete, detailed quote instantly—no sales call required, no waiting for a spreadsheet.</li>
+<li><strong>Complete Price Transparency</strong> — See exactly what you're paying for: cabinet costs, hardware, finishes, and labor are itemized clearly.</li>
+<li><strong>Multi-Zone Pricing</strong> — Different areas of your kitchen can use different cabinet series and price points within a single order.</li>
+<li><strong>All-Inclusive Quotes</strong> — Your quote is complete: shipping, flat-pack preparation, and assembly guides are all included in the price.</li>
+</ul>
+
+<h2>Configuration &amp; Options</h2>
+<ul>
+<li><strong>Cabinet Series &amp; Door Styles</strong> — Choose from multiple cabinet collections and door designs to match your style and budget.</li>
+<li><strong>Materials &amp; Finishes</strong> — Select box materials and finish options that suit your aesthetic and durability needs.</li>
+<li><strong>Customizable Hardware</strong> — Pick from a comprehensive hardware catalog to match your cabinet design and functional requirements.</li>
+<li><strong>Finished Sides, Gables &amp; Accessories</strong> — Add finished panel options, gable ends, toe kicks, and accessories to complete your look.</li>
+<li><strong>Hinge &amp; Side Orientation</strong> — Control which direction doors open and which cabinet sides are visible for seamless integration with your space.</li>
+<li><strong>Appliance Accommodation</strong> — Define your appliance placement and dimensions; the platform automatically sizes cabinet openings to fit.</li>
+<li><strong>Smart Rules Prevent Mistakes</strong> — The platform prevents invalid combinations, so you can't accidentally order incompatible parts.</li>
+</ul>
+
+<h2>Ordering &amp; Channels</h2>
+<ul>
+<li><strong>Multi-Zone Order Builder</strong> — Design and price multiple kitchen zones (island, perimeter, pantry) in a single order with full visibility.</li>
+<li><strong>Six Pricing Channels</strong> — Pricing automatically adjusts for your account type: retail, dealer, trade, contractor, central kitchen, and big-box refacing.</li>
+<li><strong>Bill-of-Materials Preview</strong> — See the exact count and specification of every cabinet, panel, and hardware piece before you commit.</li>
+<li><strong>Validation &amp; Approval Gates</strong> — Large orders may require approval; the system flags them for review before moving to production.</li>
+<li><strong>Clear Order Status Pipeline</strong> — Track each order through clearly marked stages: draft, estimating, approval, confirmed, and in production.</li>
+</ul>
+
+<h2>Portals &amp; Self-Service</h2>
+<ul>
+<li><strong>Customer Portal — My Estimates</strong> — Review all your quotes, project concepts, and order history in one secure place, any time.</li>
+<li><strong>Dealer &amp; Trade Portal</strong> — Dealers and trade professionals manage their complete order book with channel-specific pricing and bulk ordering tools.</li>
+<li><strong>Real-Time Order Tracking</strong> — See where your order is in the pipeline—estimating, approved, or manufacturing—without placing a call.</li>
+<li><strong>Transparent Lead Times</strong> — Typical lead time is 4–6 weeks from order confirmation. Your portal always shows your expected ship date.</li>
+<li><strong>Self-Service Project History</strong> — Access all past projects and quotes to reorder, modify, or reference for future work.</li>
+</ul>
+
+<h2>Manufacturing &amp; Production</h2>
+<ul>
+<li><strong>Automated Order Conversion</strong> — Confirmed orders flow automatically from your quote into manufacturing planning and scheduling.</li>
+<li><strong>Manufacturing &amp; Work Orders</strong> — The factory receives detailed work orders with all cabinet specs, material lists, and assembly sequences.</li>
+<li><strong>Shop-Floor Dispatch Board</strong> — Production managers see all in-progress work in real time and can optimize job sequencing for efficiency.</li>
+<li><strong>QR-Scanned Floor Travelers</strong> — Each cabinet package includes a printed traveler label with QR codes that shop-floor operators scan on tablets to advance jobs and track progress in real time.</li>
+<li><strong>Printed Cut Lists &amp; Labels</strong> — Every job produces detailed cut lists and component labels so no material is wasted or misplaced.</li>
+<li><strong>Factory Health KPIs</strong> — Real-time visibility into factory capacity, cycle time, and job status—bottlenecks surface immediately.</li>
+</ul>
+
+<h2>Quality &amp; Fulfillment</h2>
+<ul>
+<li><strong>Integrated Quality Checks</strong> — Quality gates are built into every step; technicians sign off at each assembly stage before moving forward.</li>
+<li><strong>Automated Bills of Materials</strong> — Every manufacturing job includes a detailed bill of materials auto-generated from your order—guaranteed to match.</li>
+<li><strong>Complete Flat-Pack Preparation</strong> — Cabinets are nested, labeled, and kitted for flat-pack shipping with all hardware, screws, and assembly guides included.</li>
+<li><strong>Precision Cut Lists</strong> — Material is dimensioned precisely from your design; zero guesswork on sheet layouts or material waste.</li>
+<li><strong>Typical 4–6 Week Lead Time</strong> — From order confirmation to ready-to-ship flat-pack; expedited options available on request.</li>
+</ul>
+
+<h2>Business Intelligence &amp; Management</h2>
+<ul>
+<li><strong>Command Center Dashboard</strong> — One screen shows what needs attention today: delayed orders, quality issues, approval requests, and real-time factory health.</li>
+<li><strong>Live Performance Metrics</strong> — See real-time KPIs: how fast jobs move through the factory, quality pass rates, and on-time delivery performance.</li>
+<li><strong>Approval Gates for Large Orders</strong> — Set thresholds to flag orders over certain value or complexity for manager sign-off before manufacturing begins.</li>
+<li><strong>Complete Pipeline Reporting</strong> — From estimate to shipment, every order leaves a full trail; reporting shows sales trends, production efficiency, and customer patterns.</li>
+<li><strong>System Integration</strong> — The platform connects to accounting, payroll, and inventory systems so data flows seamlessly from quote to fulfillment.</li>
+<li><strong>AI-Driven Recommendations</strong> — Intelligent insights flag bottlenecks, suggest optimizations, and notify you of exceptions that need immediate attention.</li>
+</ul>
+        </div>
+        <div class="sbd-footer">&#169; Southbrook Cabinetry &#183; southbrookcabinetry.space &#183; Custom kitchen cabinets, designed online.</div>
+      </div>
+    </t>
+  </template>
+  <template id="sb_doc_brochure">
+    <t t-call="web.html_container">
+      <div class="page sbd">
+        <style>
+  .sbd { color:#1a1814; font-family:'Helvetica Neue',Arial,sans-serif; font-size:10.5pt; line-height:1.55; }
+  .sbd-cover { padding:26px 0 20px; border-bottom:3px solid #6b3f2a; margin-bottom:22px; }
+  .sbd-mark { font-weight:700; letter-spacing:.22em; color:#6b3f2a; font-size:12pt; }
+  .sbd-mark .sub { color:#2b4f6b; }
+  .sbd-kicker { margin-top:26px; text-transform:uppercase; letter-spacing:.16em; font-size:8.5pt; color:#6b665e; }
+  .sbd-title { margin:4px 0 0; font-size:26pt; font-weight:600; color:#4a2b1d; line-height:1.1; }
+  .sbd-meta { margin-top:14px; font-size:9pt; color:#6b665e; }
+  .sbd-body h1 { font-size:17pt; font-weight:600; color:#6b3f2a; margin:6px 0 8px; padding-bottom:6px; border-bottom:1px solid #d8cfbf; }
+  .sbd-body h2 { font-size:13pt; font-weight:600; color:#2b4f6b; margin:18px 0 6px; }
+  .sbd-body h3 { font-size:11pt; font-weight:700; color:#1a1814; margin:12px 0 4px; }
+  .sbd-body p { margin:0 0 8px; }
+  .sbd-body ul, .sbd-body ol { margin:0 0 10px; padding-left:20px; }
+  .sbd-body li { margin:2px 0; }
+  .sbd-body strong { color:#4a2b1d; }
+  .sbd-body em { color:#2b4f6b; }
+  .sbd-body table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:9.5pt; }
+  .sbd-body th { background:#6b3f2a; color:#f4ede2; text-align:left; padding:6px 9px; }
+  .sbd-body td { border:1px solid #d8cfbf; padding:6px 9px; vertical-align:top; }
+  .sbd-body tr:nth-child(even) td { background:#fbf7ef; }
+  .sbd-chap { page-break-before: always; }
+  .sbd-footer { margin-top:26px; padding-top:8px; border-top:1px solid #d8cfbf; font-size:8pt; color:#6b665e; }
+</style>
+        <div class="sbd-cover">
+          <div class="sbd-mark">SOUTHBROOK <span class="sub">CABINETRY</span></div>
+          <div class="sbd-kicker">Southbrook Cabinetry</div>
+          <h1 class="sbd-title">Sales Brochure</h1>
+          <div class="sbd-meta">southbrookcabinetry.space</div>
+        </div>
+        <div class="sbd-body">
+<h1>Your Kitchen, Designed by You, Built Exactly as Designed</h1>
+<p><em>Southbrook Cabinetry brings custom cabinetry design, transparent pricing, and precision manufacturing into one continuous experience — so the kitchen you imagine is the kitchen that arrives.</em></p>
+
+<h2>The Old Way vs. The Southbrook Way</h2>
+<p>Custom cabinetry has always meant trade-offs: weeks of back-and-forth before you see a real price, a showroom visit to picture your own kitchen, and a quiet worry that what gets built won't quite match what you approved. Southbrook was built to remove those trade-offs, not just soften them.</p>
+<table>
+<thead>
+<tr><th>The Old Way</th><th>The Southbrook Way</th></tr>
+</thead>
+<tbody>
+<tr><td>Wait days for a rough estimate</td><td>See a formal, itemized quote in under 5 minutes</td></tr>
+<tr><td>Picture your kitchen from a catalog</td><td>See your actual room in live 3D as you design</td></tr>
+<tr><td>Hope the order was entered correctly</td><td>Your design becomes the shop's build instructions directly</td></tr>
+<tr><td>One price list for everyone</td><td>Pricing tailored to how you buy — retail, trade, or dealer</td></tr>
+<tr><td>Uncertain delivery windows</td><td>A clear, typical 4–6 week path from approval to shipment</td></tr>
+</tbody>
+</table>
+
+<h2>Design It Yourself, In Your Browser</h2>
+<p>Start from a room's measurements, upload photos of the space, or simply describe what you have in mind in a guided conversation — Southbrook meets you wherever you're most comfortable starting. From there, your kitchen takes shape in a live, interactive 3D view, so you're never designing blind and never waiting for someone else's rendering.</p>
+<p>Move walls, swap finishes, resize a run of cabinets, and watch the kitchen respond in real time. This isn't a static picture of a similar kitchen — it's your kitchen, in your space, built to your dimensions from the very first click.</p>
+
+<h3>Priced Instantly, Quoted Formally</h3>
+<p>Every choice you make — a door style, a finish, a drawer upgrade, a piece of hardware — updates your price immediately. No waiting on a callback, no spreadsheet emailed back and forth. When you're ready, a polished, itemized PDF quote is yours in typically under 5 minutes: clear, professional, and ready to share with a partner, a contractor, or yourself.</p>
+
+<h2>Truly Custom, Truly Buildable</h2>
+<p>"Custom" should mean more than a color chip. With Southbrook, every cabinet is configured individually — series, door style, box material, finish, hardware, and accessories — fitted to your exact measurements rather than the nearest standard size. Built-in guardrails work quietly in the background, so every combination you're able to select is one our shop can actually build, beautifully and correctly, the first time.</p>
+<p>The result is design freedom without the risk: you can explore boldly, knowing that what looks right on screen is guaranteed to be right in the shop.</p>
+
+<h2>From Your Screen to the Shop Floor</h2>
+<p>Here is what sets Southbrook apart: the design you approve is the exact data our cabinet makers build from. There is no re-entry, no re-interpretation, and no gap where details get lost in translation. Your specifications flow directly into our shop's work orders, guiding every cut, every panel, and every quality check along the way.</p>
+<p>That single, unbroken thread — from your screen to the saw — is what lets us promise a kitchen that matches your design precisely, and deliver it on a dependable timeline. Cabinets ship flat-pack-ready, complete with the cut lists your installer needs, with a typical lead time of 4–6 weeks from approval.</p>
+
+<h2>Built for Trade Partners</h2>
+<p>Southbrook is designed to work as hard for our trade partners as it does for homeowners. Six distinct pricing channels — retail, dealer, contractor and trade, central-KD, big-box, and refacing — are applied automatically, so every partner sees the right numbers without manual adjustment or awkward conversations.</p>
+<p>Dealers get a dedicated order book to manage their business at a glance, and every customer — yours or ours — has a personal portal to track every estimate from first draft to shipped order. Whether you design one kitchen a year or a hundred, Southbrook scales with you.</p>
+
+<h2>How It Works</h2>
+<ul>
+<li><strong>Design</strong> — Start from your room's dimensions, photos, or a simple conversation. Watch your kitchen come together in live 3D.</li>
+<li><strong>Configure</strong> — Choose your series, door style, finish, hardware, and accessories. Pricing updates instantly as you go.</li>
+<li><strong>Approve</strong> — Review your formal, itemized quote and give the go-ahead when you're ready — no pressure, no phone tag.</li>
+<li><strong>Build</strong> — Your approved design moves straight to our shop floor, built to spec and shipped flat-pack-ready in a typical 4–6 weeks.</li>
+</ul>
+
+<h2>At a Glance</h2>
+<ul>
+<li>A formal, itemized quote in typically under 5 minutes</li>
+<li>Live 3D design from your room's dimensions, photos, or a guided conversation</li>
+<li>Every cabinet configured to your exact measurements, with buildability guaranteed</li>
+<li>One continuous thread from your design to the finished cabinet — nothing re-entered, nothing lost</li>
+<li>Six pricing channels for retail, dealer, trade, and beyond</li>
+<li>A typical 4–6 week lead time, flat-pack-ready with complete cut lists</li>
+<li>A personal portal to track every estimate, for homeowners and dealers alike</li>
+</ul>
+
+<h2>Start Your Kitchen Today</h2>
+<p>Your next kitchen doesn't have to start with a showroom appointment or a waiting game. Open your browser, bring your room — or just your idea of one — and see a real, priced, buildable design of your own kitchen in minutes.</p>
+<p>If you're a dealer, contractor, or trade professional, we'd welcome the conversation about a dealer account: your own pricing channel, your own order book, and the same precision manufacturing behind every order you place.</p>
+<p><strong>Begin your design, or talk to us about a dealer account, today.</strong></p>
+        </div>
+        <div class="sbd-footer">&#169; Southbrook Cabinetry &#183; southbrookcabinetry.space &#183; Custom kitchen cabinets, designed online.</div>
+      </div>
+    </t>
+  </template>
+  <template id="sb_doc_quickguide">
+    <t t-call="web.html_container">
+      <div class="page sbd">
+        <style>
+  .sbd { color:#1a1814; font-family:'Helvetica Neue',Arial,sans-serif; font-size:10.5pt; line-height:1.55; }
+  .sbd-cover { padding:26px 0 20px; border-bottom:3px solid #6b3f2a; margin-bottom:22px; }
+  .sbd-mark { font-weight:700; letter-spacing:.22em; color:#6b3f2a; font-size:12pt; }
+  .sbd-mark .sub { color:#2b4f6b; }
+  .sbd-kicker { margin-top:26px; text-transform:uppercase; letter-spacing:.16em; font-size:8.5pt; color:#6b665e; }
+  .sbd-title { margin:4px 0 0; font-size:26pt; font-weight:600; color:#4a2b1d; line-height:1.1; }
+  .sbd-meta { margin-top:14px; font-size:9pt; color:#6b665e; }
+  .sbd-body h1 { font-size:17pt; font-weight:600; color:#6b3f2a; margin:6px 0 8px; padding-bottom:6px; border-bottom:1px solid #d8cfbf; }
+  .sbd-body h2 { font-size:13pt; font-weight:600; color:#2b4f6b; margin:18px 0 6px; }
+  .sbd-body h3 { font-size:11pt; font-weight:700; color:#1a1814; margin:12px 0 4px; }
+  .sbd-body p { margin:0 0 8px; }
+  .sbd-body ul, .sbd-body ol { margin:0 0 10px; padding-left:20px; }
+  .sbd-body li { margin:2px 0; }
+  .sbd-body strong { color:#4a2b1d; }
+  .sbd-body em { color:#2b4f6b; }
+  .sbd-body table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:9.5pt; }
+  .sbd-body th { background:#6b3f2a; color:#f4ede2; text-align:left; padding:6px 9px; }
+  .sbd-body td { border:1px solid #d8cfbf; padding:6px 9px; vertical-align:top; }
+  .sbd-body tr:nth-child(even) td { background:#fbf7ef; }
+  .sbd-chap { page-break-before: always; }
+  .sbd-footer { margin-top:26px; padding-top:8px; border-top:1px solid #d8cfbf; font-size:8pt; color:#6b665e; }
+</style>
+        <div class="sbd-cover">
+          <div class="sbd-mark">SOUTHBROOK <span class="sub">CABINETRY</span></div>
+          <div class="sbd-kicker">Southbrook Cabinetry</div>
+          <h1 class="sbd-title">Quick Start Guide</h1>
+          <div class="sbd-meta">southbrookcabinetry.space</div>
+        </div>
+        <div class="sbd-body">
+<h1>Southbrook Cabinetry — Quick Start Guide</h1>
+
+<p>Whether you're a homeowner dreaming up your dream kitchen or a dealer building orders for clients, Southbrook's design-to-quote platform makes it easy. Start in minutes, see your kitchen in 3D, and get a formal quote faster than ever.</p>
+
+<h2>For Homeowners — Design Your Kitchen in 5 Minutes</h2>
+
+<ol>
+<li><strong>Visit the homepage and try the 3D sample.</strong> No sign-in needed. Drag the sample cabinets around, rotate the view, and get a feel for how the design tool works. This takes less than a minute.</li>
+<li><strong>Start a new room.</strong> Choose how you want to begin: upload a photo of your current kitchen, measure your space and enter the dimensions, or describe your vision in a guided chat. We'll help you capture the basics.</li>
+<li><strong>Lay out your cabinets in live 3D.</strong> Drag cabinets into your space, arrange them, and watch the 3D view update instantly. You'll see exactly how your kitchen will look.</li>
+<li><strong>Pick your style.</strong> Choose door styles, finishes, hardware, and accessories. Prices update in real time as you make choices, so you always know what you're spending.</li>
+<li><strong>Request your quote.</strong> Once you're happy with your design, request a formal PDF quote in just a few clicks. A Southbrook specialist will review it and get back to you.</li>
+<li><strong>Sign in to save your work.</strong> Create an account to save your designs, track estimates, and revisit your ideas anytime. Your design is yours to keep.</li>
+</ol>
+
+<h2>For Trade <em>&amp;</em> Dealer Partners — Build an Order</h2>
+
+<ol>
+<li><strong>Sign in to your partner account.</strong> Access the Order Builder, where you can manage all your customer quotes and orders in one place.</li>
+<li><strong>Create a new order and add zones.</strong> Start fresh or copy a recent design. Add one or more kitchen zones — main cabinets, island, pantry, whatever your client needs.</li>
+<li><strong>Configure each line.</strong> For each zone, select cabinet types, door styles, finishes, hardware, and accessories. You'll see your channel-specific pricing as you go.</li>
+<li><strong>Check the pricing for your channel.</strong> Dealer pricing varies by channel. See exactly what your margin is and what your client will pay.</li>
+<li><strong>Preview the bill of materials.</strong> Review the parts list for your order — every cabinet, hinge, handle, and finish is spelled out clearly. No surprises on the factory floor.</li>
+<li><strong>Send the quote or confirm the order.</strong> Export a professional quote to send to your customer, or move the order straight to confirmed and into our production pipeline. Lead time is 4–6 weeks from confirmation.</li>
+</ol>
+
+<h2>Tips</h2>
+
+<ul>
+<li><strong>Start with a photo or room sketch.</strong> The better the detail you give us upfront, the more accurate your design. Photos work especially well.</li>
+<li><strong>Live pricing is your friend.</strong> Change a door style, add an island, swap a finish — the price updates instantly. You can explore what-ifs without committing.</li>
+<li><strong>Save your design so you don't lose it.</strong> If you're browsing on a phone and want to continue on desktop, or if you want to come back tomorrow, sign in and save. It's all there waiting.</li>
+<li><strong>Questions?</strong> Our specialists are a chat or phone call away. If you get stuck, reach out — we're here to help.</li>
+</ul>
+        </div>
+        <div class="sbd-footer">&#169; Southbrook Cabinetry &#183; southbrookcabinetry.space &#183; Custom kitchen cabinets, designed online.</div>
+      </div>
+    </t>
+  </template>
+  <template id="sb_doc_manual">
+    <t t-call="web.html_container">
+      <div class="page sbd">
+        <style>
+  .sbd { color:#1a1814; font-family:'Helvetica Neue',Arial,sans-serif; font-size:10.5pt; line-height:1.55; }
+  .sbd-cover { padding:26px 0 20px; border-bottom:3px solid #6b3f2a; margin-bottom:22px; }
+  .sbd-mark { font-weight:700; letter-spacing:.22em; color:#6b3f2a; font-size:12pt; }
+  .sbd-mark .sub { color:#2b4f6b; }
+  .sbd-kicker { margin-top:26px; text-transform:uppercase; letter-spacing:.16em; font-size:8.5pt; color:#6b665e; }
+  .sbd-title { margin:4px 0 0; font-size:26pt; font-weight:600; color:#4a2b1d; line-height:1.1; }
+  .sbd-meta { margin-top:14px; font-size:9pt; color:#6b665e; }
+  .sbd-body h1 { font-size:17pt; font-weight:600; color:#6b3f2a; margin:6px 0 8px; padding-bottom:6px; border-bottom:1px solid #d8cfbf; }
+  .sbd-body h2 { font-size:13pt; font-weight:600; color:#2b4f6b; margin:18px 0 6px; }
+  .sbd-body h3 { font-size:11pt; font-weight:700; color:#1a1814; margin:12px 0 4px; }
+  .sbd-body p { margin:0 0 8px; }
+  .sbd-body ul, .sbd-body ol { margin:0 0 10px; padding-left:20px; }
+  .sbd-body li { margin:2px 0; }
+  .sbd-body strong { color:#4a2b1d; }
+  .sbd-body em { color:#2b4f6b; }
+  .sbd-body table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:9.5pt; }
+  .sbd-body th { background:#6b3f2a; color:#f4ede2; text-align:left; padding:6px 9px; }
+  .sbd-body td { border:1px solid #d8cfbf; padding:6px 9px; vertical-align:top; }
+  .sbd-body tr:nth-child(even) td { background:#fbf7ef; }
+  .sbd-chap { page-break-before: always; }
+  .sbd-footer { margin-top:26px; padding-top:8px; border-top:1px solid #d8cfbf; font-size:8pt; color:#6b665e; }
+</style>
+        <div class="sbd-cover">
+          <div class="sbd-mark">SOUTHBROOK <span class="sub">CABINETRY</span></div>
+          <div class="sbd-kicker">Southbrook Cabinetry</div>
+          <h1 class="sbd-title">User Manual</h1>
+          <div class="sbd-meta">southbrookcabinetry.space</div>
+        </div>
+        <div class="sbd-body">
+<h1>Southbrook Cabinetry — User Manual</h1><p>Welcome to the Southbrook platform. This manual is organized into three chapters, one for each main type of user. Read the chapter that matches your role — or all three to see how the whole process fits together, from a customer&#8217;s first design to a finished kitchen leaving the shop.</p><ul><li><strong>For Management</strong> — dashboards, the pipeline, approvals, pricing channels, and the numbers.</li><li><strong>For Sales &amp; Design</strong> — designing kitchens, building orders, pricing, quotes, and portals.</li><li><strong>For Manufacturing &amp; Production</strong> — the shop floor, traveler labels, scanning, cut lists, quality, and shipping.</li></ul><div class="sbd-chap"></div><h1>For Management</h1>
+
+<p>This chapter is written for the people who run the business day to day: the owner, the office manager, and the production manager. It covers the tools that give you visibility across the whole operation — from a quote that just came in, to an order waiting on your approval, to a job on the shop floor — and the controls you use to keep pricing, approvals, and production moving in the right direction. Nothing described here requires technical knowledge. If you can read a dashboard and make a decision, you can use everything in this chapter.</p>
+
+<h2>Your daily dashboard</h2>
+
+<p>Every morning, your first stop should be the Command Center — a single screen that answers one question: <em>what needs my attention today?</em> Instead of digging through quotes, orders, and floor reports separately, the dashboard pulls the important items into one place and updates continuously as things change, so what you see reflects the current state of the business, not yesterday's snapshot.</p>
+
+<p>The dashboard is organized around three kinds of information:</p>
+
+<ul>
+<li><strong>Exceptions</strong> — things that have fallen outside the normal pattern and likely need a decision: an order stuck waiting on approval, a job that's behind where it should be, a quote that's gone quiet.</li>
+<li><strong>Factory health</strong> — a plain-language read on how production is flowing right now: which stages are moving smoothly and which are under pressure.</li>
+<li><strong>Recommended actions</strong> — specific, ready-to-review suggestions (covered in more detail later in this chapter) that you can approve, adjust, or dismiss.</li>
+</ul>
+
+<h3>How to use it day to day</h3>
+
+<ol>
+<li>Open the Command Center at the start of your day, before checking anything else.</li>
+<li>Scan the exceptions first — these are the items most likely to need you specifically, rather than someone further down the chain.</li>
+<li>Glance at factory health to understand the context behind those exceptions — a single delayed order reads differently if the whole floor is under strain versus running normally.</li>
+<li>Work through the recommended actions queue, approving or holding items as appropriate.</li>
+</ol>
+
+<p><strong>Tip:</strong> Because the dashboard updates in real time, it's meant to be checked more than once a day during busy periods — a quick midday glance is often enough to catch a new exception before it becomes a bigger problem.</p>
+
+<h2>Reading the pipeline at a glance</h2>
+
+<p>Behind every dashboard number is the pipeline itself — the path every order takes from first conversation to finished cabinets. Understanding how to read it lets you answer, at any moment, "where is everything, and what's next?"</p>
+
+<h3>The stages</h3>
+
+<p>Every order moves through the same sequence of stages, and the platform always shows you which stage each order currently sits in:</p>
+
+<ul>
+<li><strong>Draft</strong> — a quote or design in progress, not yet finalized.</li>
+<li><strong>Estimating</strong> — the design and pricing are being worked out in detail.</li>
+<li><strong>Approval</strong> — the order is complete and priced, and is waiting on a management decision before it can proceed (see the next section).</li>
+<li><strong>Confirmed</strong> — the customer and the business have agreed; the order is committed.</li>
+<li><strong>In production</strong> — the order is being built on the floor.</li>
+</ul>
+
+<h3>How to check pipeline status</h3>
+
+<ol>
+<li>From the Command Center or the pipeline view, look at the count of orders in each stage — a healthy pipeline has orders distributed across stages, not piled up in one place.</li>
+<li>If one stage shows an unusually large number of orders sitting in it, that's a signal something is slowing down at that step — for example, a backlog in Estimating may mean designs need more staff attention, while a backlog in Approval means orders are waiting on a decision-maker.</li>
+<li>Drill into any stage to see the individual orders it contains, including how long each has been sitting there.</li>
+</ol>
+
+<p><strong>Tip:</strong> Age matters as much as count. Ten orders that just entered Estimating this morning is normal. Two orders that have sat in Approval for a week is worth a look.</p>
+
+<h2>Approving large orders</h2>
+
+<p>To protect the business from mistakes and to keep large commitments visible to management, any order above a set dollar threshold is automatically held at the Approval stage before it can move into production. This isn't a delay for its own sake — it's a deliberate checkpoint that ensures every significant order gets a second set of eyes before materials are committed and floor time is scheduled.</p>
+
+<h3>What happens when an order reaches this gate</h3>
+
+<p>The order stops moving forward on its own. It appears in your approval queue and, typically, as an exception on the Command Center dashboard, with the full detail of the order attached — the customer, the design, the pricing, and how it was arrived at.</p>
+
+<h3>How to review and act on an order</h3>
+
+<ol>
+<li>Open the order from the approval queue or from the dashboard exception that references it.</li>
+<li>Review the customer and order details, the final price, and how that price was built (see the next section on pricing channels for how the price may have been calculated).</li>
+<li>Decide whether to approve, hold, or send it back for changes:
+  <ul>
+  <li><strong>Approve</strong> — the order proceeds to Confirmed and becomes eligible for production scheduling.</li>
+  <li><strong>Hold</strong> — the order stays at this stage while you gather more information or wait on a customer conversation.</li>
+  <li><strong>Send back</strong> — the order returns to Estimating if something needs to be reworked before it can be approved.</li>
+  </ul>
+</li>
+<li>Record your decision. This creates a clear, permanent record of who approved what and when — useful for your own records and for resolving any later questions about how an order was authorized.</li>
+</ol>
+
+<p><strong>Tip:</strong> Because this gate exists specifically to catch large, high-stakes orders, it's worth treating the approval queue as a standing item in your daily routine rather than something you only check when reminded — an order sitting unapproved does not move to production on its own, no matter how long it waits.</p>
+
+<h2>How pricing channels work</h2>
+
+<p>Not every customer pays the same price for the same cabinets, and the platform handles this automatically rather than requiring anyone to manually adjust prices order by order. There are six distinct pricing channels, and the right one is applied based on who the customer is:</p>
+
+<ul>
+<li><strong>Retail</strong> — standard pricing for individual homeowners.</li>
+<li><strong>Dealer</strong> — pricing for authorized dealer partners.</li>
+<li><strong>Contractor / trade</strong> — pricing for contractors and trade professionals.</li>
+<li><strong>Central-KD</strong> — pricing for knocked-down (flat-pack) orders routed through a central channel.</li>
+<li><strong>Big-box</strong> — pricing for large retail partners.</li>
+<li><strong>Refacing</strong> — pricing specific to cabinet refacing work rather than full new builds.</li>
+</ul>
+
+<h3>How a customer gets the right channel</h3>
+
+<p>Pricing channel is tied to the customer's account type. When a customer account is set up or classified — as a homeowner, a dealer, a contractor, and so on — every quote and order generated for that account automatically applies the pricing that belongs to that channel. Nobody needs to remember to switch a price list or apply a discount by hand; the correct numbers appear from the moment a quote is started.</p>
+
+<h3>How to assign or check a customer's channel</h3>
+
+<ol>
+<li>Open the customer's account record.</li>
+<li>Confirm the account type reflects the relationship — for example, a contractor who has been buying at retail pricing should be reclassified to the contractor/trade channel.</li>
+<li>Once the account type is set correctly, all future quotes and orders for that customer will price automatically under the matching channel; existing draft quotes may need to be refreshed to pick up the change.</li>
+</ol>
+
+<p><strong>Tip:</strong> Because channel is driven entirely by account type, the most common pricing question — "why did this customer get this price?" — is almost always answered by checking how that customer's account is classified.</p>
+
+<h2>Reading the numbers (KPIs &amp; reports)</h2>
+
+<p>Beyond the day-to-day exception list, the platform tracks the numbers that describe the overall health of the business over time. These are the figures worth reviewing on a weekly or monthly rhythm, in addition to your daily dashboard check.</p>
+
+<h3>What's tracked</h3>
+
+<ul>
+<li><strong>Lead times</strong> — how long orders take to move from confirmed to finished, typically in the 4–6 week range for a standard order; tracking this over time tells you whether the business is speeding up, holding steady, or slowing down.</li>
+<li><strong>Order volume</strong> — how many quotes and orders are moving through the pipeline, and how that compares to prior periods.</li>
+<li><strong>Pipeline bottlenecks</strong> — which stage of the pipeline is most often the one holding up the next step, so you know where to focus attention or add resources.</li>
+</ul>
+
+<h3>How to use this information</h3>
+
+<ol>
+<li>Review the KPI and reporting view on a regular schedule — weekly is a reasonable rhythm for most owners and managers.</li>
+<li>Compare current lead times and volumes against recent history rather than judging any single number in isolation.</li>
+<li>When a bottleneck is flagged repeatedly at the same stage, treat that as a planning signal — it may point to a staffing gap, a process step that needs attention, or a step worth simplifying.</li>
+</ol>
+
+<p><strong>Tip:</strong> The numbers are most useful as a trend, not a single reading. A lead time that ticks up for one week is normal variation; a lead time that climbs for a month in a row is worth investigating.</p>
+
+<h2>Acting on recommendations</h2>
+
+<p>As the platform observes the pipeline and the shop floor, it will surface suggestions for things worth doing — for example, flagging a quote that's gone cold and might need a follow-up call, or noting that a particular stage has been slow and might benefit from attention. These appear in a recommendations queue, most visibly through the Command Center.</p>
+
+<p>It's important to understand what this queue is and isn't. It is a list of suggestions for a person to consider. It is not an automatic decision-maker — nothing in the recommendations queue acts on its own. Every recommendation waits for a human being to review it and choose what to do.</p>
+
+<h3>How to work through recommendations</h3>
+
+<ol>
+<li>Open the recommendations queue from the Command Center.</li>
+<li>Read each suggested action along with the reasoning behind it — the platform shows why the recommendation was made, not just what it's suggesting.</li>
+<li>For each item, choose one of the available responses:
+  <ul>
+  <li><strong>Approve</strong> — accept the recommendation and let it proceed.</li>
+  <li><strong>Dismiss</strong> — decline the suggestion if it doesn't apply or isn't needed.</li>
+  <li><strong>Hold</strong> — leave it for later if you need more information first.</li>
+  </ul>
+</li>
+<li>Your decision is recorded, building a clear history of what was suggested and how it was handled.</li>
+</ol>
+
+<p><strong>Tip:</strong> Treat the recommendations queue as a second opinion, not an instruction. It's designed to catch things a busy manager might otherwise miss, but the judgment call is always yours.</p><div class="sbd-chap"></div><h1>For Sales &amp; Design</h1>
+
+<p>This chapter is for sales representatives, in-house designers, and dealers who help customers turn a room into a priced, buildable cabinet order. It covers both ways customers and reps can design a project, how to build and configure an order, how pricing adjusts to each customer's account type, how to review a bill of materials before you commit anything, and how to move a project from a draft into production.</p>
+
+<h2>The two ways to design</h2>
+
+<p>Every project starts in one of two places, and both end up in the same place: a fully configured, priced order that can become a formal quote.</p>
+
+<h3>The public online designer</h3>
+
+<p>Customers can design on their own, without a rep in the room. This is the self-serve path you'll point homeowners to when they want to explore options before talking to you, or when they're working after hours. From there, they can:</p>
+
+<ul>
+<li>Start a room from scratch by entering dimensions.</li>
+<li>Start from photos of their actual space.</li>
+<li>Start by describing the room in a guided design chat that builds the layout for them as they talk.</li>
+</ul>
+
+<p>Whichever starting point they choose, the customer lands in a live 3D configurator where they can adjust the room, drop in cabinetry, and change options while watching the price update in real time. Many customers will arrive at their first appointment with a project already started — your job is often to refine it, not begin it.</p>
+
+<h3>The Order Builder</h3>
+
+<p>The Order Builder is your workspace as a rep. Use it when you're building or refining an order directly — during a phone call, at a design consultation, or when converting a customer's self-serve project into a finished order. It gives you full control over every zone, every line, and every option, plus visibility into rules, warnings, and bill of materials that the public designer keeps simplified for customers.</p>
+
+<h3>Tip</h3>
+
+<p>Think of the public designer as the "front door" for inspiration and rough layout, and the Order Builder as the workbench where an order gets finalized. A project can move between the two — a customer's room-first design can be pulled into the Order Builder for you to fine-tune before quoting.</p>
+
+<h2>Starting a room (dimensions, photos, or chat)</h2>
+
+<p>Helping a customer start a room is usually the first thing you'll do together, whether you're sitting with them or guiding them remotely.</p>
+
+<h3>How to start a room from dimensions</h3>
+
+<ol>
+<li>Open the room-first designer and choose to start with measurements.</li>
+<li>Enter the room's length, width, and ceiling height, along with the locations of doors, windows, and any fixed obstacles like plumbing or existing outlets.</li>
+<li>Confirm the layout in the preview — walls and openings will appear as a simple floor plan.</li>
+<li>Move into the 3D configurator to begin placing cabinetry along the walls.</li>
+</ol>
+
+<h3>How to start a room from photos</h3>
+
+<ol>
+<li>Have the customer take a few clear photos of the space — most rooms only need two or three angles.</li>
+<li>Upload the photos into the room capture flow.</li>
+<li>Review the room shape it produces and make any corrections to wall lengths or openings that need adjusting.</li>
+<li>Proceed into the 3D configurator once the layout looks right.</li>
+</ol>
+
+<h3>How to start a room with the design chat</h3>
+
+<ol>
+<li>Open the guided design chat and have the customer describe their room in their own words — dimensions if they know them, or just a general description of the space and how they want to use it.</li>
+<li>The chat asks clarifying questions as needed and builds out a room layout as the conversation progresses.</li>
+<li>Review the resulting layout together and adjust anything that doesn't match the real space.</li>
+</ol>
+
+<h3>Tips</h3>
+
+<ul>
+<li>The photo and chat paths are especially useful for customers who don't have measurements handy or feel intimidated by a blank floor plan.</li>
+<li>Always walk through the generated layout with the customer before moving on — it's much faster to fix a wall length here than after cabinets have been placed.</li>
+<li>A room started by a customer online can always be picked up and continued by you in the Order Builder.</li>
+</ul>
+
+<h2>Building an order in the Order Builder</h2>
+
+<p>An order is organized into zones, which mirror how a kitchen or room is actually laid out. Building an order means adding the right zones and then configuring each cabinet line within them.</p>
+
+<h3>Understanding zones</h3>
+
+<ul>
+<li><strong>Base run</strong> — base cabinets along a wall or run of counter.</li>
+<li><strong>Wall</strong> — upper wall cabinets.</li>
+<li><strong>Tall</strong> — pantry, oven, and other full-height cabinets.</li>
+<li><strong>Island</strong> — freestanding island cabinetry.</li>
+<li><strong>Accessories</strong> — hardware, organizers, and other add-ons that aren't full cabinet boxes.</li>
+</ul>
+
+<h3>How to build an order</h3>
+
+<ol>
+<li>Start a new order for the customer, or open their existing draft if one already exists.</li>
+<li>Add a zone for each area of the project — for example, a base run along the sink wall, a wall zone above it, and an island zone in the center of the room.</li>
+<li>Within each zone, add a line for each cabinet the customer needs.</li>
+<li>Configure each line's options (covered in the next section).</li>
+<li>Repeat for every zone until the full room is represented in the order.</li>
+</ol>
+
+<h3>Tips</h3>
+
+<ul>
+<li>Build zone by zone rather than jumping around — it keeps the order easy to review with the customer and easier to sanity-check against the room layout.</li>
+<li>An order can be saved as a draft at any point and returned to later, so there's no need to finish in one sitting.</li>
+<li>Accessories are easy to forget — walk through hardware and organizer needs for each zone before moving to pricing and quoting.</li>
+</ul>
+
+<h2>Configuring a cabinet line</h2>
+
+<p>Each line in an order represents a single cabinet, and each one has its own set of options. Getting these right the first time is what keeps an order clean and buildable.</p>
+
+<h3>What you configure on a line</h3>
+
+<ul>
+<li><strong>Series</strong> — the cabinet line or collection the customer is ordering from.</li>
+<li><strong>Door style</strong> — the door and drawer front style.</li>
+<li><strong>Box material</strong> — the material the cabinet box itself is built from.</li>
+<li><strong>Finish</strong> — the color or stain applied to the visible surfaces.</li>
+<li><strong>Hinge side</strong> — which side the door swings from.</li>
+<li><strong>Finished sides</strong> — whether an exposed side panel needs a finished (rather than unfinished) surface, for cabinets that will be visible from the side.</li>
+<li><strong>Gables</strong> — end panels used to close off runs or islands.</li>
+<li><strong>Hardware</strong> — knobs, pulls, and similar fittings.</li>
+<li><strong>Accessories</strong> — pull-out organizers, trays, and other line-level add-ons.</li>
+</ul>
+
+<h3>How to configure a line</h3>
+
+<ol>
+<li>Open the line you want to configure.</li>
+<li>Choose the series and door style first — these determine what other options are available.</li>
+<li>Work down through box material, finish, hinge side, finished sides, and gables.</li>
+<li>Add any hardware and accessories specific to that cabinet.</li>
+<li>Watch for validation messages as you go — the system actively blocks combinations that can't actually be built.</li>
+</ol>
+
+<h3>How the rules protect you</h3>
+
+<p>Behind every line is a set of rules that understands which combinations are valid — for example, a particular door style might only be offered in certain finishes, or a given box material might not support a particular hardware option. When you pick something that conflicts with an earlier choice, the system will stop you or flag it immediately rather than letting an unbuildable line slip through to production.</p>
+
+<h3>Tips</h3>
+
+<ul>
+<li>Configure series and door style before anything else — changing them later can reset other choices that depended on them.</li>
+<li>If an option you expect to see isn't available, it's usually because an earlier choice on the same line excludes it — check finish and box material first.</li>
+<li>Finished sides are easy to miss on end-of-run and island cabinets; always check exposed sides before moving on.</li>
+</ul>
+
+<h2>How pricing works for your channel</h2>
+
+<p>Every customer's account is set to one of six pricing channels, and that channel determines what they pay for every line in the order:</p>
+
+<ul>
+<li><strong>Retail</strong></li>
+<li><strong>Dealer</strong></li>
+<li><strong>Contractor / trade</strong></li>
+<li><strong>Central-KD</strong></li>
+<li><strong>Big-box</strong></li>
+<li><strong>Refacing</strong></li>
+</ul>
+
+<p>Pricing updates live as an order is built — every option you add or change re-prices instantly, so the customer always sees an accurate running total rather than an estimate that needs to be recalculated later.</p>
+
+<h3>How to price for the right customer</h3>
+
+<ol>
+<li>Confirm which account the order belongs to, or select the correct customer if you're starting a new order.</li>
+<li>Verify their pricing channel matches the relationship — for example, a dealer account should be priced on the dealer channel, not retail.</li>
+<li>If you switch the customer on an existing order, the entire order re-prices instantly to reflect the new channel — there's no need to rebuild anything.</li>
+</ol>
+
+<h3>Tips</h3>
+
+<ul>
+<li>Always double-check the channel before sending a quote — the same order can look very different in total depending on which of the six channels it's priced under.</li>
+<li>If a customer's relationship with Southbrook changes (for example, a homeowner becomes a dealer), switching their account type re-prices future orders automatically — no manual repricing needed.</li>
+</ul>
+
+<h2>Previewing the bill of materials &amp; fixing validation issues</h2>
+
+<p>Before an order goes any further, it's worth checking what's actually going to get built — not just what it costs.</p>
+
+<h3>Previewing the bill of materials</h3>
+
+<p>Every line in an order can show you its own bill of materials — the actual components that make up that cabinet based on the options selected. This is a useful gut-check before confirming an order, especially on unusual configurations, because it shows you exactly what production will receive rather than just the option labels.</p>
+
+<h3>How to preview and resolve issues</h3>
+
+<ol>
+<li>Open the line you want to check and view its bill of materials.</li>
+<li>Review the components listed against what the customer expects — this is especially worth doing for custom sizes, uncommon finish combinations, or heavily accessorized lines.</li>
+<li>Check the order for any validation warnings — these flag options or combinations that need attention before the order can move forward.</li>
+<li>Resolve each warning by adjusting the flagged option on the line it belongs to.</li>
+<li>Re-check the order once changes are made, since fixing one warning can occasionally surface another.</li>
+</ol>
+
+<h3>Tips</h3>
+
+<ul>
+<li>Get in the habit of checking validation warnings before you generate a quote, not after — it's much easier to fix a line while you're still in the configuration mindset.</li>
+<li>Never confirm an order with open validation warnings; they exist specifically to catch things that can't be built as configured.</li>
+<li>If you're unsure why a warning appeared, check the most recently changed option on that line first — most warnings are triggered by the last thing that was touched.</li>
+</ul>
+
+<h2>Sending a quote and confirming an order</h2>
+
+<p>Once an order is configured, priced, and clean of validation warnings, it's ready to become a formal quote — and eventually a confirmed order headed to production.</p>
+
+<h3>Generating a quote</h3>
+
+<p>A quote is a formal, itemized PDF that lists every zone, every line, and its price, priced according to the customer's channel. It's what you hand a customer to review and approve, and what a customer receives when they submit a "request a quote" themselves from the public designer. With an order already built and validated, generating a first quote typically takes under 5 minutes.</p>
+
+<h3>How to send a quote</h3>
+
+<ol>
+<li>Confirm the order is complete, priced correctly, and free of validation warnings.</li>
+<li>Generate the itemized PDF quote from the order.</li>
+<li>Review the quote for accuracy — zone by zone is the fastest way to catch anything out of place.</li>
+<li>Send the quote to the customer, or hand it to them directly if you're together.</li>
+</ol>
+
+<h3>Understanding the pipeline</h3>
+
+<p>Every order moves through a predictable set of stages:</p>
+
+<ul>
+<li><strong>Draft</strong> — the order is still being built and configured.</li>
+<li><strong>Estimating</strong> — the order is priced and ready for quoting or under quote review.</li>
+<li><strong>Approval</strong> — the order is awaiting sign-off, typically the customer's acceptance of the quote.</li>
+<li><strong>Confirmed</strong> — the order has been approved and locked in.</li>
+<li><strong>In production</strong> — the confirmed order has been sent on to be built.</li>
+</ul>
+
+<h3>What "confirm" does</h3>
+
+<p>Confirming an order is the point of no casual return — it signals that the customer has approved the quote and the order is ready to be built. Confirming sends the order on toward manufacturing, so it should only happen once the customer has agreed to the quote and every line has passed validation. Once confirmed, changes to the order should go through your normal change process rather than simply editing lines, since production may already be planning around what was confirmed.</p>
+
+<h3>Tips</h3>
+
+<ul>
+<li>Don't confirm an order on the customer's behalf without their explicit approval of the quote — confirmation is meant to reflect a real commitment.</li>
+<li>If a customer wants changes after a quote is sent, it's usually faster to revise the order and re-issue the quote than to confirm and correct afterward.</li>
+<li>Keep an eye on orders sitting in draft or estimating for a long time — a quick follow-up with the customer often moves things along.</li>
+</ul>
+
+<h2>Helping customers in their portal</h2>
+
+<p>Customers and dealers each have their own place to track projects after you've handed off a quote or order.</p>
+
+<h3>Customer portal</h3>
+
+<p>Customers can log into their own portal to track the status of their estimates — seeing where a project sits in the pipeline, reviewing past quotes, and picking up a room design they started earlier. Point customers here when they ask "where's my quote?" or want to revisit a design between conversations with you.</p>
+
+<h3>Dealer order book</h3>
+
+<p>Dealers work from their own order book, which gives them visibility into their orders across the pipeline, priced according to their dealer channel. This is the go-to reference when a dealer asks about the status of an order they placed or wants to review what's currently in progress.</p>
+
+<h3>Tips</h3>
+
+<ul>
+<li>Encourage customers to create and use their portal login early — it reduces status-check calls and gives them a place to return to their design.</li>
+<li>For dealers, the order book is usually faster than a phone call for simple status questions — it's worth walking new dealers through it once so they know it's there.</li>
+</ul><div class="sbd-chap"></div><h1>For Manufacturing &amp; Production</h1>
+
+<p><strong>Who this chapter is for:</strong> production managers, machine operators, shop-floor leads, and shipping/installation staff. It explains what happens the moment a customer's order is confirmed, how work is dispatched and tracked on the floor, how to use QR labels and the staff scanner, how bills of materials and cut lists are built, and how quality checks and shipping fit into the process. Typical lead time from a confirmed order to a shipped, ready-to-install kitchen is <strong>4–6 weeks</strong>.</p>
+
+<h2>From confirmed order to the floor</h2>
+
+<p>When a sales rep or customer finalizes and confirms an order, that order does not need to be re-typed, re-drawn, or re-entered anywhere. The exact configuration that was designed — every cabinet, every dimension, every finish and hardware choice — becomes the production plan automatically. The system creates the manufacturing jobs and the individual work steps needed to build the order, in the right sequence, without anyone on the floor doing manual data entry.</p>
+
+<p>This matters for accuracy: what the customer approved is what gets built. There is no hand-off gap where a spec sheet gets mis-copied or a dimension gets transposed. If something on the floor looks wrong compared to what was designed, that is a signal to stop and check the order rather than "fix it in the shop."</p>
+
+<h3>What a production manager sees when an order lands</h3>
+<ul>
+  <li>A new job (or set of jobs) appears on the shop-floor board, broken into the individual pieces of work needed — cutting, edge-banding, drilling, assembly, finishing, packing, and so on, depending on what that order requires.</li>
+  <li>Each job carries the full specification: dimensions, materials, finishes, hardware, and any custom notes from the design stage.</li>
+  <li>Jobs are automatically sequenced so that dependent steps (for example, assembly waiting on cut parts) are visible as blocked until their inputs are ready.</li>
+</ul>
+
+<h3>Tips</h3>
+<ul>
+  <li>Because the plan is generated automatically from the confirmed design, always treat the order record as the source of truth. Do not rely on memory or a printed sheet from an earlier revision — always check that you are looking at the current traveler or board entry.</li>
+  <li>If a customer requests a change after confirmation, that change needs to go back through the design/order process, not be applied directly on the floor, so that labels, cut lists, and BOMs all stay in sync.</li>
+</ul>
+
+<h2>Reading the shop-floor board</h2>
+
+<p>The shop-floor board is the day-to-day control center for production. It shows, at a glance, what needs to be made next and — just as importantly — what is currently blocking the next cut or the next step.</p>
+
+<h3>What the board tells you</h3>
+<ul>
+  <li><strong>What's next:</strong> jobs are ordered by priority and readiness, so the top of the queue is what the floor should be working on now.</li>
+  <li><strong>What's blocked:</strong> a job waiting on a prior step, a missing material, or an open quality issue is flagged so operators are not left guessing why a job hasn't started.</li>
+  <li><strong>Where each job stands:</strong> every job shows its current stage (for example, cutting, edge-banding, assembly, finishing, packing) so a lead can walk the floor and know instantly what's in progress versus complete.</li>
+</ul>
+
+<h3>How to use the board day-to-day</h3>
+<ol>
+  <li>Start each shift by scanning the board for anything marked blocked. Resolve blockers (missing material, unresolved quality hold, waiting on an upstream step) before pulling new work.</li>
+  <li>Work jobs in the order the board presents them unless a supervisor has a documented reason to reprioritize.</li>
+  <li>As work is completed at each station, update the job's status (see the next section on scanning labels) so the board — and everyone relying on it — stays current in real time.</li>
+  <li>At shift change, hand off by reviewing the board together rather than relying on verbal notes; the board is always up to date.</li>
+</ol>
+
+<h3>Practical tips</h3>
+<ul>
+  <li>The board is only as accurate as the scans and updates feeding it. A job that's actually done but never scanned as complete will keep showing as in-progress and can confuse the next shift.</li>
+  <li>If the same type of blocker keeps appearing (for example, a recurring material shortage), flag it to the production manager — the board is a good early-warning system for recurring production problems, not just a to-do list.</li>
+</ul>
+
+<h2>Floor-traveler labels &amp; QR scanning</h2>
+
+<p>Every job that goes onto the floor is printed with a traveler label — a physical tag that stays with the piece, package, or cart through production. Each traveler carries a QR code that links back to that specific job's full details.</p>
+
+<h3>What's on a traveler label</h3>
+<ul>
+  <li>The job and order it belongs to</li>
+  <li>Key specifications needed to make the piece correctly (dimensions, material, finish, hardware)</li>
+  <li>A QR code that operators scan with a phone or tablet to pull up full details and to move the job forward through its steps</li>
+</ul>
+
+<h3>How to advance a job by scanning its label</h3>
+<ol>
+  <li>Open the scanning view on your phone or tablet.</li>
+  <li>Scan the QR code on the traveler label attached to the piece or package in front of you.</li>
+  <li>Confirm the job details shown on screen match the physical piece — dimensions, material, and finish should agree with what you're holding.</li>
+  <li>Mark the current step complete (or log an issue if something doesn't check out — see Quality checks below).</li>
+  <li>The job automatically advances to its next stage on the shop-floor board, and the traveler stays with the piece for the next operator to scan at the next station.</li>
+</ol>
+
+<h3>Safety and accuracy notes</h3>
+<ul>
+  <li>Always confirm the label matches the physical piece before scanning it as complete. A traveler that gets separated from its piece and re-attached to the wrong one will create a mismatch that's hard to trace later.</li>
+  <li>Keep traveler labels away from moisture, saw dust buildup, or heat sources that could damage the printed QR code — a damaged code may not scan and will need to be reprinted from the job record.</li>
+  <li>Do not advance a job past a step that hasn't actually been completed just to "keep the board moving." The board's value depends on it reflecting real, physical progress.</li>
+  <li>If a label is lost or destroyed, don't guess at the job details from memory — look the piece up by its order and reprint the traveler.</li>
+</ul>
+
+<h2>Using the staff scanner to look up any item</h2>
+
+<p>In addition to advancing work at each production step, staff have access to a general-purpose scanner for looking up any Southbrook QR code — whether it's on a traveler, a package, or a shipped unit. Scanning any of these codes shows the internal details for that item: which customer and order it belongs to, its manufacturing status, and its shipping details.</p>
+
+<h3>When to use the staff scanner</h3>
+<ul>
+  <li>A piece or package shows up on the floor or in the warehouse without clear context — scan it to identify the order and customer instantly.</li>
+  <li>A customer or dealer calls asking about the status of an order and you have a physical item or label in hand — scan it to pull up current status rather than searching by name or order number.</li>
+  <li>During shipping, to confirm a package matches the order it's being loaded against.</li>
+  <li>During a walk-through or audit, to spot-check that physical inventory matches what the system expects to be on the floor.</li>
+</ul>
+
+<h3>How to look up an item</h3>
+<ol>
+  <li>Open the staff scanner on your phone or tablet.</li>
+  <li>Scan any Southbrook QR code — traveler, package label, or shipping label.</li>
+  <li>Review the details shown: customer and order, manufacturing stage, and shipping/fulfillment status.</li>
+  <li>Use this information to answer questions on the spot, route the item correctly, or flag a discrepancy if something doesn't match expectations.</li>
+</ol>
+
+<h3>Tips</h3>
+<ul>
+  <li>This scanner is for internal staff use — it shows more detail than a customer-facing tag would, so treat what you see as internal order information.</li>
+  <li>Because it works on any Southbrook QR code, it's useful even for items that have moved past their original production step — for example, a finished package sitting in a staging area.</li>
+</ul>
+
+<h2>Bills of materials &amp; cut lists</h2>
+
+<p>Every cabinet a customer configures is automatically translated into exactly what the shop needs to build it: a bill of materials listing every panel, door, and piece of hardware, and a cut list giving the precise dimensions each panel needs to be cut to.</p>
+
+<h3>How this works in practice</h3>
+<ul>
+  <li>The dimensions and options chosen during design flow directly into the cut list — there is no manual re-measuring or re-calculating on the floor.</li>
+  <li>Hardware requirements (hinges, slides, pulls, fasteners) are generated alongside the panel and door lines, so a job doesn't reach assembly missing a hardware piece that should have been pulled earlier.</li>
+  <li>Cabinets are prepared to ship flat-pack-ready, with their cut lists traveling alongside them so that whoever assembles the piece — whether in-house or on site — has the exact specifications on hand.</li>
+</ul>
+
+<h3>How to use a cut list at the saw</h3>
+<ol>
+  <li>Pull up the job on the traveler or scanner and confirm you're looking at the current cut list for that specific order — not a similar-looking job.</li>
+  <li>Cut each panel to the listed dimensions exactly; do not round or estimate, since cabinet fit depends on precise, consistent dimensions across all its parts.</li>
+  <li>Set aside and label pieces that don't pass a quick visual/dimensional check rather than sending them forward — catching an error at the saw is far cheaper than catching it at assembly or on site.</li>
+  <li>Confirm hardware and fasteners listed on the BOM are pulled and staged with the cut pieces before the job moves to the next station.</li>
+</ol>
+
+<h3>Tips</h3>
+<ul>
+  <li>Because the cut list is generated straight from the confirmed design, a wrong dimension almost always traces back to how the piece was configured, not the cut list logic — if a dimension looks physically wrong, flag it and check the order rather than "fixing" the cut list yourself.</li>
+  <li>Flat-pack orders depend on every panel matching its cut list precisely, since assembly may happen later and off-site — small cutting errors that would be caught during in-house assembly may not surface until installation.</li>
+</ul>
+
+<h2>Quality checks</h2>
+
+<p>Quality checks happen at multiple points along the production line, not just at the very end. This catches problems early — while they're still cheap and easy to fix — rather than after a cabinet is fully assembled, finished, or shipped.</p>
+
+<h3>What gets checked</h3>
+<ul>
+  <li>Dimensional accuracy against the cut list at key stages (after cutting, after assembly)</li>
+  <li>Finish and material quality (surface condition, color/finish match, damage)</li>
+  <li>Hardware fit and function (doors and drawers operate correctly, hinges and slides are properly installed)</li>
+  <li>Completeness against the bill of materials before a job is packed for shipping</li>
+</ul>
+
+<h3>How to record a quality issue</h3>
+<ol>
+  <li>Scan the job's traveler label or look it up with the staff scanner so the issue is logged against the correct order and job.</li>
+  <li>Record what you observed as specifically as possible — which dimension, which surface, which part.</li>
+  <li>Flag the job as on hold rather than passing it to the next station, so it doesn't move forward until the issue is resolved.</li>
+  <li>Notify the production manager or lead so the issue can be triaged — reworked, replaced, or escalated back to the order if it points to a design or specification problem.</li>
+</ol>
+
+<h3>Tips</h3>
+<ul>
+  <li>Recording an issue, even a minor one, helps spot patterns — the same issue showing up repeatedly on similar jobs is worth raising even if each individual instance seems small.</li>
+  <li>Never pass a piece forward "to deal with later." A held job is visible and tracked; a piece that quietly continues down the line with a known defect is not.</li>
+</ul>
+
+<h2>Shipping &amp; fulfillment</h2>
+
+<p>Once a job has cleared its quality checks and every piece for the order is complete, it moves to shipping and fulfillment — the final stage before the order leaves the shop.</p>
+
+<h3>What happens at this stage</h3>
+<ul>
+  <li>Packages are matched against the order's bill of materials to confirm everything scheduled to ship is present and accounted for.</li>
+  <li>Packages are labeled with their own QR codes, which can be scanned with the staff scanner to confirm order, customer, and destination details at any point before or during transit.</li>
+  <li>Once confirmed complete, the order's status is updated so office staff, dealers, and customers all see accurate, current shipping status.</li>
+</ul>
+
+<h3>How to prepare and confirm an order for shipping</h3>
+<ol>
+  <li>Gather all packages associated with the order and scan each package label to confirm it belongs to the same order.</li>
+  <li>Check the gathered packages against the order's bill of materials — every panel, door, and hardware set that was configured should be present.</li>
+  <li>Flag any missing or mismatched item before the order ships, rather than after — a shortage discovered on-site is far more disruptive than one caught in the shipping bay.</li>
+  <li>Once confirmed complete, mark the order as shipped so its status is current for anyone checking on it afterward.</li>
+</ol>
+
+<h3>Tips</h3>
+<ul>
+  <li>For flat-pack orders, make sure the cut list and assembly notes are included with the shipment — the installer or assembler on the other end depends on that information being physically present, not just recorded in the system.</li>
+  <li>If an order is being split into multiple shipments, scan and confirm each shipment separately so status stays accurate for partial deliveries.</li>
+</ul>
+        </div>
+        <div class="sbd-footer">&#169; Southbrook Cabinetry &#183; southbrookcabinetry.space &#183; Custom kitchen cabinets, designed online.</div>
+      </div>
+    </t>
+  </template>
+  <record id="report_sb_doc_features" model="ir.actions.report">
+    <field name="name">Southbrook — Platform Features</field>
+    <field name="model">res.company</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">southbrook_estimating_website.sb_doc_features</field>
+    <field name="report_file">southbrook_estimating_website.sb_doc_features</field>
+    <field name="paperformat_id" ref="paperformat_sb_doc"/>
+  </record>
+  <record id="report_sb_doc_brochure" model="ir.actions.report">
+    <field name="name">Southbrook — Sales Brochure</field>
+    <field name="model">res.company</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">southbrook_estimating_website.sb_doc_brochure</field>
+    <field name="report_file">southbrook_estimating_website.sb_doc_brochure</field>
+    <field name="paperformat_id" ref="paperformat_sb_doc"/>
+  </record>
+  <record id="report_sb_doc_quickguide" model="ir.actions.report">
+    <field name="name">Southbrook — Quick Start Guide</field>
+    <field name="model">res.company</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">southbrook_estimating_website.sb_doc_quickguide</field>
+    <field name="report_file">southbrook_estimating_website.sb_doc_quickguide</field>
+    <field name="paperformat_id" ref="paperformat_sb_doc"/>
+  </record>
+  <record id="report_sb_doc_manual" model="ir.actions.report">
+    <field name="name">Southbrook — User Manual</field>
+    <field name="model">res.company</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">southbrook_estimating_website.sb_doc_manual</field>
+    <field name="report_file">southbrook_estimating_website.sb_doc_manual</field>
+    <field name="paperformat_id" ref="paperformat_sb_doc"/>
+  </record>
+</odoo>

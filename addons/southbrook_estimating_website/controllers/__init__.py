@@ -5,3 +5,4 @@
 # /my/southbrook/order-builder portal route.
 from . import main
 from . import room_api
+from . import docs

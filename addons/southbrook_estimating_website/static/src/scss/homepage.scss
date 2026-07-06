@@ -348,6 +348,106 @@
 }
 
 // ---------------------------------------------------------------------
+// RESOURCES / DOCUMENTATION — downloadable PDF cards (lower area).
+// ---------------------------------------------------------------------
+.o_sb_resources {
+  padding: 72px 0;
+  background: var(--sb-paper, #fbf7ef);
+  border-top: 1px solid var(--sb-rule, #d8cfbf);
+}
+
+.o_sb_resources_header {
+  max-width: 640px;
+  margin: 0 0 32px;
+}
+
+.o_sb_resources_title {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--sb-ink, #1a1814);
+  margin: 0 0 10px;
+
+  @media (max-width: 768px) { font-size: 24px; }
+}
+
+.o_sb_resources_sub {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--sb-ink-dim, #6b665e);
+  margin: 0;
+}
+
+.o_sb_resources_grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+
+  @media (max-width: 991px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 575px) { grid-template-columns: 1fr; }
+}
+
+.o_sb_resource_card {
+  display: flex;
+  flex-direction: column;
+  padding: 22px 20px;
+  background: var(--sb-linen, #f4ede2);
+  border: 1px solid var(--sb-rule, #d8cfbf);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+
+  &:hover {
+    border-color: var(--sb-walnut, #6b3f2a);
+    box-shadow: 0 10px 24px rgba(74, 60, 46, 0.14);
+    transform: translateY(-2px);
+    text-decoration: none;
+    color: inherit;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sb-sky, #2b4f6b);
+    outline-offset: 2px;
+  }
+}
+
+.o_sb_resource_kind {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sb-walnut, #6b3f2a);
+  margin-bottom: 10px;
+}
+
+.o_sb_resource_name {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 20, "wght" 500;
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--sb-ink, #1a1814);
+  margin: 0 0 8px;
+}
+
+.o_sb_resource_desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sb-ink-dim, #6b665e);
+  margin: 0 0 16px;
+  flex: 1 1 auto;
+}
+
+.o_sb_resource_dl {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sb-walnut-d, #4a2b1d);
+  margin-top: auto;
+}
+
+// ---------------------------------------------------------------------
 // SECONDARY CTA STRIP
 // ---------------------------------------------------------------------
 .o_sb_cta_strip {

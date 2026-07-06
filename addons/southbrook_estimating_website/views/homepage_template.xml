@@ -172,6 +172,62 @@
             </div>
           </section>
 
+          <!-- RESOURCES / DOCUMENTATION — downloadable PDFs (served by
+               controllers/docs.py at /southbrook/docs/<slug>.pdf, rendered
+               from reports/southbrook_docs.xml). Placed in the lower area so
+               visitors find them easily above the closing CTA. -->
+          <section class="o_sb_resources">
+            <div class="container">
+              <header class="o_sb_resources_header">
+                <h2 class="o_sb_resources_title">
+                  Resources &amp; documentation
+                </h2>
+                <p class="o_sb_resources_sub">
+                  Everything about the Southbrook platform — free to download,
+                  no sign-in required.
+                </p>
+              </header>
+              <div class="o_sb_resources_grid">
+                <a class="o_sb_resource_card" href="/southbrook/docs/features.pdf">
+                  <div class="o_sb_resource_kind">Features</div>
+                  <h3 class="o_sb_resource_name">Platform Features</h3>
+                  <p class="o_sb_resource_desc">
+                    Every capability at a glance, grouped from design and
+                    pricing through manufacturing and management.
+                  </p>
+                  <span class="o_sb_resource_dl">Download PDF <span aria-hidden="true">↓</span></span>
+                </a>
+                <a class="o_sb_resource_card" href="/southbrook/docs/brochure.pdf">
+                  <div class="o_sb_resource_kind">Brochure</div>
+                  <h3 class="o_sb_resource_name">Sales Brochure</h3>
+                  <p class="o_sb_resource_desc">
+                    Why Southbrook — the unbroken thread from your screen to
+                    the shop floor, for homeowners and trade partners.
+                  </p>
+                  <span class="o_sb_resource_dl">Download PDF <span aria-hidden="true">↓</span></span>
+                </a>
+                <a class="o_sb_resource_card" href="/southbrook/docs/quick-guide.pdf">
+                  <div class="o_sb_resource_kind">Quick guide</div>
+                  <h3 class="o_sb_resource_name">Quick Start Guide</h3>
+                  <p class="o_sb_resource_desc">
+                    Get going fast — design your kitchen in minutes, or build
+                    your first order as a trade partner.
+                  </p>
+                  <span class="o_sb_resource_dl">Download PDF <span aria-hidden="true">↓</span></span>
+                </a>
+                <a class="o_sb_resource_card" href="/southbrook/docs/user-manual.pdf">
+                  <div class="o_sb_resource_kind">Manual</div>
+                  <h3 class="o_sb_resource_name">User Manual</h3>
+                  <p class="o_sb_resource_desc">
+                    In-depth, chapter by chapter — for Management, Sales &amp;
+                    Design, and Manufacturing &amp; Production.
+                  </p>
+                  <span class="o_sb_resource_dl">Download PDF <span aria-hidden="true">↓</span></span>
+                </a>
+              </div>
+            </div>
+          </section>
+
           <!-- SECONDARY CTA STRIP -->
           <section class="o_sb_cta_strip">
             <div class="container">
