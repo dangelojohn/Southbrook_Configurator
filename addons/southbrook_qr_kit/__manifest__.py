@@ -43,7 +43,7 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.13.0",
+    "version": "19.0.0.14.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
@@ -89,16 +89,12 @@ SECURITY:
     "assets": {
         "web.assets_backend": [
             "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
-            "southbrook_qr_kit/static/src/js/operator_pin_modal.js",
-            "southbrook_qr_kit/static/src/scss/operator_pin_modal.scss",
             "southbrook_qr_kit/static/src/js/dark_mode_toggle.js",
             "southbrook_qr_kit/static/src/scss/dark_mode.scss",
             "southbrook_qr_kit/static/src/js/offline_scan_queue.js",
         ],
         "web.assets_frontend": [
             "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
-            "southbrook_qr_kit/static/src/js/operator_pin_modal.js",
-            "southbrook_qr_kit/static/src/scss/operator_pin_modal.scss",
             "southbrook_qr_kit/static/src/js/dark_mode_toggle.js",
             "southbrook_qr_kit/static/src/scss/dark_mode.scss",
             "southbrook_qr_kit/static/src/js/offline_scan_queue.js",
