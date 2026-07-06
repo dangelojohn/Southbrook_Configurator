@@ -16,7 +16,35 @@
           <field name="channel"/>
           <field name="tradesperson_tier"
                  invisible="channel != 'tradesperson'"/>
+          <!-- Pipeline stage — computed from this customer's orders.
+               Read-only: it reflects order state, not a manual pick.
+               Property type is set with Contact Tags (top of the form). -->
+          <field name="southbrook_pipeline_stage"/>
         </group>
+      </xpath>
+    </field>
+  </record>
+
+  <!-- Contacts search: group-by + quick filters for Pipeline Stage.
+       (Property type is classified with Contact Tags, which Odoo already
+       exposes as a native group-by/filter in this same search view.) -->
+  <record id="view_res_partner_filter_southbrook" model="ir.ui.view">
+    <field name="name">res.partner.search.southbrook</field>
+    <field name="model">res.partner</field>
+    <field name="inherit_id" ref="base.view_res_partner_filter"/>
+    <field name="arch" type="xml">
+      <xpath expr="//search" position="inside">
+        <separator/>
+        <filter name="sb_stage_active_job" string="Active Job"
+                domain="[('southbrook_pipeline_stage','=','active_job')]"/>
+        <filter name="sb_stage_proposal" string="Proposal"
+                domain="[('southbrook_pipeline_stage','=','proposal')]"/>
+        <filter name="sb_stage_quote" string="Quote"
+                domain="[('southbrook_pipeline_stage','=','quote')]"/>
+        <filter name="sb_stage_prospect" string="Prospect"
+                domain="[('southbrook_pipeline_stage','=','prospect')]"/>
+        <filter name="sb_group_pipeline_stage" string="Pipeline Stage"
+                context="{'group_by': 'southbrook_pipeline_stage'}"/>
       </xpath>
     </field>
   </record>

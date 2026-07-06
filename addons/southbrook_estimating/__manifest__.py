@@ -58,7 +58,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.7.7.0",
+    "version": "19.0.7.8.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -115,6 +115,11 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "security/ir.model.access.csv",
         # Commit 2 — seed parameters + res.partner view extension
         "data/config_parameters.xml",
+        # Customer property-type classification — Contact Tags tree
+        # (Residential: House/Condo/Apartment · Commercial: Office/Retail/
+        # Restaurant/Multi-unit). Pipeline stage is a computed field on
+        # res.partner (models/res_partner.py), not a tag.
+        "data/customer_category_tags.xml",
         "views/res_partner_views.xml",
         # Commit 3 — configurator attribute vocabulary
         "data/attributes.xml",

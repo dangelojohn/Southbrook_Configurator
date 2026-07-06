@@ -31,6 +31,46 @@ class ResPartner(models.Model):
     _inherit = "res.partner"
 
     # ------------------------------------------------------------------
+    # Pipeline stage (2026-07-06) — customer classification by where they
+    # sit in the sales pipeline, DERIVED from their own orders so it can
+    # never drift (unlike a manual tag). Groupable/filterable in Contacts:
+    # answers "is this customer in the Quote module or the Sales module".
+    # Property TYPE (house/condo/apartment/office/retail/...) is handled
+    # the Odoo-native way via Contact Tags (res.partner.category) seeded in
+    # data/customer_category_tags.xml — a stable attribute a rep sets,
+    # where tags are the right tool; pipeline stage is derived state, where
+    # a computed field is the right tool.
+    # ------------------------------------------------------------------
+    southbrook_pipeline_stage = fields.Selection(
+        [
+            ("prospect", "Prospect"),
+            ("quote", "Quote"),
+            ("proposal", "Proposal"),
+            ("active_job", "Active Job"),
+        ],
+        string="Pipeline Stage",
+        compute="_compute_southbrook_pipeline_stage",
+        store=True,
+        help="Where this customer sits in the sales pipeline, derived from "
+             "their orders: Active Job (a confirmed order — Sales module) > "
+             "Proposal (a sent quotation) > Quote (a draft quotation — Quote "
+             "module) > Prospect (a customer with no orders yet).",
+    )
+
+    @api.depends("sale_order_ids.state")
+    def _compute_southbrook_pipeline_stage(self):
+        for partner in self:
+            states = set(partner.sale_order_ids.mapped("state"))
+            if "sale" in states:
+                partner.southbrook_pipeline_stage = "active_job"
+            elif "sent" in states:
+                partner.southbrook_pipeline_stage = "proposal"
+            elif "draft" in states:
+                partner.southbrook_pipeline_stage = "quote"
+            else:
+                partner.southbrook_pipeline_stage = "prospect"
+
+    # ------------------------------------------------------------------
     # Customer identity resolver (2026-07-06).
     #
     # The Order Builder is used by internal staff/dealers building an order

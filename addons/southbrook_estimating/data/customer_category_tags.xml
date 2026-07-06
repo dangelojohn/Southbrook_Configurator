@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- Customer property-type classification (2026-07-06).
+     Odoo-native Contact Tags (res.partner.category), hierarchical so
+     Contacts can be grouped/filtered by Residential vs Commercial and by
+     the specific property type. A rep tags each customer with the type of
+     property the job is for. noupdate="1" so renames/edits survive -u. -->
+<odoo>
+    <data noupdate="1">
+
+        <!-- Residential -->
+        <record id="partner_category_residential" model="res.partner.category">
+            <field name="name">Residential</field>
+            <field name="color">10</field>
+        </record>
+        <record id="partner_category_house" model="res.partner.category">
+            <field name="name">House</field>
+            <field name="parent_id" ref="partner_category_residential"/>
+            <field name="color">10</field>
+        </record>
+        <record id="partner_category_condo" model="res.partner.category">
+            <field name="name">Condo</field>
+            <field name="parent_id" ref="partner_category_residential"/>
+            <field name="color">10</field>
+        </record>
+        <record id="partner_category_apartment" model="res.partner.category">
+            <field name="name">Apartment</field>
+            <field name="parent_id" ref="partner_category_residential"/>
+            <field name="color">10</field>
+        </record>
+
+        <!-- Commercial -->
+        <record id="partner_category_commercial" model="res.partner.category">
+            <field name="name">Commercial</field>
+            <field name="color">4</field>
+        </record>
+        <record id="partner_category_office" model="res.partner.category">
+            <field name="name">Office</field>
+            <field name="parent_id" ref="partner_category_commercial"/>
+            <field name="color">4</field>
+        </record>
+        <record id="partner_category_retail" model="res.partner.category">
+            <field name="name">Retail</field>
+            <field name="parent_id" ref="partner_category_commercial"/>
+            <field name="color">4</field>
+        </record>
+        <record id="partner_category_restaurant" model="res.partner.category">
+            <field name="name">Restaurant</field>
+            <field name="parent_id" ref="partner_category_commercial"/>
+            <field name="color">4</field>
+        </record>
+        <record id="partner_category_multi_unit" model="res.partner.category">
+            <field name="name">Multi-unit</field>
+            <field name="parent_id" ref="partner_category_commercial"/>
+            <field name="color">4</field>
+        </record>
+
+    </data>
+</odoo>
