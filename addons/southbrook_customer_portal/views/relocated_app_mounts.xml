@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!--
+    2026-07-07 — Relocated app mounts.
+
+    The Room Chat (+ live preview) and Ask Hermes widgets used to be
+    injected onto the sales-rep Order Builder page, where users found
+    they cluttered the order-building workflow. They were deactivated
+    there (see southbrook_room_chat/views/order_builder_room_chat_inject.xml
+    and southbrook_hermes/views/order_builder_chat_inject.xml, both now
+    active="False") and re-mounted here on their natural customer-facing
+    portal homes:
+
+      * Room Chat + preview  -> /my/kitchen-project/<id>  (portal_kitchen_project_detail)
+      * Ask Hermes           -> /my/fabio                 (portal_fabio_ask)
+
+    Both widgets' OWL bundles load into web.assets_frontend (global), so
+    they auto-mount on any frontend page wherever their data-*-mount div
+    appears. These mount divs are inert HTML until the widget bundle finds
+    them, matching the existing data-attribute mount convention. This addon
+    already depends on southbrook_hermes; southbrook_room_chat is added to
+    the manifest depends so the mount only renders when that addon is
+    present and its assets load first.
+  -->
+
+  <!-- Room Chat + live preview -> Kitchen Project detail page -->
+  <template id="room_chat_mount_kitchen_project"
+            inherit_id="southbrook_customer_portal.portal_kitchen_project_detail"
+            name="Room Chat — Kitchen Project mount">
+    <xpath expr="//h2[1]" position="after">
+      <div class="o_room_chat_wrap mt-3 mb-4"
+           data-room-chat-mount="1"
+           t-att-data-order-id="''"/>
+    </xpath>
+  </template>
+
+  <!-- Ask Hermes -> Ask Fabio portal page -->
+  <template id="hermes_chat_mount_fabio"
+            inherit_id="southbrook_customer_portal.portal_fabio_ask"
+            name="Ask Hermes — Fabio page mount">
+    <xpath expr="//h2[1]" position="after">
+      <div class="o_hermes_chat_wrap mt-3 mb-4"
+           data-hermes-chat-mount="1"
+           t-att-data-order-id="''"/>
+    </xpath>
+  </template>
+
+</odoo>

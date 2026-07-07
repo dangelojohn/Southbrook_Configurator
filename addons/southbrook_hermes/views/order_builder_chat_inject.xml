@@ -4,9 +4,15 @@
        page. The mount is auto-discovered by the OWL bundle's
        autoMount() routine and Hermes appears as a chat panel below the
        order header card. -->
+  <!-- 2026-07-07 — DEACTIVATED. Ask Hermes was cluttering the Order
+       Builder workflow; relocated to the /my/fabio ("Ask Fabio") portal
+       page, which is already the Hermes Q&A surface. Kept inactive (not
+       deleted) for a one-flag revert. New mount lives in
+       southbrook_customer_portal/views/relocated_app_mounts.xml. -->
   <template id="hermes_chat_inject_order_builder"
             inherit_id="southbrook_estimating_website.portal_order_builder"
-            name="Hermes Chat — Order Builder mount">
+            name="Hermes Chat — Order Builder mount (deactivated 2026-07-07)"
+            active="False">
     <xpath expr="//div[hasclass('o_southbrook_portal_header')]" position="after">
       <div class="o_hermes_chat_wrap mt-3 mb-3"
            data-hermes-chat-mount="1"

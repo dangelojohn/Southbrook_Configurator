@@ -10,9 +10,16 @@
        is auto-discovered by this addon's OWL bundle's autoMount()
        routine and appears as its own panel alongside Hermes's chat,
        below the order header card. -->
+  <!-- 2026-07-07 — DEACTIVATED. The Room Chat + preview widget was
+       cluttering the sales-rep Order Builder workflow; it was relocated
+       to the customer Kitchen Project detail page. Kept inactive (not
+       deleted) so it's a one-flag revert if we ever want it back here.
+       The new mount lives in
+       southbrook_customer_portal/views/relocated_app_mounts.xml. -->
   <template id="room_chat_inject_order_builder"
             inherit_id="southbrook_estimating_website.portal_order_builder"
-            name="Room Chat — Order Builder mount">
+            name="Room Chat — Order Builder mount (deactivated 2026-07-07)"
+            active="False">
     <xpath expr="//div[hasclass('o_southbrook_portal_header')]" position="after">
       <div class="o_room_chat_wrap mt-3 mb-3"
            data-room-chat-mount="1"

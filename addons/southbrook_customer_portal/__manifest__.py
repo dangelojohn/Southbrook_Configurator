@@ -38,13 +38,19 @@ Three.js KitchenCanvas (Phase 2):
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.6.1",
+    "version": "19.0.0.7.0",
     "depends": [
         "web",
         "website",
         "portal",
         "sale",
         "southbrook_hermes",
+        # 2026-07-07 — Room Chat widget relocated here from the Order
+        # Builder (views/relocated_app_mounts.xml drops its data-room-chat
+        # mount into the kitchen-project detail page). Declared so the
+        # widget's frontend bundle is present and load-ordered before this
+        # addon's template renders the mount div.
+        "southbrook_room_chat",
         "southbrook_kitchen_workspace",
         "southbrook_config_engine",
         # 2026-07-01 E2E audit — views/kitchen_portal_templates.xml lines
@@ -60,6 +66,7 @@ Three.js KitchenCanvas (Phase 2):
         "security/ir.model.access.csv",
         "views/kitchen_portal_templates.xml",
         "views/debrand_views.xml",
+        "views/relocated_app_mounts.xml",
     ],
     # NB: kitchen_canvas.js + kitchen_dims.js are NOT registered as
     # asset-bundle entries. Odoo's bundler does not transform their

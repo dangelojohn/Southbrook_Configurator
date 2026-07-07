@@ -46,7 +46,7 @@ RoomOutlinePreview for reuse).
     "author": "Southbrook Cabinetry",
     "license": "LGPL-3",
     "category": "Website/eCommerce",
-    "version": "19.0.2.1.0",
+    "version": "19.0.2.2.0",
     "depends": [
         "southbrook_estimating",
         "southbrook_estimating_website",
