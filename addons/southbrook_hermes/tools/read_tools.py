@@ -647,7 +647,9 @@ def get_shop_capacity(env, window="this_week"):
         wo_domain = [
             ("date_start", ">=", start_dt),
             ("date_start", "<", end_exclusive),
-            ("state", "in", ["ready", "progress", "pending", "waiting"]),
+            # Real Odoo 19 CE WO states; 'blocked' is committed (dependency-
+            # waiting) load. 'pending'/'waiting' never existed and hid it.
+            ("state", "in", ["blocked", "ready", "progress"]),
         ]
         # read_group aggregates duration_expected per workcenter without
         # loading every WO into memory.

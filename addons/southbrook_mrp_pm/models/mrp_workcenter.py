@@ -12,7 +12,7 @@ live (no stored cache) — the PM hits the dashboard and sees the
 current state without a manual refresh.
 
   southbrook_pm_inflight_count    work orders at this station in
-                                   pending/ready/progress/waiting
+                                   blocked/ready/progress
 
   southbrook_pm_throughput_today   work orders at this station
                                    that finished today (state=done
@@ -43,7 +43,10 @@ _ALERT_CONDITIONS = ("fair", "watch", "critical", "offline")
 
 # Same gate states the floor portal uses. Keeping the constant local
 # here avoids cross-module imports for what's effectively a literal.
-_IN_FLIGHT_WO_STATES = ("pending", "waiting", "ready", "progress")
+# These are the REAL Odoo 19 CE mrp.workorder.state values — 'blocked'
+# is the dependency-wait state (there is no 'pending'/'waiting'). The
+# prior tokens dropped every blocked WO from the in-flight count.
+_IN_FLIGHT_WO_STATES = ("blocked", "ready", "progress")
 
 
 class MrpWorkcenter(models.Model):
@@ -53,8 +56,8 @@ class MrpWorkcenter(models.Model):
         string="In-Flight WOs",
         compute="_compute_southbrook_pm_kpis",
         help=(
-            "Work orders queued at this station — pending / waiting / "
-            "ready / progress. The 'how busy is this station right "
+            "Work orders queued at this station — blocked / ready / "
+            "progress. The 'how busy is this station right "
             "now' metric."
         ),
     )

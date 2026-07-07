@@ -137,7 +137,7 @@
                       </div>
                       <!-- M16 Phase-2 — start / finish form-POSTs. -->
                       <div class="o_sb_floor_wo_actions">
-                        <t t-if="wo['state'] in ('pending','ready')">
+                        <t t-if="wo['state'] == 'ready'">
                           <form method="post"
                                 t-attf-action="/my/southbrook/floor/wo/{{wo['id']}}/start"
                                 class="o_sb_floor_wo_form">

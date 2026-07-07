@@ -6,7 +6,7 @@
         "Bottleneck Report (CE-native, no Enterprise mrp_mps or "
         "mrp_workorder dep)"
     ),
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry / OdooIQ",
     "category": "Manufacturing/MES",

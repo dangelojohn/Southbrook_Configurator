@@ -136,8 +136,11 @@ class SbProductionPackage(models.Model):
         package's MO. Returns empty when none."""
         if not self.mo_id:
             return self.env["mrp.workorder"]
+        # Only ready/progress WOs are actionable to finish. ('pending'
+        # never existed in Odoo 19 CE; a 'blocked' WO must NOT be picked
+        # here since finishing it would jump its unfinished predecessor.)
         wos = self.mo_id.workorder_ids.filtered(
-            lambda w: w.state in ("ready", "progress", "pending"))
+            lambda w: w.state in ("ready", "progress"))
         return wos.sorted(lambda w: (w.sequence or 0, w.id))[:1]
 
     def _append_scan_event(self, workcenter_code, wo_id):

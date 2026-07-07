@@ -294,7 +294,7 @@ class SouthbrookOpcuaTagMapping(models.Model):
                 return False
             return Model.search([
                 ("workcenter_id", "=", wc.id),
-                ("state", "in", ["ready", "progress", "pending"]),
+                ("state", "in", ["blocked", "ready", "progress"]),
             ], limit=1, order="date_start asc")
         if self.target_model == "southbrook.kitchen.workcenter.downtime":
             wc = self.target_workcenter_id or self.endpoint_id.workcenter_id

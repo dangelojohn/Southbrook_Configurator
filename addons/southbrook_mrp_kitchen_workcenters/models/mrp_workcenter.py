@@ -137,9 +137,9 @@ class MrpWorkcenter(models.Model):
         string="Pending WOs",
         compute="_compute_x_sbk_pending_load",
         store=True,
-        help="Number of WOs at this workcenter currently in 'ready', "
-             "'waiting', or 'pending' state. Auto-refreshes on every "
-             "WO state transition.",
+        help="Number of WOs queued at this workcenter (state 'blocked' "
+             "or 'ready' — assigned here but not yet running). "
+             "Auto-refreshes on every WO state transition.",
     )
     x_sbk_congestion_level = fields.Selection(
         [("clear", "Clear"),
@@ -172,8 +172,12 @@ class MrpWorkcenter(models.Model):
         except (TypeError, ValueError):
             alert_t = 5
         for wc in self:
+            # Queue depth = work assigned here but not yet running:
+            # 'blocked' (waiting on an upstream WO) + 'ready' (waiting on
+            # an operator). 'waiting'/'pending' never existed in CE and
+            # made this congestion signal silently count only 'ready'.
             pending = wc.order_ids.filtered(
-                lambda w: w.state in ("ready", "waiting", "pending"))
+                lambda w: w.state in ("blocked", "ready"))
             count = len(pending)
             wc.x_sbk_pending_wo_count = count
             if count >= alert_t:

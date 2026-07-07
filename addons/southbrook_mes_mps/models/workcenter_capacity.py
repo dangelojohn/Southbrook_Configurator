@@ -70,7 +70,10 @@ class SouthbrookMesMpsWorkcenterCapacity(models.Model):
                 ("workcenter_id", "=", rec.workcenter_id.id),
                 ("date_start", ">=", rec.week_start),
                 ("date_start", "<", week_end),
-                ("state", "in", ("ready", "progress", "pending", "waiting")),
+                # Real Odoo 19 CE WO states (blocked/ready/progress);
+                # 'pending'/'waiting' never existed and dropped all
+                # blocked (dependency-waiting) load from the week's total.
+                ("state", "in", ("blocked", "ready", "progress")),
             ]
             wos = WO.search(domain)
             # duration_expected is minutes on mrp.workorder.

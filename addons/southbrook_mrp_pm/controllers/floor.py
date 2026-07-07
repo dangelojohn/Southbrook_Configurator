@@ -30,13 +30,16 @@ from odoo.http import request
 from odoo.addons.portal.controllers.portal import CustomerPortal
 
 
-# In-flight WO states we surface. Same as M14's MO states but at
-# the work-order layer:
+# In-flight WO states we surface. These are the ACTUAL Odoo 19 CE
+# mrp.workorder.state values (verified against core mrp: the selection
+# is blocked/ready/progress/done/cancel — there is NO 'pending' or
+# 'waiting' state). The prior list used those two non-existent tokens,
+# which silently dropped every BLOCKED work order from the floor queue,
+# the kiosk, and the per-station counters — hiding the bulk of real WIP.
+#   blocked  — waiting on an upstream WO (the dependency head isn't done)
 #   ready    — upstream done, this WO is the head of the queue
-#   waiting  — blocked by an upstream WO that isn't done
 #   progress — currently being run on the floor
-#   pending  — initial state before MO confirm wakes it up
-IN_FLIGHT_WO_STATES = ("pending", "waiting", "ready", "progress")
+IN_FLIGHT_WO_STATES = ("blocked", "ready", "progress")
 
 
 class SouthbrookFloorPortal(CustomerPortal):
@@ -143,18 +146,22 @@ class SouthbrookFloorPortal(CustomerPortal):
         wo = Wo.browse(wo_id).exists()
         if not wo:
             return request.redirect("/my/southbrook/floor")
-        # Start only from ready / pending. Direct state write (not
-        # button_start) because Odoo's button_start has side-effects
-        # — component reservations, mrp_workorder timer rows, MO
-        # state cascade — that the floor MVP isn't wired for. Floor
-        # operator gets the state flip + date_start stamp; PMs who
-        # need the full mrp flow use the backend.
-        from odoo import fields as odoo_fields
-        if wo.state in ("pending", "ready", "waiting"):
+        # A WO can only be STARTED from 'ready' (its dependency head is
+        # done). 'blocked' WOs show in the queue but have no Start button.
+        #
+        # We deliberately do NOT call button_start(): on this deployment
+        # WOs are confirmed but never planned, so button_start() raises
+        # "This work order has not been scheduled yet" (verified against
+        # production 2026-07-06). Instead we flip the state directly AND
+        # open a real productivity time row, so the OEE / throughput KPIs
+        # (which read time_ids / duration) get true run-time data — the
+        # piece the original MVP omitted and the E2E review flagged.
+        if wo.state == "ready":
             wo.write({
                 "state": "progress",
-                "date_start": odoo_fields.Datetime.now(),
+                "date_start": fields.Datetime.now(),
             })
+            self._sbk_open_productive_time(wo)
         return request.redirect(
             "/my/southbrook/floor/%s" % wo.workcenter_id.id
         )
@@ -173,38 +180,68 @@ class SouthbrookFloorPortal(CustomerPortal):
         wo = Wo.browse(wo_id).exists()
         if not wo:
             return request.redirect("/my/southbrook/floor")
-        from odoo import fields as odoo_fields
         if wo.state == "progress":
-            # Same shortcut pattern as start — direct write of
-            # terminal state. The parent MO does NOT auto-close on
-            # this write (Odoo expects button_finish to cascade);
-            # PMs reconcile via the backend when the whole order
-            # finishes upstream.
+            # Close the open productivity time row FIRST so `duration`
+            # captures real elapsed run-time, then flip to done. We avoid
+            # button_finish() because it posts stock-valuation account
+            # moves that fail on this config (account_move.journal_id
+            # NOT NULL, verified against production 2026-07-06).
+            self._sbk_close_productive_time(wo)
             wo.write({
                 "state": "done",
-                "date_finished": odoo_fields.Datetime.now(),
+                "date_finished": fields.Datetime.now(),
             })
-            # Bump the next non-done sibling WO to 'ready' so the
-            # floor portal reflects what the next operator should
-            # see. Odoo's stock auto-cascade happens via
-            # button_finish; since we bypassed it, do it manually.
-            # Filter captures Odoo's gate states: blocked / waiting /
-            # pending / ready (already-ready is a no-op via the
-            # state write).
+            # Release the next work order in the chain to 'ready'. Native
+            # Odoo does this via button_finish's qty cascade; since we
+            # bypass it, we advance the lowest-sequence 'blocked' sibling
+            # manually so the next operator sees a Start button.
             mo = wo.production_id
-            next_pending = mo.workorder_ids.filtered(
-                lambda w: w.state not in ("done", "cancel", "progress")
-                and w.sequence > wo.sequence,
+            next_blocked = mo.workorder_ids.filtered(
+                lambda w: w.state == "blocked" and w.sequence > wo.sequence,
             )
-            if next_pending:
-                next_wo = min(
-                    next_pending, key=lambda w: w.sequence,
-                )
-                if next_wo.state != "ready":
-                    next_wo.write({"state": "ready"})
+            if next_blocked:
+                next_wo = min(next_blocked, key=lambda w: w.sequence)
+                next_wo.write({"state": "ready"})
         return request.redirect(
             "/my/southbrook/floor/%s" % wo.workcenter_id.id
         )
+
+    # ------------------------------------------------------------------
+    # Productivity time-row helpers (M16 P0 truth-fix 2026-07-06).
+    #
+    # The floor Start/Finish shortcuts bypass button_start/button_finish
+    # (which raise on this deployment — unplanned WOs + accounting config,
+    # verified). To stop OEE/throughput KPIs from silently under-reporting
+    # work done through the portal, we open a 'Fully Productive Time' row
+    # on Start and close it on Finish, exactly as button_start/finish
+    # would. `duration` then reflects true elapsed time.
+    # ------------------------------------------------------------------
+    def _sbk_open_productive_time(self, wo):
+        Prod = request.env["mrp.workcenter.productivity"].sudo()
+        loss = request.env["mrp.workcenter.productivity.loss"].sudo().search(
+            [("loss_type", "=", "productive")], limit=1)
+        if not loss:
+            return
+        vals = {
+            "workorder_id": wo.id,
+            "workcenter_id": wo.workcenter_id.id,
+            "date_start": fields.Datetime.now(),
+            "loss_id": loss.id,
+            "user_id": request.env.uid,
+        }
+        if "employee_id" in Prod._fields:
+            emp = request.env.user.employee_id
+            if emp:
+                vals["employee_id"] = emp.id
+        Prod.create(vals)
+
+    def _sbk_close_productive_time(self, wo):
+        open_rows = request.env["mrp.workcenter.productivity"].sudo().search([
+            ("workorder_id", "=", wo.id),
+            ("date_end", "=", False),
+        ])
+        if open_rows:
+            open_rows.write({"date_end": fields.Datetime.now()})
 
     @http.route(
         "/my/southbrook/floor/equipment/<int:eq_id>/condition",

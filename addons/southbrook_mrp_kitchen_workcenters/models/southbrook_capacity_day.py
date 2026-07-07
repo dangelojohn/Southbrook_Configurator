@@ -71,12 +71,12 @@ class SouthbrookCapacityDay(models.Model):
              "for this WC's resource_calendar_id. Honours 4-day weeks, "
              "company holidays, and 2-shift calendars.",
     )
-    # Sum of in-flight (pending/waiting/ready/progress) WO
+    # Sum of in-flight (blocked/ready/progress) WO
     # duration_expected scheduled for this day.
     loaded_minutes = fields.Float(
         string="Loaded (min)",
         help="Sum of mrp.workorder.duration_expected for WOs in "
-             "pending/waiting/ready/progress at this WC, with "
+             "blocked/ready/progress at this WC, with "
              "date_start on this day.",
     )
     # Pre-computed for ease of pivot measure selection.
@@ -190,7 +190,10 @@ class SouthbrookCapacityDay(models.Model):
         load_map = {}
         wos = Workorder.search([
             ("workcenter_id", "in", workcenters.ids),
-            ("state", "in", ["pending", "waiting", "ready", "progress"]),
+            # Real Odoo 19 CE WO states — 'blocked' is the dependency-wait
+            # state; 'pending'/'waiting' never existed and silently zeroed
+            # out the blocked load (the bulk of committed work).
+            ("state", "in", ["blocked", "ready", "progress"]),
             ("date_start", ">=", win_start),
             ("date_start", "<", win_end),
         ])

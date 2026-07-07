@@ -8,8 +8,10 @@
   this week, and where's the headroom'.
 
   Default filter:
-    - state in pending/waiting/ready/progress (in-flight; done
-      orders don't consume future capacity)
+    - state in blocked/ready/progress (in-flight; done
+      orders don't consume future capacity). NB: these are the
+      real Odoo 19 CE WO states — 'blocked' is dependency-wait;
+      'pending'/'waiting' never existed and hid all blocked load.
     - date_start in next 7 days (default search filter
       via context)
 
@@ -68,7 +70,7 @@
       <field name="res_model">mrp.workorder</field>
       <field name="view_mode">pivot,graph,list,form</field>
       <field name="domain">[
-        ('state','in',['pending','waiting','ready','progress'])
+        ('state','in',['blocked','ready','progress'])
       ]</field>
       <field name="context">{
         'search_default_group_by_workcenter': 1,

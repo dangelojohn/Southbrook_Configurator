@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+  P0 alerting spine (E2E owner review 2026-07-06).
+
+  Central Command already materializes exceptions every 15 min, but until
+  now nothing pushed them to a human — monitoring was pull-only, so a
+  stalled MO or blocked work order could sit for weeks unseen. This cron
+  emails each owner a one-shot digest of their NEW high/critical open
+  exceptions. It only READS already-materialized rows (no event-hook risk).
+
+  noupdate="1" so an operator can retune the cadence / disable it without a
+  module upgrade reverting the change.
+-->
+<odoo>
+
+    <!-- Cron is operator-tunable (noupdate) so retuning the cadence or
+         disabling it survives a module upgrade. -->
+    <data noupdate="1">
+        <record id="cron_command_center_alert_digest" model="ir.cron">
+            <field name="name">Central Command: email alert digest</field>
+            <field name="model_id" ref="model_southbrook_command_exception"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_send_alert_digest()</field>
+            <field name="interval_number">30</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+
+    <!--
+      Housekeeping (E2E review P0-5): the core `base.menu_tests` root menu
+      ships ungated on this DB (its normal group_no_one restriction was
+      lost), so an empty "Tests" app shows to every user in production.
+      Deactivate it — no action, no children here. In update mode
+      (noupdate=0) so it is (re)applied on every upgrade; reversible by
+      dropping this record.
+    -->
+    <data noupdate="0">
+        <record id="base.menu_tests" model="ir.ui.menu">
+            <field name="active" eval="False"/>
+        </record>
+    </data>
+
+</odoo>

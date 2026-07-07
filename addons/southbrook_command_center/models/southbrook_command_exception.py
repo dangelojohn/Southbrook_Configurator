@@ -30,7 +30,11 @@ surface explicitly out of this file's scope. ``SEVERITY_HARMONIZATION`` below
 is provided as a documented starting point for whoever implements that
 method next, so the mapping table doesn't have to be re-derived.
 """
+import logging
+
 from odoo import _, api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 # Per-source severity vocabularies harmonized onto this model's own
@@ -215,6 +219,15 @@ class SouthbrookCommandException(models.Model):
         required=True,
     )
 
+    # ------------------------------------------------------------------
+    # P0 alerting spine (E2E review 2026-07-06) — push, not pull.
+    # `alert_notified` flips True once an exception has been pushed to its
+    # owner by the email-digest cron, so each NEW high/critical issue is
+    # emailed exactly once (no re-spam) while nothing is silently missed.
+    # ------------------------------------------------------------------
+    alert_notified = fields.Boolean(default=False, copy=False, index=True)
+    alert_notified_date = fields.Datetime(readonly=True, copy=False)
+
     _source_uniq = models.Constraint(
         "unique(source_model, source_res_id, exception_type)",
         "An exception of this type already exists for this source record.",
@@ -293,4 +306,96 @@ class SouthbrookCommandException(models.Model):
                 "acknowledged_date": False,
             }
         )
+        return True
+
+    # ------------------------------------------------------------------
+    # P0 alerting spine — email-digest cron (E2E review 2026-07-06).
+    #
+    # Central Command already MATERIALIZES exceptions every 15 min, but
+    # nothing ever told a human: monitoring was pull-only, so an issue
+    # could sit unseen until someone happened to open the dashboard (the
+    # review found MOs stalled 18-34 days with zero alert). This cron
+    # PUSHES every new high/critical open exception to its owner by email,
+    # exactly once. It only READS already-materialized rows, so — unlike
+    # the Phase-2 write hooks — enabling it carries no event-hook risk.
+    # ------------------------------------------------------------------
+    @api.model
+    def _cron_send_alert_digest(self):
+        pending = self.search([
+            ("state", "in", ("new", "acknowledged", "in_progress")),
+            ("severity", "in", ("high", "critical")),
+            ("alert_notified", "=", False),
+        ])
+        if not pending:
+            return True
+        now = fields.Datetime.now()
+        type_labels = dict(self._fields["exception_type"].selection)
+        # One digest per owner, not one notification per exception. We push
+        # via message_notify (not raw mail.mail): it lands in the owner's
+        # in-app Discuss Inbox immediately — no SMTP required — AND emails
+        # them once an outgoing mail server is configured. Gate on
+        # partner_id (always present for a user), not email.
+        by_owner = {}
+        for exc in pending:
+            owner = exc.owner_id
+            if owner and owner.partner_id:
+                by_owner.setdefault(owner.id, (owner, self.browse()))
+                by_owner[owner.id] = (owner, by_owner[owner.id][1] | exc)
+        MAX_ROWS = 25
+        for owner, excs in by_owner.values():
+            shown = excs.sorted(lambda e: e.severity_rank)[:MAX_ROWS]
+            extra = len(excs) - len(shown)
+            rows = "".join(
+                "<tr>"
+                "<td style='padding:4px 10px;border-bottom:1px solid #eee'>"
+                "<strong>%s</strong></td>"
+                "<td style='padding:4px 10px;border-bottom:1px solid #eee'>%s</td>"
+                "<td style='padding:4px 10px;border-bottom:1px solid #eee'>%s</td>"
+                "</tr>" % (
+                    (exc.severity or "").upper(),
+                    type_labels.get(exc.exception_type, exc.exception_type or ""),
+                    (exc.impact_summary or exc.name or "").replace(
+                        "&", "&amp;").replace("<", "&lt;"),
+                )
+                for exc in shown
+            )
+            if extra > 0:
+                rows += (
+                    "<tr><td colspan='3' style='padding:6px 10px;color:#6b665e'>"
+                    "…and %s more — open Central Command for the full queue."
+                    "</td></tr>" % extra
+                )
+            body = (
+                "<div style='font-family:Roboto,Arial,sans-serif;color:#1a1814'>"
+                "<h2 style='color:#4a2b1d;margin:0 0 8px'>Central Command — "
+                "%(n)s alert(s) need your attention</h2>"
+                "<p style='margin:0 0 12px'>New high/critical issues are open "
+                "in the plant. Open Central Command for the full queue and to "
+                "acknowledge or resolve them.</p>"
+                "<table style='border-collapse:collapse;font-size:13px'>"
+                "<tr><th style='text-align:left;padding:4px 10px'>Severity</th>"
+                "<th style='text-align:left;padding:4px 10px'>Type</th>"
+                "<th style='text-align:left;padding:4px 10px'>Impact</th></tr>"
+                "%(rows)s</table></div>"
+            ) % {"n": len(excs), "rows": rows}
+            # message_notify posts to the owner's Inbox (and emails when
+            # SMTP is up). Anchor it on the most-severe exception so the
+            # notification links straight to a real record.
+            try:
+                shown[:1].message_notify(
+                    partner_ids=owner.partner_id.ids,
+                    subject=(
+                        "[Central Command] %s alert(s) need attention"
+                        % len(excs)),
+                    body=body,
+                )
+            except Exception:  # noqa: BLE001 — one owner must not abort the run
+                _logger.exception(
+                    "Central Command alert digest failed for owner %s",
+                    owner.login)
+                continue
+            # Mark this owner's batch pushed so we never re-notify the same
+            # issues; genuinely new exceptions (default alert_notified=False)
+            # surface on the next run.
+            excs.write({"alert_notified": True, "alert_notified_date": now})
         return True

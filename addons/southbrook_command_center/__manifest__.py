@@ -29,7 +29,7 @@ record this addon implements.
     "author": "Southbrook Cabinetry",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.1",
     "depends": [
         # --- Odoo core / native (read-only, no new business schema) ---
         "mail",     # chatter/activity mixin + owner-assignment notifications
@@ -59,6 +59,7 @@ record this addon implements.
         "security/ir.model.access.csv",
         "data/command_center_params.xml",
         "data/command_center_data.xml",
+        "data/command_center_alerts.xml",
         "views/command_center_views.xml",
         "views/command_center_menus.xml",
     ],

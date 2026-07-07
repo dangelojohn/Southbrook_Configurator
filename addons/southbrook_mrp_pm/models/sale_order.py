@@ -296,6 +296,7 @@ class SaleOrder(models.Model):
             return existing
 
         created = MO.browse()
+        skipped = []
         for line in self.order_line:
             if not line.product_id:
                 continue
@@ -303,6 +304,13 @@ class SaleOrder(models.Model):
             # signature varies across Odoo versions; cover both.
             bom = self._resolve_bom_for_line(Bom, line)
             if not bom:
+                # P0 (E2E review): a cabinet line with no BoM used to be
+                # SILENTLY skipped here — the order could ship half-built
+                # with nobody told. Collect these so we surface them below
+                # instead of dropping them on the floor.
+                if getattr(line.product_id.product_tmpl_id,
+                           "southbrook_is_cabinet", False):
+                    skipped.append(line)
                 continue
 
             # Schedule: start now, finish at now + total routing time.
@@ -338,6 +346,32 @@ class SaleOrder(models.Model):
             # floor.
             mo.action_confirm()
             created |= mo
+
+        # P0 (E2E review): loudly surface any cabinet line that produced
+        # NO manufacturing order for lack of a BoM. Chatter records it for
+        # audit; an activity puts an actionable task on the salesperson so
+        # the gap can't pass unnoticed.
+        if skipped:
+            names = ", ".join(
+                "%s (line #%s)" % (l.product_id.display_name, l.id)
+                for l in skipped)
+            body = _(
+                "%(n)s cabinet line(s) were sent to production with NO "
+                "manufacturing order because no Bill of Materials exists "
+                "for them: %(names)s. These items will NOT be built until "
+                "a BoM is created — run the catalog BoM generator or add a "
+                "BoM, then re-send to production."
+            ) % {"n": len(skipped), "names": names}
+            self.message_post(body=body)
+            try:
+                self.activity_schedule(
+                    "mail.mail_activity_data_todo",
+                    summary=_("Order has unbuildable lines (no BoM)"),
+                    note=body,
+                    user_id=(self.user_id.id or self.env.uid),
+                )
+            except Exception:  # noqa: BLE001 — chatter already logged it
+                pass
 
         return created
 
