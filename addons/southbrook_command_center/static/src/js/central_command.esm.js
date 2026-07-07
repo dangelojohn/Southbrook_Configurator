@@ -11,7 +11,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { user } from "@web/core/user";
 import { rpc } from "@web/core/network/rpc";
-import { Component, useState, onWillStart, onMounted, onWillUnmount } from "@odoo/owl";
+import { Component, useState, onWillStart, onMounted, onWillUnmount, status } from "@odoo/owl";
 
 const EXCEPTION_FIELDS = [
     "severity", "owner_id", "impact_summary", "recommended_action",
@@ -398,6 +398,13 @@ export class CentralCommand extends Component {
     }
 
     _onExceptionMsg(payload) {
+        // A late "exception_upsert" bus message can arrive after this component has
+        // been torn down (bus delivery is async and at-most-once across reconnects).
+        // Calling the protected ORM after destroy throws "Component is destroyed"
+        // synchronously -> uncaught promise. Bail out if we're already gone.
+        if (status(this) === "destroyed") {
+            return;
+        }
         if (!payload || !payload.exception_id) {
             return;
         }
@@ -422,7 +429,11 @@ export class CentralCommand extends Component {
                     this.state.exceptions[idx] = records[0];
                 }
                 this.state.factoryHealthStale = true;
-            });
+            })
+            // Swallow async rejections too (e.g. an AccessError on the exception
+            // record, or a destroy mid-flight) — a background bus refresh must
+            // never surface an uncaught promise to the user.
+            .catch(() => {});
     }
 
     _onAlertMsg(payload) {

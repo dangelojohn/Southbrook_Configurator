@@ -180,13 +180,29 @@ class SaleOrder(models.Model):
                 ))
 
     def action_confirm(self):
-        """W009 gate: enforce production approval before super().
-        Running the gate BEFORE super() means we block at the very
-        edge of the SO state-change; downstream procurement hooks +
-        sibling action_confirm overrides only run once the gate is
-        cleared.
+        """Confirm the sale order.
+
+        The production-approval gate used to run HERE (W009), but it
+        created a deadlock: confirming was blocked until the order was
+        approved, yet action_request_production requires the order to
+        already be confirmed (state == 'sale'). An order with any
+        manufacturing line could therefore never be approved OR confirmed
+        through the UI — the only escape was force_production_release,
+        which made the "bypass" the only working path.
+
+        Governance is preserved WITHOUT this gate: mrp.production.create()
+        still refuses to create an MO for a sale order that isn't approved
+        or force-released. So the intended flow now works end-to-end:
+            Confirm -> Request Production -> Approve Production
+        and MO creation (only ever triggered by action_send_to_production,
+        which requires state == 'sale') is gated at the point that matters.
+
+        NOTE (verify before shipping): confirm this addon's cabinet
+        products do NOT carry the Manufacture route — i.e. confirming does
+        not auto-spawn MOs via procurement. If it does, the create-gate
+        will fire during confirm and this needs the deferred-MO variant
+        instead. Covered by tests/test_production_approval_gate.py.
         """
-        self._check_production_approval_gate()
         return super().action_confirm()
 
     # ──────────────────────────────────────────────────────────────────

@@ -71,3 +71,22 @@
         }
     }
 }
+
+// ---- Wide desktop (Bootstrap xxl, ≥1400px) ----
+//
+// At the xxl breakpoint Odoo adds the `o_xxl_form_view` class, whose core rule
+//   .o_form_view.o_xxl_form_view .o_form_view_container { width: 1px; }
+// assumes a chatter/aside sibling that flex-grows to fill the remaining row.
+// This dashboard is a plain form with NO chatter, so its sole container stays
+// pinned at 1px and the whole page reads as blank (only the breadcrumb shows).
+// Restore full width for this view specifically. The `o_kops_dashboard` class
+// sits on the SAME element as o_form_view (Odoo applies the form arch root class
+// to .o_form_view), so we chain it directly — NOT via :has(), which only matches
+// descendants and would never fire here. Verified live: container 1px -> full.
+.o_form_view.o_xxl_form_view.o_kops_dashboard {
+    .o_form_view_container {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 auto !important;
+    }
+}
