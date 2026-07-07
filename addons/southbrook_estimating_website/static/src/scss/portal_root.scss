@@ -3041,6 +3041,52 @@
     pointer-events: none;
 }
 
+// 2026-07-06 — Mobile "Take a photo" floating action button. A second,
+// thumb-reachable instance of the Room Setup camera button. Hidden on
+// desktop (the inline button is already well placed there); shown only
+// on phone-width viewports where reaching the Room Setup tab is fiddly.
+.o_sb_photo_fab {
+    display: none;                       // desktop: hidden by default
+}
+@media (max-width: 768px) {
+    .o_sb_photo_fab {
+        position: fixed;
+        right: 16px;
+        bottom: 20px;
+        z-index: 940;                    // under the bulk toolbar (950)
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 18px;
+        border: none;
+        border-radius: 999px;
+        background: var(--sb-walnut, #4a3a2a);
+        color: var(--sb-linen, #fdfbf6);
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+        cursor: pointer;
+        transition: transform 0.12s ease, opacity 0.12s ease;
+
+        &:active {
+            transform: scale(0.96);
+        }
+        &:focus-visible {
+            outline: 2px solid var(--sb-sky, #2b4f6b);
+            outline-offset: 2px;
+        }
+        &:disabled {
+            opacity: 0.5;
+            cursor: progress;
+        }
+    }
+    .o_sb_photo_fab_icon {
+        font-size: 20px;
+        line-height: 1;
+    }
+}
+
 .o_owl_toast {
     pointer-events: auto;
     display: flex;

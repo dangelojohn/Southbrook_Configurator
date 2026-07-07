@@ -3038,6 +3038,42 @@ const TEMPLATE = xml`
             </div>
         </div>
 
+        <!-- 2026-07-06 — MOBILE PHOTO FAB. A second instance of the
+             Room Setup "Take photos" camera button, surfaced as a
+             thumb-reachable floating action button so a phone user can
+             snap their kitchen and start the room capture from anywhere
+             in the Order Builder without hunting for the Room Setup tab.
+             Behaviour is identical to the inline camera button: it fires
+             the SAME _sbOnCaptureFilesSelected handler, which posts to
+             /southbrook/api/order/<orderId>/room/analyze-photos — so the
+             photos always attach to THIS order (project).
+
+             Gated on !state.room (capture is for INITIAL room entry,
+             matching the inline button's empty-state-only rule — a saved
+             room is re-scanned via Edit Room, not a fresh capture).
+             Mobile-only via CSS (.o_sb_photo_fab is display:none on
+             desktop, where the inline button is already well placed).
+
+             A dedicated hidden input lives HERE at the root (not the
+             Room Setup tab panel) so its t-ref resolves no matter which
+             tab is active — the inline inputs only mount when that panel
+             renders. -->
+        <input type="file"
+               t-ref="sb_room_capture_fab_input"
+               class="sb-capture-file-input"
+               accept="image/*"
+               capture="environment"
+               t-on-change="_sbOnCaptureFilesSelected"/>
+        <button t-if="!state.room"
+                type="button"
+                class="o_sb_photo_fab"
+                t-att-disabled="state.room_capture_busy"
+                t-on-click="_sbOpenRoomCameraMobile"
+                aria-label="Take a photo of your kitchen">
+            <span class="o_sb_photo_fab_icon" aria-hidden="true">📷</span>
+            <span class="o_sb_photo_fab_label">Take a photo</span>
+        </button>
+
         <!-- 2026-06-27 L1 — sticky bulk-action toolbar. Renders only
              when at least one line is checked. Position: fixed at the
              bottom of the viewport so it doesn't push page layout.
@@ -4108,6 +4144,10 @@ class OrderBuilder extends Component {
         // camera vs upload — see the two-input template comment).
         this._sbRoomCaptureCameraRef = useRef("sb_room_capture_camera_input");
         this._sbRoomCaptureUploadRef = useRef("sb_room_capture_upload_input");
+        // 2026-07-06 — root-level camera input backing the mobile photo
+        // FAB (present on every tab, unlike the two above which only
+        // mount inside the Room Setup panel).
+        this._sbRoomCaptureFabRef = useRef("sb_room_capture_fab_input");
 
         // P1 bugfix: synchronous lock prevents double-add on rapid clicks
         // (the reactive `state.catalog_busy` flag flips inside an async
@@ -5084,6 +5124,17 @@ class OrderBuilder extends Component {
 
     _sbOpenRoomUpload = () => {
         this._sbTriggerCaptureInput(this._sbRoomCaptureUploadRef);
+    };
+
+    // 2026-07-06 — mobile photo FAB opener. Switches to the Room Setup
+    // tab FIRST so the busy spinner, any error message, and the review
+    // wizard land where the customer can see them (the FAB itself can be
+    // tapped from any tab), then fires the same rear-camera capture as
+    // the inline "Take photos" button via its own root-level input.
+    _sbOpenRoomCameraMobile = () => {
+        if (this.state.room_capture_busy) return;
+        this.state.ui.current_tab = "room_setup";
+        this._sbTriggerCaptureInput(this._sbRoomCaptureFabRef);
     };
 
     _sbOnCeilingHintChanged = (ev) => {
