@@ -59,12 +59,20 @@ export class HermesChat extends Component {
                 body: JSON.stringify({ q, order_id: this.orderId }),
             });
             if (!resp.ok) {
+                // Read the single-use body ONCE as text, then try to parse
+                // it as JSON. Calling resp.json() and then resp.text() on the
+                // same Response throws "body stream already read" — the first
+                // read consumes the stream — which was surfacing on every
+                // error response whose body wasn't valid JSON.
                 let detail = "";
-                try {
-                    const j = await resp.json();
-                    detail = j.detail || j.error || "";
-                } catch (e) {
-                    detail = await resp.text();
+                const raw = await resp.text().catch(() => "");
+                if (raw) {
+                    try {
+                        const j = JSON.parse(raw);
+                        detail = j.detail || j.error || "";
+                    } catch (e) {
+                        detail = raw;
+                    }
                 }
                 assistant.content = `(Hermes is unavailable: ${detail || resp.status})`;
                 assistant.streaming = false;
