@@ -13,10 +13,13 @@
             inherit_id="southbrook_estimating_website.portal_order_builder"
             name="Hermes Chat — Order Builder mount (deactivated 2026-07-07)"
             active="False">
+    <!-- Body emptied 2026-07-07 — the mount div was relocated to the
+         /my/fabio page (see customer_portal relocated_app_mounts.xml).
+         Odoo preserves a view's `active` across upgrades, so emptying the
+         injected body (arch always updates on -u) is what actually clears
+         it on an existing DB. Kept as a no-op inherit for a trivial revert. -->
     <xpath expr="//div[hasclass('o_southbrook_portal_header')]" position="after">
-      <div class="o_hermes_chat_wrap mt-3 mb-3"
-           data-hermes-chat-mount="1"
-           t-att-data-order-id="order_id or ''"/>
+      <t/>
     </xpath>
   </template>
 </odoo>
