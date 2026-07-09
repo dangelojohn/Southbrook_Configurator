@@ -38,7 +38,7 @@ These are flagged in the README for a human operator.
     "author": "Southbrook Cabinetry / OdooIQ",
     "license": "LGPL-3",
     "category": "Services/Project",
-    "version": "19.0.0.1.0",
+    "version": "19.0.1.0.0",
     "depends": [
         "project",
         # x_southbrook_sale_order_id is a Many2one to sale.order, so sale MUST

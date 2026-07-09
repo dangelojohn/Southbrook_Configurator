@@ -113,6 +113,24 @@
                  (`//div[hasclass('o_southbrook_portal_header')]`) still has a
                  target to inject after. -->
             <div class="o_southbrook_portal_header" aria-hidden="true"/>
+            <!-- 2026-07-07 — order-navigation toolbar. On a bound order the
+                 page was a dead-end: no way to start another order or jump
+                 to a different one without going back out to My Account.
+                 A customer/dealer can have more than one order, so surface
+                 both here. Shown only on a real order (the no-order list
+                 state already has its own "Start New Quote" CTA). -->
+            <t t-if="order">
+                <div class="o_sb_order_toolbar d-flex flex-wrap justify-content-end align-items-center gap-2 mb-3">
+                    <a href="/my/southbrook/order-builder"
+                       class="btn btn-outline-secondary btn-sm">
+                        <i class="fa fa-list-ul me-1" role="img" aria-label="My Orders"/>My Orders
+                    </a>
+                    <a href="/my/southbrook/order-builder/new"
+                       class="btn btn-primary btn-sm">
+                        <i class="fa fa-plus me-1" role="img" aria-label="New Order"/>New Order
+                    </a>
+                </div>
+            </t>
             <t t-if="not order">
                 <!-- Anonymous landing copy when no order is bound — the OWL
                      mount stays empty, so a minimal prompt belongs here. -->
