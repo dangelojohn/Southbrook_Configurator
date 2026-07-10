@@ -18,6 +18,36 @@ $sb_ink: #1a1814;
 $sb_ink_dim: #6b665e;
 $sb_rule: #d8cfbf;
 
+// =====================================================================
+// Vertical-scroll fix for the grouped PM dashboard kanban.
+// The kanban arch class `o_sb_pm_dash` lands on the kanban controller
+// root (which also carries `.o_kanban_view` — see web computeViewClassName).
+// Inside it, `main.o_content` is the only height-constrained ancestor
+// (~540px) yet ships overflow-y:hidden, while the grouped renderer
+// overflows `visible` at its full content height (~4320px) — so nothing
+// scrolls and the lower cards ("Door Hanging") are unreachable.
+// Scope every rule to `.o_sb_pm_dash` so standard kanban views elsewhere
+// in the backend are untouched.
+// =====================================================================
+.o_kanban_view.o_sb_pm_dash {
+  // Bound the renderer to its flex parent and let it scroll. `min-height: 0`
+  // is load-bearing: a flex child defaults to min-height:auto and grows to
+  // its content height, so overflow-y:auto never engages without this.
+  .o_kanban_renderer {
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+    min-height: 0;
+  }
+
+  // Fallback for the case where o_content clips before the renderer can
+  // scroll — verified live: setting this made the wheel scroll immediately.
+  // Descendant of the scoped root, so only this dashboard is affected.
+  .o_content {
+    overflow-y: auto;
+  }
+}
+
 .o_sb_pm_dash_card {
   background: white;
   border: 1px solid $sb_rule;
