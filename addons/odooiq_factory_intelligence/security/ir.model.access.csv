@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_oiq_factory_audit_user,oiq.factory.audit.user,model_oiq_factory_audit,group_odooiq_user,1,0,0,0
+access_oiq_factory_audit_manager,oiq.factory.audit.manager,model_oiq_factory_audit,group_odooiq_manager,1,1,1,1
+access_oiq_factory_audit_finding_user,oiq.factory.audit.finding.user,model_oiq_factory_audit_finding,group_odooiq_user,1,0,0,0
+access_oiq_factory_audit_finding_manager,oiq.factory.audit.finding.manager,model_oiq_factory_audit_finding,group_odooiq_manager,1,1,1,1
