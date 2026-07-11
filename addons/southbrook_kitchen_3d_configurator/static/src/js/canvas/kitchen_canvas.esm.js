@@ -356,9 +356,20 @@ export class KitchenCanvas extends Component {
     }
 
     _onMouseDown(e) {
-        const { activeCamera, raycaster, handleMesh, depthHandleMesh, clickable } = this.T;
+        const { activeCamera, raycaster, handleMesh, arrowMeshes,
+                depthHandleMesh, depthArrowMeshes, clickable } = this.T;
         if (!activeCamera || !raycaster) return;
         raycaster.setFromCamera(this._ndcFromEvent(e), activeCamera);
+
+        // A handle's grab target is the whole visible cluster — the ●
+        // sphere AND its flanking arrow cones. Sphere-only hit-testing
+        // made the arrows dead: the width arrows happened to overlap
+        // their sphere in screen space (so pulling them "worked"), but
+        // the depth arrows don't, so pulling them hit nothing.
+        const hitsWidth = handleMesh &&
+            raycaster.intersectObjects([handleMesh, ...arrowMeshes], false).length;
+        const hitsDepth = depthHandleMesh &&
+            raycaster.intersectObjects([depthHandleMesh, ...depthArrowMeshes], false).length;
 
         const handleActive = isHandleActiveView(this._currentView);
         // TEMP DIAG (2026-07-11): opt-in, off by default. In the browser
@@ -366,17 +377,15 @@ export class KitchenCanvas extends Component {
         // depth pin to see why the raycast is/ isn't hitting. Zero effect
         // for normal users. Remove once the depth handle is confirmed.
         if (typeof window !== "undefined" && window.__SBK_DEPTH_DEBUG__) {
-            const wHit = handleMesh ? raycaster.intersectObject(handleMesh).length : -1;
-            const dHit = depthHandleMesh ? raycaster.intersectObject(depthHandleMesh).length : -1;
             // eslint-disable-next-line no-console
             console.debug("[sbk-depth] mousedown", {
                 view: this._currentView, handleActive,
                 hasWidthMesh: !!handleMesh, hasDepthMesh: !!depthHandleMesh,
-                widthHit: wHit, depthHit: dHit,
+                widthHit: hitsWidth || 0, depthHit: hitsDepth || 0,
                 client: [e.clientX, e.clientY],
             });
         }
-        if (handleActive && handleMesh && raycaster.intersectObject(handleMesh).length) {
+        if (handleActive && hitsWidth) {
             this.T.dragging = true;
             this.T.dragX0   = e.clientX;
             this.T.dragW0   = (this.props.room && this.props.room.width_in) || 0;
@@ -384,7 +393,7 @@ export class KitchenCanvas extends Component {
             e.preventDefault();
             return;
         }
-        if (handleActive && depthHandleMesh && raycaster.intersectObject(depthHandleMesh).length) {
+        if (handleActive && hitsDepth) {
             this.T.draggingDepth = true;
             this.T.dragY0   = e.clientY;
             this.T.dragD0   = (this.props.room && this.props.room.depth_in) || 0;
@@ -493,9 +502,9 @@ export class KitchenCanvas extends Component {
         this.T.raycaster.setFromCamera(this._ndcFromEvent(e), this.T.activeCamera);
         const handleActive = isHandleActiveView(this._currentView);
         const onHandle = handleActive && this.T.handleMesh &&
-            this.T.raycaster.intersectObject(this.T.handleMesh).length > 0;
+            this.T.raycaster.intersectObjects([this.T.handleMesh, ...this.T.arrowMeshes], false).length > 0;
         const onDepthHandle = !onHandle && handleActive && this.T.depthHandleMesh &&
-            this.T.raycaster.intersectObject(this.T.depthHandleMesh).length > 0;
+            this.T.raycaster.intersectObjects([this.T.depthHandleMesh, ...this.T.depthArrowMeshes], false).length > 0;
         const onCabinet = !onHandle && !onDepthHandle &&
             this.T.raycaster.intersectObjects(this.T.clickable, false).length > 0;
         const cvs = this.T.renderer?.domElement;
