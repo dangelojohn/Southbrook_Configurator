@@ -94,3 +94,39 @@ class TestKitchenLayoutEngine(TransactionCase):
         by = {p["id"]: p for p in a}
         self.assertLess(by[2]["z"], by[1]["z"])
         self.assertEqual([p["id"] for p in a], [1, 2])
+
+    # ── Corner detection (P2) ───────────────────────────────────────────
+    def _cab(self, wall, ct="base"):
+        return {"id": wall + ct, "width_mm": 600,
+                "family": ct if ct == "wall" else "base",
+                "cabinet_type": ct, "wall": wall}
+
+    @staticmethod
+    def _names(corners):
+        return sorted((c["corner"], c["layer"]) for c in corners)
+
+    def test_no_corner_for_single_wall(self):
+        self.assertEqual(
+            E.detect_corners([self._cab("back"), self._cab("back")], ROOM), [])
+        self.assertEqual(
+            E.detect_corners([self._cab("right"), self._cab("right")], ROOM), [])
+
+    def test_l_shape_corner(self):
+        got = E.detect_corners([self._cab("back"), self._cab("left")], ROOM)
+        self.assertEqual(self._names(got), [("back-left", "base")])
+
+    def test_base_and_wall_corners_independent(self):
+        got = E.detect_corners([
+            self._cab("back"), self._cab("left"),
+            self._cab("back", "wall"), self._cab("left", "wall"),
+        ], ROOM)
+        self.assertEqual(self._names(got),
+                         [("back-left", "base"), ("back-left", "wall")])
+
+    def test_u_shape_two_corners(self):
+        got = E.detect_corners(
+            [self._cab("left"), self._cab("back"), self._cab("right")], ROOM)
+        self.assertEqual(self._names(got),
+                         [("back-left", "base"), ("back-right", "base")])
+        br = [c for c in got if c["corner"] == "back-right"][0]
+        self.assertEqual(br["position_mm"], {"x": 4000.0, "z": 0.0})

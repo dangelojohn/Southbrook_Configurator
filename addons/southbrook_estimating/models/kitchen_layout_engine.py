@@ -181,3 +181,59 @@ def layout(cabinets, room,
 
     # Emit in original input order for stable, caller-friendly output.
     return [placed_by_id[id(cab)] for cab in cabinets]
+
+
+# ── Corner resolution (P2) ──────────────────────────────────────────────
+# An inside 90° corner exists wherever two adjacent walls BOTH carry a run
+# in the same layer (base vs wall). Base and wall corners resolve
+# independently. The four room corners and the wall pair that forms each:
+_CORNER_SPECS = (
+    # name,          (wall_a, wall_b),  (x_key, z_key)
+    ("back-left",   ("back",  "left"),  ("0", "0")),
+    ("back-right",  ("back",  "right"), ("W", "0")),
+    ("front-left",  ("front", "left"),  ("0", "D")),
+    ("front-right", ("front", "right"), ("W", "D")),
+)
+
+
+def _layer_of(cab):
+    """Which corner layer a cabinet belongs to. Wall (upper) cabinets
+    corner independently of base/floor cabinets."""
+    if cab.get("cabinet_type") == "wall" or cab.get("family") == "wall":
+        return "wall"
+    return "base"
+
+
+def detect_corners(cabinets, room):
+    """Find every inside 90° corner that needs a corner cabinet.
+
+    Pure + deterministic. A corner is "active" for a layer when BOTH of
+    its two walls carry at least one cabinet in that layer. Detection only
+    — resolution (footprint reservation, standard-cabinet removal, corner
+    SKU selection, run re-flow, manufacturing write-back) is layered on top
+    in the Odoo integration, which owns product identity.
+
+    Returns a list (stable order) of:
+      {"corner": "back-left"|..., "layer": "base"|"wall",
+       "walls": [wall_a, wall_b],
+       "position_mm": {"x": float, "z": float}}
+    """
+    room_w = room.get("width_mm", 0)
+    room_d = room.get("depth_mm", 0)
+    coord = {"0": 0.0, "W": float(room_w), "D": float(room_d)}
+
+    walls_with = {"base": set(), "wall": set()}
+    for cab in cabinets:
+        walls_with[_layer_of(cab)].add(cab.get("wall") or "back")
+
+    out = []
+    for name, (wa, wb), (xk, zk) in _CORNER_SPECS:
+        for layer in ("base", "wall"):
+            if wa in walls_with[layer] and wb in walls_with[layer]:
+                out.append({
+                    "corner": name,
+                    "layer": layer,
+                    "walls": [wa, wb],
+                    "position_mm": {"x": coord[xk], "z": coord[zk]},
+                })
+    return out
