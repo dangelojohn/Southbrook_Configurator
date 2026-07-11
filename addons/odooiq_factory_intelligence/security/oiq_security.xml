@@ -42,5 +42,19 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
+        <record id="rule_oiq_completion_observation_company" model="ir.rule">
+            <field name="name">Completion observation: multi-company</field>
+            <field name="model_id" ref="model_oiq_completion_observation"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_oiq_calibration_factor_company" model="ir.rule">
+            <field name="name">Calibration factor: multi-company</field>
+            <field name="model_id" ref="model_oiq_calibration_factor"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
     </data>
 </odoo>
