@@ -43,6 +43,13 @@ READINESS_NAMES = {
     1: "Blind", 2: "Structured", 3: "Observed", 4: "Calibrated", 5: "Predictive",
 }
 
+# --- shadow scheduler (§6) ---
+DEFAULT_FALLBACK_MIN = 30.0   # never schedule a zero-duration op
+MIN_CALIB_SAMPLE = 5          # blend calibration to 1.0 below this sample count
+RISK_CONF_WEIGHT = 20.0       # low calibration confidence widens late_risk
+LATE_SCALE_MIN = 480.0        # 8 working hours = one "unit" of lateness
+EARLY_SCALE_MIN = 480.0
+
 
 def _clamp(lo, hi, v):
     return max(lo, min(hi, v))
@@ -455,3 +462,226 @@ class OiqSchedulingIntelligence(models.AbstractModel):
             return 0.0, 0, []
         on_time = len(mos.filtered(lambda m: m.date_finished <= m.date_deadline))
         return 100.0 * on_time / len(mos), len(mos), []
+
+    # ==================================================================
+    # Shadow scheduling engine (§6) — read-only vs MRP
+    # ==================================================================
+    def shadow_schedule(self, company, horizon_days=14):
+        """Compute a capacity-aware EDD-greedy shadow schedule and persist it as
+        an ``oiq.schedule.run`` with its slots. Never writes to mrp.*."""
+        run = self.env["oiq.schedule.run"].create({
+            "date": fields.Datetime.now(),
+            "company_id": company.id,
+            "horizon_days": horizon_days,
+            "algorithm": "edd_greedy",
+            "state": "computing",
+        })
+        try:
+            mos = self._gather_ready_mos(company, horizon_days)
+            cal_map = self._load_calibration_factors(company)
+            queue = self._explode_to_workorders(mos, cal_map)
+            queue = self._edd_sort(queue)
+            slots = self._forward_pass(queue)
+            self._persist_slots(run, slots)
+
+            if slots:
+                starts = [s["planned_start"] for s in slots]
+                finishes = [s["planned_finish"] for s in slots]
+                makespan = (max(finishes) - min(starts)).total_seconds() / 60.0
+            else:
+                makespan = 0.0
+            late = sum(1 for s in slots if s["is_final"] and s["deadline"]
+                       and s["predicted_complete"] > s["deadline"])
+            run.write({"state": "complete", "makespan_min": makespan,
+                       "predicted_late_count": late})
+        except Exception as e:  # noqa: BLE001 — record failure, then re-raise
+            run.write({"state": "failed", "notes": str(e)})
+            raise
+        return run
+
+    def backfill_actuals(self, company):
+        """Fill ``vs_actual_delta_min`` for slots whose workorder has completed.
+        Read-only vs MRP (writes only oiq.schedule.slot)."""
+        slots = self.env["oiq.schedule.slot"].search([
+            ("vs_actual_delta_min", "=", False),
+            ("run_id.company_id", "=", company.id),
+        ])
+        for slot in slots:
+            wo = slot.workorder_id
+            if wo.state == "done" and wo.date_finished and slot.predicted_complete:
+                slot.vs_actual_delta_min = (
+                    wo.date_finished - slot.predicted_complete).total_seconds() / 60.0
+
+    # ---- gather ----
+    def _gather_ready_mos(self, company, horizon_days):
+        from datetime import timedelta as _td
+        domain = [
+            ("company_id", "=", company.id),
+            ("state", "in", ("confirmed", "progress")),
+        ]
+        cap = fields.Datetime.now() + _td(days=horizon_days)
+        mos = self.env["mrp.production"].search(domain)
+        result = self.env["mrp.production"]
+        for mo in mos:
+            # optional horizon cap on deadline (unbounded MOs still included)
+            if mo.date_deadline and mo.date_deadline > cap:
+                continue
+            if self._components_available(mo):
+                result |= mo
+        return result
+
+    def _components_available(self, mo):
+        if "components_availability_state" in mo._fields:
+            return mo.components_availability_state in ("available", "assigned", False)
+        return True
+
+    # ---- calibration lookup (empty until Step 3 ships the model) ----
+    def _load_calibration_factors(self, company):
+        model = self._model_or_none("oiq.calibration.factor")
+        if not model:
+            return {}
+        return {(f.scope, f.key): f for f in model.search([])}
+
+    def _calibrated_duration(self, wo, cal_map):
+        base = wo.duration_expected or self._fallback_duration(wo)
+        op_cat = self._operation_category(wo)
+        family = self._product_family(wo.production_id.product_id)
+        candidates = [
+            ("composite", f"{op_cat}|{wo.workcenter_id.id}|{family}"),
+            ("workcenter", str(wo.workcenter_id.id)),
+            ("operation_category", op_cat),
+            ("product_family", family),
+        ]
+        factor = None
+        for key in candidates:
+            f = cal_map.get(key)
+            if f and f.sample_count >= MIN_CALIB_SAMPLE:
+                factor = f
+                break
+        multiplier = factor.multiplier if factor else 1.0
+        confidence = factor.confidence if factor else 0.0
+        return base * multiplier, confidence
+
+    def _fallback_duration(self, wo):
+        op = wo.operation_id if "operation_id" in wo._fields else None
+        if op and getattr(op, "time_cycle_manual", 0):
+            return op.time_cycle_manual
+        return DEFAULT_FALLBACK_MIN
+
+    def _operation_category(self, wo):
+        op = wo.operation_id if "operation_id" in wo._fields else None
+        if op and op.name:
+            return op.name
+        return wo.name or "unknown"
+
+    def _product_family(self, product):
+        return product.categ_id.name if product.categ_id else ""
+
+    def _explode_to_workorders(self, mos, cal_map):
+        queue = []
+        for mo in mos:
+            for seq, wo in enumerate(mo.workorder_ids.sorted(key=lambda w: w.id)):
+                cal_min, conf = self._calibrated_duration(wo, cal_map)
+                wc = wo.workcenter_id
+                eff = (wc.time_efficiency or 100.0) / 100.0 if wc else 1.0
+                queue.append({
+                    "wo_id": wo.id, "production_id": mo.id,
+                    "workcenter_id": wc.id if wc else False,
+                    "seq": seq, "cal_min": cal_min, "efficiency": eff or 1.0,
+                    "confidence": conf, "deadline": mo.date_deadline,
+                    "is_bottleneck": bool(getattr(wc, "x_sbk_is_bottleneck", False)),
+                    "priority": self._priority_level(mo),
+                })
+        return queue
+
+    def _priority_level(self, mo):
+        raw = getattr(mo, "x_sbk_priority_level", None)
+        mapping = {"urgent": 3, "high": 2, "normal": 1, "low": 0}
+        return mapping.get(raw, 0) if isinstance(raw, str) else 0
+
+    # ---- solver ----
+    def _edd_sort(self, queue):
+        from datetime import datetime as _dt
+        far = _dt(2999, 1, 1)
+        return sorted(queue, key=lambda i: (
+            i["deadline"] or far, -int(i["is_bottleneck"]), -i["priority"],
+            i["production_id"], i["seq"]))
+
+    def _forward_pass(self, queue):
+        from datetime import timedelta as _td
+        now = fields.Datetime.now()
+        wc_free = {}       # workcenter_id -> next free datetime (single lane, capacity 1)
+        mo_cursor = {}     # production_id -> earliest next-op start (flow-shop precedence)
+        slots = []
+        for item in queue:
+            wc = item["workcenter_id"]
+            not_before = max(wc_free.get(wc, now),
+                             mo_cursor.get(item["production_id"], now), now)
+            eff_min = item["cal_min"] / (item["efficiency"] or 1.0)
+            start, finish = self._place_on_calendar(wc, not_before, eff_min)
+            slots.append({
+                "wo_id": item["wo_id"], "production_id": item["production_id"],
+                "workcenter_id": wc, "seq": item["seq"],
+                "planned_start": start, "planned_finish": finish,
+                "deadline": item["deadline"], "confidence": item["confidence"],
+                "is_final": False, "predicted_complete": finish,
+            })
+            wc_free[wc] = finish
+            mo_cursor[item["production_id"]] = finish
+
+        # MO-level completion + final-op flag + late_risk
+        by_mo = {}
+        for s in slots:
+            by_mo.setdefault(s["production_id"], []).append(s)
+        for mo_id, mo_slots in by_mo.items():
+            final_finish = max(s["planned_finish"] for s in mo_slots)
+            last = max(mo_slots, key=lambda s: (s["seq"], s["planned_finish"]))
+            avg_conf = sum(s["confidence"] for s in mo_slots) / len(mo_slots)
+            for s in mo_slots:
+                s["predicted_complete"] = final_finish
+                s["late_risk"] = self._late_risk(s["deadline"], final_finish, avg_conf)
+            last["is_final"] = True
+        return slots
+
+    def _place_on_calendar(self, wc_id, not_before, minutes):
+        from datetime import timedelta as _td
+        wc = self.env["mrp.workcenter"].browse(wc_id) if wc_id else None
+        cal = wc.resource_calendar_id if wc else None
+        finish = None
+        if cal:
+            try:
+                finish = cal.plan_hours(minutes / 60.0, not_before, compute_leaves=False)
+            except Exception:  # calendar API variance — fall back to wall-clock
+                finish = None
+        if not finish:
+            finish = not_before + _td(minutes=minutes)
+        return not_before, finish
+
+    def _late_risk(self, deadline, final_finish, avg_conf):
+        if not deadline:
+            return 50.0
+        slack_min = (deadline - final_finish).total_seconds() / 60.0
+        penalty = (1.0 - avg_conf) * RISK_CONF_WEIGHT
+        if slack_min <= 0:
+            return min(100.0, 70.0 + abs(slack_min) / LATE_SCALE_MIN + penalty)
+        return max(0.0, 40.0 - (slack_min / EARLY_SCALE_MIN) + penalty)
+
+    def _persist_slots(self, run, slots):
+        SlotModel = self.env["oiq.schedule.slot"]
+        for s in slots:
+            wo = self.env["mrp.workorder"].browse(s["wo_id"])
+            vs_odoo = False
+            if wo.date_start:
+                vs_odoo = (s["planned_finish"] - (
+                    wo.date_finished or wo.date_start)).total_seconds() / 60.0
+            vals = {
+                "run_id": run.id, "production_id": s["production_id"],
+                "workorder_id": s["wo_id"], "workcenter_id": s["workcenter_id"],
+                "seq": s["seq"], "planned_start": s["planned_start"],
+                "planned_finish": s["planned_finish"],
+                "predicted_complete": s["predicted_complete"],
+                "late_risk": s["late_risk"],
+            }
+            if vs_odoo is not False:
+                vals["vs_odoo_delta_min"] = vs_odoo
+            SlotModel.create(vals)

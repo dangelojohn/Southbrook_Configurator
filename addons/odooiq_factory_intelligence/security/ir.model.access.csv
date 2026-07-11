@@ -3,3 +3,7 @@ access_oiq_factory_audit_user,oiq.factory.audit.user,model_oiq_factory_audit,gro
 access_oiq_factory_audit_manager,oiq.factory.audit.manager,model_oiq_factory_audit,group_odooiq_manager,1,1,1,1
 access_oiq_factory_audit_finding_user,oiq.factory.audit.finding.user,model_oiq_factory_audit_finding,group_odooiq_user,1,0,0,0
 access_oiq_factory_audit_finding_manager,oiq.factory.audit.finding.manager,model_oiq_factory_audit_finding,group_odooiq_manager,1,1,1,1
+access_oiq_schedule_run_user,oiq.schedule.run.user,model_oiq_schedule_run,group_odooiq_user,1,0,0,0
+access_oiq_schedule_run_manager,oiq.schedule.run.manager,model_oiq_schedule_run,group_odooiq_manager,1,1,1,1
+access_oiq_schedule_slot_user,oiq.schedule.slot.user,model_oiq_schedule_slot,group_odooiq_user,1,0,0,0
+access_oiq_schedule_slot_manager,oiq.schedule.slot.manager,model_oiq_schedule_slot,group_odooiq_manager,1,1,1,1

@@ -23,6 +23,7 @@ Step 1 (this build): the read-only Factory Intelligence Audit + Readiness engine
         "security/oiq_security.xml",
         "security/ir.model.access.csv",
         "views/oiq_factory_audit_views.xml",
+        "views/oiq_schedule_views.xml",
         "data/ir_cron.xml",
     ],
     "application": True,
