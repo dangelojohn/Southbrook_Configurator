@@ -361,6 +361,21 @@ export class KitchenCanvas extends Component {
         raycaster.setFromCamera(this._ndcFromEvent(e), activeCamera);
 
         const handleActive = isHandleActiveView(this._currentView);
+        // TEMP DIAG (2026-07-11): opt-in, off by default. In the browser
+        // console run `window.__SBK_DEPTH_DEBUG__ = true` then click the
+        // depth pin to see why the raycast is/ isn't hitting. Zero effect
+        // for normal users. Remove once the depth handle is confirmed.
+        if (typeof window !== "undefined" && window.__SBK_DEPTH_DEBUG__) {
+            const wHit = handleMesh ? raycaster.intersectObject(handleMesh).length : -1;
+            const dHit = depthHandleMesh ? raycaster.intersectObject(depthHandleMesh).length : -1;
+            // eslint-disable-next-line no-console
+            console.debug("[sbk-depth] mousedown", {
+                view: this._currentView, handleActive,
+                hasWidthMesh: !!handleMesh, hasDepthMesh: !!depthHandleMesh,
+                widthHit: wHit, depthHit: dHit,
+                client: [e.clientX, e.clientY],
+            });
+        }
         if (handleActive && handleMesh && raycaster.intersectObject(handleMesh).length) {
             this.T.dragging = true;
             this.T.dragX0   = e.clientX;
@@ -407,6 +422,10 @@ export class KitchenCanvas extends Component {
 
         if (this.T.draggingDepth) {
             const nd = resolveRoomDepthFromDrag(e.clientY, this.T.dragY0, this.T.dragD0);
+            if (typeof window !== "undefined" && window.__SBK_DEPTH_DEBUG__) {
+                // eslint-disable-next-line no-console
+                console.debug("[sbk-depth] move", { clientY: e.clientY, dragY0: this.T.dragY0, dragD0: this.T.dragD0, nd });
+            }
             if (nd !== this._lastResizeDepth) {
                 this._lastResizeDepth = nd;
                 if (this.props.onResizeRoomDepth) this.props.onResizeRoomDepth(nd, /*inFlight=*/true);
@@ -444,6 +463,10 @@ export class KitchenCanvas extends Component {
             const finalNd = this._lastResizeDepth ??
                 ((this.props.room && this.props.room.depth_in) || 0);
             this._lastResizeDepth = null;
+            if (typeof window !== "undefined" && window.__SBK_DEPTH_DEBUG__) {
+                // eslint-disable-next-line no-console
+                console.debug("[sbk-depth] up commit", { finalNd });
+            }
             if (this.props.onResizeRoomDepth) this.props.onResizeRoomDepth(finalNd, /*inFlight=*/false);
         }
         if (this.T.movingItem) {

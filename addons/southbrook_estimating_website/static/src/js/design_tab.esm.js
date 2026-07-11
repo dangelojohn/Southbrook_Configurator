@@ -612,6 +612,10 @@ export class KitchenDesignTab extends Component {
     // only), the final inFlight=false call commits via _persistRoom
     // (which already sends depth_in to the /design-3d/room route).
     async _onResizeRoomDepth(newDepthIn, inFlight) {
+        if (typeof window !== "undefined" && window.__SBK_DEPTH_DEBUG__) {
+            // eslint-disable-next-line no-console
+            console.debug("[sbk-depth] portal _onResizeRoomDepth", { newDepthIn, inFlight });
+        }
         this.state.room = { ...this.state.room, depth_in: newDepthIn };
         if (inFlight) return;
         await this._persistRoom();
