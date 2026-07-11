@@ -27,5 +27,19 @@ for company in env['res.company'].search([]):
             <field name="interval_type">days</field>
             <field name="active" eval="False"/>
         </record>
+
+        <record id="cron_oiq_calibration" model="ir.cron">
+            <field name="name">OdooIQ: Harvest Completions + Recompute Calibration</field>
+            <field name="model_id" ref="model_oiq_scheduling_intelligence"/>
+            <field name="state">code</field>
+            <field name="code">
+for company in env['res.company'].search([]):
+    env['oiq.scheduling.intelligence'].harvest_completions(company)
+    env['oiq.scheduling.intelligence'].recompute_calibration(company)
+            </field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="False"/>
+        </record>
     </data>
 </odoo>

@@ -9,6 +9,8 @@ service produces. Step 1 implements ``analyze()`` (the Factory Intelligence Audi
 Read-only invariant: nothing here writes to mrp.production / mrp.workorder /
 mrp.workcenter — the audit only reads MRP and writes its own oiq.* records.
 """
+import json
+import statistics
 from datetime import timedelta
 
 from odoo import fields, models
@@ -49,6 +51,22 @@ MIN_CALIB_SAMPLE = 5          # blend calibration to 1.0 below this sample count
 RISK_CONF_WEIGHT = 20.0       # low calibration confidence widens late_risk
 LATE_SCALE_MIN = 480.0        # 8 working hours = one "unit" of lateness
 EARLY_SCALE_MIN = 480.0
+
+# --- calibration engine (§7) ---
+MIN_SAMPLE_THRESHOLD = 5      # below this, no factor is applied (pass-through)
+BLEND_FULL_TRUST_AT = 20      # at/above this, the raw median is used at full weight
+SAMPLE_SATURATION = 40        # sample_count that saturates the confidence sample-term
+CALIB_WINDOW_DAYS = 120       # rolling window keeps factors responsive to process change
+# Coarse operation-category keyword map — keeps scope keys low-cardinality so
+# sample size accumulates quickly. Used by BOTH capture and the scheduler so the
+# factor a WO is learned under is the factor it is later scheduled with.
+OP_KEYWORDS = {
+    "paint": "paint", "spray": "paint", "finish": "paint",
+    "assembl": "assembly", "cnc": "cnc", "rout": "cnc", "mill": "cnc",
+    "sand": "sanding", "edge": "edgeband", "band": "edgeband",
+    "drill": "drilling", "bore": "drilling",
+    "cut": "cutting", "saw": "cutting", "nest": "cutting",
+}
 
 
 def _clamp(lo, hi, v):
@@ -176,7 +194,7 @@ class OiqSchedulingIntelligence(models.AbstractModel):
             g_behav = 3
         else:
             factors = self._model_or_none("oiq.calibration.factor")
-            calibrated = bool(factors) and bool(factors.search_count([
+            calibrated = factors is not None and bool(factors.search_count([
                 ("sample_count", ">=", MIN_SAMPLES["B2_ESTIMATE_ACCURACY"]),
                 ("confidence", ">=", 0.5),
             ]))
@@ -425,7 +443,7 @@ class OiqSchedulingIntelligence(models.AbstractModel):
     def _eval_b2(self, company, window_start):
         code = "B2_ESTIMATE_ACCURACY"
         obs_model = self._model_or_none("oiq.completion.observation")
-        if not obs_model:
+        if obs_model is None:
             return 0.0, 0, []
         obs = obs_model.search([("observed_at", ">=", window_start)])
         if not obs:
@@ -436,7 +454,7 @@ class OiqSchedulingIntelligence(models.AbstractModel):
     def _eval_b3(self, company, window_start):
         code = "B3_OVERRIDE_RATE"
         slot_model = self._model_or_none("oiq.schedule.slot")
-        if not slot_model:
+        if slot_model is None:
             return 0.0, 0, []
         wos = self.env["mrp.workorder"].search([
             ("company_id", "=", company.id), ("state", "=", "done"),
@@ -538,19 +556,20 @@ class OiqSchedulingIntelligence(models.AbstractModel):
     # ---- calibration lookup (empty until Step 3 ships the model) ----
     def _load_calibration_factors(self, company):
         model = self._model_or_none("oiq.calibration.factor")
-        if not model:
+        if model is None:   # empty recordset is falsy — must test identity, not truth
             return {}
-        return {(f.scope, f.key): f for f in model.search([])}
+        return {(f.scope, f.key): f
+                for f in model.search([("company_id", "=", company.id)])}
 
     def _calibrated_duration(self, wo, cal_map):
         base = wo.duration_expected or self._fallback_duration(wo)
         op_cat = self._operation_category(wo)
         family = self._product_family(wo.production_id.product_id)
         candidates = [
-            ("composite", f"{op_cat}|{wo.workcenter_id.id}|{family}"),
-            ("workcenter", str(wo.workcenter_id.id)),
+            ("composite", f"{family}::{op_cat}::{wo.workcenter_id.id}"),
             ("operation_category", op_cat),
             ("product_family", family),
+            ("workcenter", str(wo.workcenter_id.id)),
         ]
         factor = None
         for key in candidates:
@@ -569,13 +588,23 @@ class OiqSchedulingIntelligence(models.AbstractModel):
         return DEFAULT_FALLBACK_MIN
 
     def _operation_category(self, wo):
+        """Normalized, low-cardinality operation category (shared by capture and
+        scheduler so learned and applied keys agree)."""
         op = wo.operation_id if "operation_id" in wo._fields else None
-        if op and op.name:
-            return op.name
-        return wo.name or "unknown"
+        base = ((op.name if op else "") or wo.name
+                or (wo.workcenter_id.name if wo.workcenter_id else "") or "")
+        low = base.lower()
+        for kw, cat in OP_KEYWORDS.items():
+            if kw in low:
+                return cat
+        return low or "unknown"
 
     def _product_family(self, product):
-        return product.categ_id.name if product.categ_id else ""
+        tmpl = product.product_tmpl_id
+        if "x_product_family" in tmpl._fields and getattr(product, "x_product_family", False):
+            return product.x_product_family
+        categ = product.categ_id
+        return (categ.complete_name or categ.name) if categ else ""
 
     def _explode_to_workorders(self, mos, cal_map):
         queue = []
@@ -685,3 +714,107 @@ class OiqSchedulingIntelligence(models.AbstractModel):
             if vs_odoo is not False:
                 vals["vs_odoo_delta_min"] = vs_odoo
             SlotModel.create(vals)
+
+    # ==================================================================
+    # Calibration engine (§7) — the Factory Learning Graph (the moat)
+    # ==================================================================
+    def _actual_minutes(self, wo):
+        if wo.duration:
+            return wo.duration
+        if wo.date_finished and wo.date_start:
+            return (wo.date_finished - wo.date_start).total_seconds() / 60.0
+        return 0.0
+
+    def _capture_observation(self, wo):
+        """Create one completion observation for a finished work order.
+        Idempotent (UNIQUE(workorder_id) + explicit guard). Read-only vs MRP."""
+        Obs = self.env["oiq.completion.observation"]
+        if Obs.search_count([("workorder_id", "=", wo.id)]):
+            return Obs
+        estimated = wo.duration_expected or self._fallback_duration(wo)
+        actual = self._actual_minutes(wo)
+        if estimated <= 0 or actual <= 0:
+            return Obs  # cannot learn from a zero — S3_TIME_REALISM flags this structurally
+        return Obs.create({
+            "workorder_id": wo.id,
+            "production_id": wo.production_id.id,
+            "product_id": wo.production_id.product_id.id,
+            "product_family": self._product_family(wo.production_id.product_id),
+            "operation_category": self._operation_category(wo),
+            "workcenter_id": wo.workcenter_id.id,
+            "estimated_min": estimated,
+            "actual_min": actual,
+            "context_json": json.dumps(self._observation_context(wo)),
+            "observed_at": fields.Datetime.now(),
+        })
+
+    def _observation_context(self, wo):
+        finished = wo.date_finished or fields.Datetime.now()
+        return {"day_of_week": finished.weekday(),
+                "workcenter_id": wo.workcenter_id.id}
+
+    def harvest_completions(self, company):
+        """Capture observations for any completed work orders not yet observed."""
+        done = self.env["mrp.workorder"].search([
+            ("production_id.company_id", "=", company.id),
+            ("state", "=", "done"),
+            ("date_finished", "!=", False),
+        ])
+        count = 0
+        for wo in done:
+            obs = self._capture_observation(wo)
+            if obs:
+                count += 1
+        return count
+
+    def recompute_calibration(self, company):
+        """Roll observations up into per-scope calibration factors (§7.3.2/§7.4).
+        Median-based (outlier robust) with a small-sample blend toward 1.0."""
+        window_start = fields.Datetime.now() - timedelta(days=CALIB_WINDOW_DAYS)
+        obs = self.env["oiq.completion.observation"].search([
+            ("company_id", "=", company.id),
+            ("observed_at", ">=", window_start),
+            ("ratio", ">", 0),
+        ])
+        groups = {}   # (scope, key) -> [ratios]
+        for o in obs:
+            fam = o.product_family or ""
+            opc = o.operation_category or ""
+            wcid = str(o.workcenter_id.id)
+            composite = f"{fam}::{opc}::{wcid}"
+            for scope, key in (("composite", composite), ("product_family", fam),
+                               ("operation_category", opc), ("workcenter", wcid)):
+                if key:
+                    groups.setdefault((scope, key), []).append(o.ratio)
+
+        Factor = self.env["oiq.calibration.factor"]
+        written = 0
+        for (scope, key), ratios in groups.items():
+            n = len(ratios)
+            if n < MIN_SAMPLE_THRESHOLD:
+                continue  # pass-through: no factor emitted below threshold
+            med = statistics.median(ratios)
+            mad = statistics.median([abs(r - med) for r in ratios]) if n > 1 else 0.0
+            norm_var = (mad / med) if med else 0.0
+            consistency = 1.0 / (1.0 + norm_var)
+            sample_term = min(1.0, n / SAMPLE_SATURATION)
+            confidence = round(sample_term * consistency, 3)
+            if n < BLEND_FULL_TRUST_AT:
+                w = (n - MIN_SAMPLE_THRESHOLD) / (BLEND_FULL_TRUST_AT - MIN_SAMPLE_THRESHOLD)
+                multiplier = 1.0 * (1 - w) + med * w
+            else:
+                multiplier = med
+            multiplier = max(multiplier, 0.01)
+            vals = {"multiplier": multiplier, "sample_count": n,
+                    "confidence": _clamp(0.0, 1.0, confidence),
+                    "last_recomputed": fields.Datetime.now()}
+            factor = Factor.search([
+                ("company_id", "=", company.id), ("scope", "=", scope),
+                ("key", "=", key)], limit=1)
+            if factor:
+                factor.write(vals)
+            else:
+                Factor.create({**vals, "company_id": company.id,
+                               "scope": scope, "key": key})
+            written += 1
+        return written

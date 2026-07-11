@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_oiq_calibration_factor_list" model="ir.ui.view">
+        <field name="name">oiq.calibration.factor.list</field>
+        <field name="model">oiq.calibration.factor</field>
+        <field name="arch" type="xml">
+            <list string="Calibration Factors (Factory Learning Graph)">
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="scope"/>
+                <field name="key"/>
+                <field name="multiplier"/>
+                <field name="sample_count"/>
+                <field name="confidence" widget="progressbar"/>
+                <field name="last_recomputed"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_oiq_calibration_factor" model="ir.actions.act_window">
+        <field name="name">Calibration Factors</field>
+        <field name="res_model">oiq.calibration.factor</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <record id="view_oiq_completion_observation_list" model="ir.ui.view">
+        <field name="name">oiq.completion.observation.list</field>
+        <field name="model">oiq.completion.observation</field>
+        <field name="arch" type="xml">
+            <list string="Completion Observations" create="0">
+                <field name="observed_at"/>
+                <field name="production_id"/>
+                <field name="operation_category"/>
+                <field name="workcenter_id"/>
+                <field name="estimated_min"/>
+                <field name="actual_min"/>
+                <field name="ratio"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_oiq_completion_observation" model="ir.actions.act_window">
+        <field name="name">Completion Observations</field>
+        <field name="res_model">oiq.completion.observation</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <menuitem id="menu_oiq_calibration" name="Calibration Factors" parent="menu_oiq_root"
+              action="action_oiq_calibration_factor" sequence="50"
+              groups="group_odooiq_user"/>
+    <menuitem id="menu_oiq_observations" name="Completion Observations" parent="menu_oiq_root"
+              action="action_oiq_completion_observation" sequence="60"
+              groups="group_odooiq_manager"/>
+
+</odoo>
