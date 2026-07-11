@@ -174,6 +174,7 @@ export class KitchenDesignTab extends Component {
                                        onSelectItem.bind="_onSelectItem"
                                        onMoveItem.bind="_onMoveItem"
                                        onResizeRoom.bind="_onResizeRoom"
+                                       onResizeRoomDepth.bind="_onResizeRoomDepth"
                                        onViewChange.bind="_onViewChange"
                                        onReady.bind="_onCanvasReady"/>
                         <div class="o_owl_design3d_viewbar" role="toolbar" aria-label="Camera view">
@@ -602,6 +603,16 @@ export class KitchenDesignTab extends Component {
     // final inFlight=false call is the commit.
     async _onResizeRoom(newWidthIn, inFlight) {
         this.state.room = { ...this.state.room, width_in: newWidthIn };
+        if (inFlight) return;
+        await this._persistRoom();
+    }
+
+    // KitchenCanvas → depth-handle room-depth resize. Mirrors
+    // _onResizeRoom: inFlight=true streams during the drag (local
+    // only), the final inFlight=false call commits via _persistRoom
+    // (which already sends depth_in to the /design-3d/room route).
+    async _onResizeRoomDepth(newDepthIn, inFlight) {
+        this.state.room = { ...this.state.room, depth_in: newDepthIn };
         if (inFlight) return;
         await this._persistRoom();
     }

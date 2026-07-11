@@ -19,6 +19,7 @@
  *   props.onMoveItem({item, x_position_in,
  *                     pinnable})                — move-drag commit
  *   props.onResizeRoom(newWidthIn, inFlight)    — room-width drag
+ *   props.onResizeRoomDepth(newDepthIn, inFlight) — room-depth drag
  *   props.onViewChange(view)                    — post-setView ack
  *
  * Parent-scoped keyboard + HTML5 drop handlers reach into this
@@ -39,7 +40,7 @@ import { destroyScene }      from "@southbrook_kitchen_3d_configurator/js/canvas
 import { installPbrEnvMap }  from "@southbrook_kitchen_3d_configurator/js/canvas/pbr_env_map.esm";
 import { makeMesh }          from "@southbrook_kitchen_3d_configurator/js/canvas/mesh_factory.esm";
 import { buildRoomShell }    from "@southbrook_kitchen_3d_configurator/js/canvas/room_shell.esm";
-import { buildDragHandle }   from "@southbrook_kitchen_3d_configurator/js/canvas/drag_handle.esm";
+import { buildDragHandle, buildDepthHandle } from "@southbrook_kitchen_3d_configurator/js/canvas/drag_handle.esm";
 import { buildDropLanes }    from "@southbrook_kitchen_3d_configurator/js/canvas/drop_lanes.esm";
 import { buildBaseCabinet }  from "@southbrook_kitchen_3d_configurator/js/canvas/base_cabinet.esm";
 import { buildWallCabinet }  from "@southbrook_kitchen_3d_configurator/js/canvas/wall_cabinet.esm";
@@ -58,7 +59,7 @@ import {
     onWheel as onWheelShared,
 } from "@southbrook_kitchen_3d_configurator/js/canvas/camera_controller.esm";
 import {
-    isHandleActiveView, resolveRoomWidthFromDrag,
+    isHandleActiveView, resolveRoomWidthFromDrag, resolveRoomDepthFromDrag,
     isCabinetDragCommitted, isPinnable, cursorForPointerState,
 } from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_pipeline.esm";
 
@@ -76,6 +77,7 @@ export class KitchenCanvas extends Component {
         onSelectItem:   { type: Function, optional: true },
         onMoveItem:     { type: Function, optional: true },
         onResizeRoom:   { type: Function, optional: true },
+        onResizeRoomDepth: { type: Function, optional: true },
         onViewChange:   { type: Function, optional: true },
         onReady:        { type: Function, optional: true },
     };
@@ -88,6 +90,7 @@ export class KitchenCanvas extends Component {
         this.canvasRef = useRef("kitchenCanvas");
         this._currentView    = this.props.view || "iso";
         this._lastResizeWidth = null;
+        this._lastResizeDepth = null;
         this._resizeObserver  = null;
         this.T = {
             THREE: null, scene: null, renderer: null,
@@ -97,8 +100,10 @@ export class KitchenCanvas extends Component {
             orbit: null, raycaster: null,
             roomObjs: [], cabObjs: [], clickable: [],
             handleMesh: null, arrowMeshes: [],
+            depthHandleMesh: null, depthArrowMeshes: [],
             laneMeshes: null,
             dragging: false, dragX0: 0, dragW0: 0,
+            draggingDepth: false, dragY0: 0, dragD0: 0,
             animId: null, animatingCamera: false,
             movingItem: null, moveStartClient: { x: 0, y: 0 },
             moveLastX: null, moveCommitted: false,
@@ -158,7 +163,7 @@ export class KitchenCanvas extends Component {
             if (!this.T.scene) return;
             // In-flight drag: child is source of truth; ignore
             // prop echos from parent to avoid a re-render loop.
-            if (this.T.dragging || this.T.movingItem) return;
+            if (this.T.dragging || this.T.draggingDepth || this.T.movingItem) return;
 
             const roomChanged = next.room !== this.props.room ||
                 (next.room && this.props.room && (
@@ -223,6 +228,9 @@ export class KitchenCanvas extends Component {
             scene.remove(m);
         });
         if (this.T.handleMesh) { scene.remove(this.T.handleMesh); dispose(this.T.handleMesh); }
+        this.T.arrowMeshes.forEach(m => { scene.remove(m); dispose(m); });
+        if (this.T.depthHandleMesh) { scene.remove(this.T.depthHandleMesh); dispose(this.T.depthHandleMesh); }
+        this.T.depthArrowMeshes.forEach(m => { scene.remove(m); dispose(m); });
         if (this.T.laneMeshes) {
             for (const k of ["base", "wall", "tall"]) {
                 const m = this.T.laneMeshes[k];
@@ -233,6 +241,7 @@ export class KitchenCanvas extends Component {
         }
         this.T.roomObjs = []; this.T.cabObjs = []; this.T.clickable = [];
         this.T.handleMesh = null; this.T.arrowMeshes = [];
+        this.T.depthHandleMesh = null; this.T.depthArrowMeshes = [];
 
         const mk = (geo, color, pos, rotE, opts) =>
             makeMesh(THREE, scene, geo, color, pos, rotE, opts);
@@ -259,6 +268,10 @@ export class KitchenCanvas extends Component {
             buildDragHandle(THREE, scene, P, rw, rd);
         this.T.handleMesh = handleMesh;
         this.T.arrowMeshes.push(...arrowMeshes);
+        const { depthHandleMesh, depthArrowMeshes } =
+            buildDepthHandle(THREE, scene, P, rw, rd);
+        this.T.depthHandleMesh = depthHandleMesh;
+        this.T.depthArrowMeshes.push(...depthArrowMeshes);
         this.T.laneMeshes = buildDropLanes(THREE, scene, rw, rh);
         this._updateLaneVisibility(props);
 
@@ -343,7 +356,7 @@ export class KitchenCanvas extends Component {
     }
 
     _onMouseDown(e) {
-        const { activeCamera, raycaster, handleMesh, clickable } = this.T;
+        const { activeCamera, raycaster, handleMesh, depthHandleMesh, clickable } = this.T;
         if (!activeCamera || !raycaster) return;
         raycaster.setFromCamera(this._ndcFromEvent(e), activeCamera);
 
@@ -353,6 +366,14 @@ export class KitchenCanvas extends Component {
             this.T.dragX0   = e.clientX;
             this.T.dragW0   = (this.props.room && this.props.room.width_in) || 0;
             this._lastResizeWidth = null;
+            e.preventDefault();
+            return;
+        }
+        if (handleActive && depthHandleMesh && raycaster.intersectObject(depthHandleMesh).length) {
+            this.T.draggingDepth = true;
+            this.T.dragY0   = e.clientY;
+            this.T.dragD0   = (this.props.room && this.props.room.depth_in) || 0;
+            this._lastResizeDepth = null;
             e.preventDefault();
             return;
         }
@@ -384,6 +405,15 @@ export class KitchenCanvas extends Component {
             return;
         }
 
+        if (this.T.draggingDepth) {
+            const nd = resolveRoomDepthFromDrag(e.clientY, this.T.dragY0, this.T.dragD0);
+            if (nd !== this._lastResizeDepth) {
+                this._lastResizeDepth = nd;
+                if (this.props.onResizeRoomDepth) this.props.onResizeRoomDepth(nd, /*inFlight=*/true);
+            }
+            return;
+        }
+
         if (this.T.movingItem) {
             if (!this.T.moveCommitted &&
                 !isCabinetDragCommitted(this.T.moveStartClient, e)) return;
@@ -408,6 +438,13 @@ export class KitchenCanvas extends Component {
                 ((this.props.room && this.props.room.width_in) || 0);
             this._lastResizeWidth = null;
             if (this.props.onResizeRoom) this.props.onResizeRoom(finalNw, /*inFlight=*/false);
+        }
+        if (this.T.draggingDepth) {
+            this.T.draggingDepth = false;
+            const finalNd = this._lastResizeDepth ??
+                ((this.props.room && this.props.room.depth_in) || 0);
+            this._lastResizeDepth = null;
+            if (this.props.onResizeRoomDepth) this.props.onResizeRoomDepth(finalNd, /*inFlight=*/false);
         }
         if (this.T.movingItem) {
             const item = this.T.movingItem;
@@ -434,11 +471,14 @@ export class KitchenCanvas extends Component {
         const handleActive = isHandleActiveView(this._currentView);
         const onHandle = handleActive && this.T.handleMesh &&
             this.T.raycaster.intersectObject(this.T.handleMesh).length > 0;
-        const onCabinet = !onHandle &&
+        const onDepthHandle = !onHandle && handleActive && this.T.depthHandleMesh &&
+            this.T.raycaster.intersectObject(this.T.depthHandleMesh).length > 0;
+        const onCabinet = !onHandle && !onDepthHandle &&
             this.T.raycaster.intersectObjects(this.T.clickable, false).length > 0;
         const cvs = this.T.renderer?.domElement;
         if (cvs) cvs.style.cursor = cursorForPointerState({
-            dragging: this.T.dragging, onHandle, onCabinet,
+            dragging: this.T.dragging, draggingDepth: this.T.draggingDepth,
+            onHandle, onDepthHandle, onCabinet,
         });
     }
 }

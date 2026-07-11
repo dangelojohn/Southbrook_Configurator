@@ -54,3 +54,50 @@ export function buildDragHandle(THREE, scene, palette, rw, rd) {
 
     return { handleMesh, arrowMeshes };
 }
+
+/**
+ * Depth (Z-axis) counterpart of {@link buildDragHandle}. Identical
+ * blue pin, placed at the front wall centre (mid-width, +Z edge) so
+ * it never overlaps the width pin at the right wall. Dragging it
+ * resizes the room's depth. Arrow cones flank it along Z (pointing
+ * into/out of the room) rather than along X.
+ *
+ * @param {typeof THREE} THREE
+ * @param {THREE.Scene} scene
+ * @param {{ drag: number, arrow: number }} palette
+ * @param {number} rw — room width in scene units
+ * @param {number} rd — room depth in scene units
+ * @returns {{ depthHandleMesh: THREE.Mesh, depthArrowMeshes: THREE.Mesh[] }}
+ */
+export function buildDepthHandle(THREE, scene, palette, rw, rd) {
+    const depthHandleMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 20, 20),
+        new THREE.MeshStandardMaterial({
+            color: palette.drag, emissive: 0x001166, emissiveIntensity: 0.4,
+            roughness: 0.3, metalness: 0.1,
+        }),
+    );
+    depthHandleMesh.position.set(rw / 2, 0.18, rd + 0.08);
+    depthHandleMesh.userData = { isDepthHandle: true };
+    scene.add(depthHandleMesh);
+
+    // Arrow cones flanking the handle along the depth (Z) axis.
+    const depthArrowMeshes = [];
+    for (const { offset, rotX } of [
+        { offset: -0.42, rotX: -Math.PI / 2 },
+        { offset:  0.42, rotX:  Math.PI / 2 },
+    ]) {
+        const arr = new THREE.Mesh(
+            new THREE.ConeGeometry(0.08, 0.22, 8),
+            new THREE.MeshStandardMaterial({
+                color: palette.arrow, roughness: 0.4, metalness: 0.1,
+            }),
+        );
+        arr.rotation.x = rotX;
+        arr.position.set(rw / 2, 0.18, rd + offset);
+        scene.add(arr);
+        depthArrowMeshes.push(arr);
+    }
+
+    return { depthHandleMesh, depthArrowMeshes };
+}

@@ -47,6 +47,27 @@ export function resolveRoomWidthFromDrag(clientX, dragX0, dragW0) {
 }
 
 /**
+ * Room-depth drag: Z-axis counterpart of {@link resolveRoomWidthFromDrag},
+ * mapping vertical pointer travel to depth. Same 55px≈1ft feel, 6" snap,
+ * [12, 288]" clamp.
+ *
+ * SIGN NOTE: dragging the pointer DOWN (clientY increasing) grows depth.
+ * The correct sign depends on the camera orientation of the active view;
+ * if a live check shows the drag feels inverted, flip the sign of `dy`
+ * here (that is the single knob — no other change needed).
+ *
+ * @param {number} clientY — current pointer Y
+ * @param {number} dragY0  — pointer Y where drag started
+ * @param {number} dragD0  — room depth at drag start (inches)
+ * @returns {number} snapped, clamped new depth in inches
+ */
+export function resolveRoomDepthFromDrag(clientY, dragY0, dragD0) {
+    const dy = clientY - dragY0;
+    const nd = Math.max(12, Math.min(288, dragD0 + dy * (12 / 55)));
+    return Math.round(nd / 6) * 6;
+}
+
+/**
  * D15 — 5px cursor travel threshold before a mousedown+move counts
  * as a cabinet drag rather than a click+select. Prevents jittery
  * clicks from committing accidental moves.
@@ -81,12 +102,18 @@ export function isPinnable(cabinetType) {
  * Do NOT call from _onMouseMove — mid-drag the class body sets
  * "move" and expects _onMouseOver's early-return to preserve it.
  *
- * @param {{ dragging: boolean, onHandle: boolean, onCabinet: boolean }} state
+ * Width uses the ew-resize (horizontal) cursor; depth uses ns-resize
+ * (vertical). An in-flight drag wins over any hover; width wins over
+ * depth only in the impossible case both flags are set at once.
+ *
+ * @param {{ dragging: boolean, draggingDepth?: boolean, onHandle: boolean, onDepthHandle?: boolean, onCabinet: boolean }} state
  * @returns {string} CSS cursor value
  */
-export function cursorForPointerState({ dragging, onHandle, onCabinet }) {
+export function cursorForPointerState({ dragging, draggingDepth, onHandle, onDepthHandle, onCabinet }) {
     if (dragging) return "ew-resize";
+    if (draggingDepth) return "ns-resize";
     if (onHandle) return "ew-resize";
+    if (onDepthHandle) return "ns-resize";
     if (onCabinet) return "grab";
     return "default";
 }
