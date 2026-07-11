@@ -13,5 +13,19 @@ for company in env['res.company'].search([]):
             <field name="interval_type">days</field>
             <field name="active" eval="False"/>
         </record>
+
+        <record id="cron_oiq_shadow_schedule" model="ir.cron">
+            <field name="name">OdooIQ: Shadow Schedule + Backfill Actuals</field>
+            <field name="model_id" ref="model_oiq_scheduling_intelligence"/>
+            <field name="state">code</field>
+            <field name="code">
+for company in env['res.company'].search([]):
+    env['oiq.scheduling.intelligence'].backfill_actuals(company)
+    env['oiq.scheduling.intelligence'].shadow_schedule(company, 14)
+            </field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="False"/>
+        </record>
     </data>
 </odoo>

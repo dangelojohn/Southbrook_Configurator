@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_oiq_schedule_run_list" model="ir.ui.view">
+        <field name="name">oiq.schedule.run.list</field>
+        <field name="model">oiq.schedule.run</field>
+        <field name="arch" type="xml">
+            <list string="Shadow Schedule Runs">
+                <field name="date"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="algorithm"/>
+                <field name="horizon_days"/>
+                <field name="makespan_min"/>
+                <field name="predicted_late_count"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_oiq_schedule_run_form" model="ir.ui.view">
+        <field name="name">oiq.schedule.run.form</field>
+        <field name="model">oiq.schedule.run</field>
+        <field name="arch" type="xml">
+            <form string="Shadow Schedule Run">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="algorithm"/>
+                            <field name="horizon_days"/>
+                        </group>
+                        <group>
+                            <field name="state"/>
+                            <field name="makespan_min"/>
+                            <field name="predicted_late_count"/>
+                        </group>
+                    </group>
+                    <field name="notes" invisible="not notes" readonly="1"/>
+                    <notebook>
+                        <page string="Proposed Slots (OdooIQ vs Odoo vs Actual)">
+                            <field name="slot_ids">
+                                <list>
+                                    <field name="seq"/>
+                                    <field name="production_id"/>
+                                    <field name="workorder_id"/>
+                                    <field name="workcenter_id"/>
+                                    <field name="planned_start"/>
+                                    <field name="planned_finish"/>
+                                    <field name="predicted_complete"/>
+                                    <field name="late_risk" widget="progressbar"/>
+                                    <field name="vs_odoo_delta_min" string="vs Odoo (min)"/>
+                                    <field name="vs_actual_delta_min" string="vs Actual (min)"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_oiq_schedule_run" model="ir.actions.act_window">
+        <field name="name">Shadow Schedule Runs</field>
+        <field name="res_model">oiq.schedule.run</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_oiq_run_shadow_now" model="ir.actions.server">
+        <field name="name">Run Shadow Schedule Now</field>
+        <field name="model_id" ref="model_oiq_scheduling_intelligence"/>
+        <field name="state">code</field>
+        <field name="code">action = env['oiq.scheduling.intelligence'].shadow_schedule(env.company, 14).get_formview_action()</field>
+    </record>
+
+    <menuitem id="menu_oiq_schedule_runs" name="Shadow Schedule" parent="menu_oiq_root"
+              action="action_oiq_schedule_run" sequence="30"
+              groups="group_odooiq_user"/>
+    <menuitem id="menu_oiq_run_shadow" name="Run Shadow Schedule Now" parent="menu_oiq_root"
+              action="action_oiq_run_shadow_now" sequence="40"
+              groups="group_odooiq_manager"/>
+
+</odoo>
