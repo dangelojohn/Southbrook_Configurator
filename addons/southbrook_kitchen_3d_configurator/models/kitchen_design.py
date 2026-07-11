@@ -1517,6 +1517,31 @@ class SouthbrookKitchenDesignLine(models.Model):
         help="Y-axis rotation in degrees (0/90/180/270 in normal use).",
     )
 
+    # ── P0.2 (2026-07-11) — Layout-domain wall assignment ───────────────
+    # LAYOUT domain only. The manufacturing sale.order.line NEVER carries
+    # wall/run info (strict domain separation — see the multi-wall design
+    # doc). These are the semantic inputs the pure kitchen_layout_engine
+    # consumes to derive x/y/z + rotation_deg. Default "back" reproduces
+    # the historical single-run-along-the-back-wall layout, so every
+    # existing design line initialises to "back" on column add and its
+    # rendered position is unchanged.
+    wall = fields.Selection(
+        [("back", "Back"), ("left", "Left"),
+         ("right", "Right"), ("front", "Front")],
+        string="Wall",
+        default="back",
+        copy=True,
+        help="Room wall this cabinet's run is placed along. A layout-domain "
+             "input to the layout engine — not a manufacturing attribute.",
+    )
+    run_seq = fields.Integer(
+        string="Run Sequence",
+        default=0,
+        copy=True,
+        help="Order of this cabinet within its wall's run (lower = nearer "
+             "the run's origin corner).",
+    )
+
     # ── Recommendation D · Sprint 1 bridge field ────────────────────────
     # Points at the sale.order.line the reconciliation cron mirrors
     # this design line into. See models/sale_order_line.py for the

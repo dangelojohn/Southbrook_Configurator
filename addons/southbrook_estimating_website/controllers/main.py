@@ -32,6 +32,9 @@ from odoo.exceptions import AccessError, MissingError
 from odoo.http import request
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome
 from odoo.addons.portal.controllers.portal import CustomerPortal
+# P0.2 (2026-07-11) — the single pure layout engine (no ORM), source of
+# truth for cabinet placement. See southbrook_estimating design doc.
+from odoo.addons.southbrook_estimating.models import kitchen_layout_engine
 
 _logger = logging.getLogger(__name__)
 
@@ -2320,19 +2323,24 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         return design
 
     def _southbrook_seed_design_lines(self, order, design):
-        """Materialise design lines from the order's SB-SKU lines using the
-        SAME _SKU_DEFAULTS dims + _ZONE_LAYOUT cursor pack the read-only
-        Preview (sale_order.get_kitchen_3d_payload) uses, so the first open
-        of the Arrange tab matches the Preview. mm → inches."""
+        """Materialise design lines from the order's SB-SKU lines.
+
+        Placement is delegated to the ONE pure layout engine
+        (kitchen_layout_engine) — no inline cursor math here. Seeding puts
+        every cabinet on the BACK wall in line order; the user re-assigns
+        walls later. The golden back-wall parity test guarantees this
+        produces the same coordinates as the historical cursor pack (and
+        as the read-only Preview), so existing designs are unchanged. mm →
+        inches."""
         SaleOrder = request.env["sale.order"]
         Session = request.env["product.config.session"]
         Line = request.env["southbrook.kitchen.design.line"].sudo()
         sku_defaults = Session._SKU_DEFAULTS
-        zone_layout = SaleOrder._ZONE_LAYOUT
-        worktop_cursor = SaleOrder._WORKTOP_CURSOR
-        worktop_y = SaleOrder._WORKTOP_Y_FLOOR
         mm_to_in = 1.0 / 25.4
-        cursors = {"ground": 0, "wall": 0, "island": 0, "other": 0}
+
+        # Pass 1 — build the engine's semantic cabinet list (skip logic
+        # identical to the Preview's).
+        cabs, metas = [], []
         seq = 0
         for oline in order.order_line:
             tmpl = oline.product_id.product_tmpl_id if oline.product_id else None
@@ -2341,23 +2349,40 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             if not row:
                 continue   # non-SB product → skip (matches the Preview)
             fam, _doors, _drawers, w, h, d = row
-            if fam == "worktop":
-                cursor_name, y_floor, z_offset = worktop_cursor, worktop_y, 0
-            else:
-                zone = oline.zone or "base_run"
-                cursor_name, y_floor, z_offset = zone_layout.get(
-                    zone, ("ground", 0, 0),
-                )
-            x_offset = cursors[cursor_name] + w / 2.0
-            cursors[cursor_name] += w
             seq += 1
             cabinet_type = (
                 tmpl.southbrook_cabinet_type
                 or self._FAM_TO_CABTYPE.get(fam, "base")
             )
+            cabs.append({
+                "id": oline.id,
+                "width_mm": w, "height_mm": h, "depth_mm": d,
+                "family": fam,
+                "zone": oline.zone or "base_run",
+                "wall": "back",
+                "run_seq": seq,
+            })
+            metas.append((oline, tmpl, fam, w, h, d, seq, cabinet_type))
+
+        room = {
+            "width_mm":  (design.room_width_in or 0.0) * 25.4,
+            "depth_mm":  (design.room_depth_in or 0.0) * 25.4,
+            "height_mm": (design.room_height_in or 0.0) * 25.4,
+        }
+        placements = kitchen_layout_engine.layout(
+            cabs, room,
+            zone_layout=SaleOrder._ZONE_LAYOUT,
+            worktop_cursor=SaleOrder._WORKTOP_CURSOR,
+            worktop_y=SaleOrder._WORKTOP_Y_FLOOR,
+        )
+
+        # Pass 2 — persist a design line per cabinet from the engine's
+        # derived placement.
+        for (oline, tmpl, fam, w, h, d, cab_seq, cabinet_type), place in zip(
+                metas, placements):
             Line.create({
                 "design_id":     design.id,
-                "sequence":      seq * 10,
+                "sequence":      cab_seq * 10,
                 "product_id":    oline.product_id.id,
                 "quantity":      1,
                 "price_unit":    oline.price_unit or (tmpl.list_price if tmpl else 0.0),
@@ -2365,11 +2390,13 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 "width_in":      w * mm_to_in,
                 "height_in":     h * mm_to_in,
                 "depth_in":      d * mm_to_in,
-                "x_position_in": x_offset * mm_to_in,
-                "y_position_in": y_floor * mm_to_in,
-                "z_position_in": z_offset * mm_to_in,
+                "x_position_in": place["x"] * mm_to_in,
+                "y_position_in": place["y"] * mm_to_in,
+                "z_position_in": place["z"] * mm_to_in,
                 "pinned":        False,
-                "rotation_deg":  0.0,
+                "rotation_deg":  place["rotation_deg"],
+                "wall":          "back",
+                "run_seq":       cab_seq,
                 "layout_key":    "L%d-%s" % (oline.id, fam),
                 "origin":        "configurator",
             })
