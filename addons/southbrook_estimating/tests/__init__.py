@@ -40,3 +40,5 @@ from . import test_configurator_from_order
 from . import test_kitchen_3d_payload_order
 # QA follow-up 2026-07-05 (backend Confirm had no hard-validation guard).
 from . import test_action_confirm_hard_validation
+# P0 multi-wall layout (2026-07-11) — pure engine + golden back-wall parity.
+from . import test_layout_engine
