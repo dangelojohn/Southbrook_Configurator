@@ -137,7 +137,8 @@ def _place_on_wall(wall, along_cursor, cab, y_floor, cross_offset, room):
 
 
 def layout(cabinets, room,
-           zone_layout=None, worktop_cursor=None, worktop_y=None):
+           zone_layout=None, worktop_cursor=None, worktop_y=None,
+           wall_start_offsets=None):
     """Resolve semantic placement inputs into manufacturable placements.
 
     Args:
@@ -161,16 +162,20 @@ def layout(cabinets, room,
         worktop_cursor = _DEFAULT_WORKTOP_CURSOR
     if worktop_y is None:
         worktop_y = _DEFAULT_WORKTOP_Y
+    if wall_start_offsets is None:
+        wall_start_offsets = {}
 
     runs = _resolve_runs(cabinets)
 
-    # Accumulate along-wall cursors per (wall, cursor_name) and place.
+    # Accumulate along-wall cursors per (wall, cursor_name) and place. A
+    # wall's run may start past a reserved footprint (a corner cabinet on
+    # the adjoining wall) via wall_start_offsets[wall].
     cursors = {}
     placed_by_id = {}
     for wall, run in runs.items():
         for cab in run:
             run_key = _cabinet_run_key(cab, zone_layout, worktop_cursor)
-            along = cursors.get(run_key, 0)
+            along = cursors.get(run_key, wall_start_offsets.get(wall, 0))
             y_floor, cross_offset = _cabinet_zone_offsets(
                 cab, zone_layout, worktop_y)
             pose = _place_on_wall(
@@ -237,3 +242,117 @@ def detect_corners(cabinets, room):
                     "position_mm": {"x": coord[xk], "z": coord[zk]},
                 })
     return out
+
+
+# ── Auto-distribution (P1) ──────────────────────────────────────────────
+# Wrap a flat cabinet list across walls so an L/U kitchen falls out of a
+# straight list without any UI. This is ONE layout strategy (the graph /
+# drag editor will supply explicit wall assignments later); it only
+# produces the semantic (wall, run_seq) inputs the engine already consumes.
+
+def _wall_lengths(room):
+    w = room.get("width_mm", 0)
+    d = room.get("depth_mm", 0)
+    return {"back": w, "front": w, "left": d, "right": d}
+
+
+def auto_assign_walls(cabinets, room, wall_order=("back", "left")):
+    """Assign each cabinet a wall + run_seq by filling walls in wall_order,
+    wrapping to the next wall when the current one is full. Base and wall
+    (upper) layers distribute independently over the same wall order, so
+    uppers land on the same walls as their bases. Pure; returns COPIES with
+    'wall'/'run_seq' set (inputs untouched)."""
+    wall_len = _wall_lengths(room)
+    result = [dict(c) for c in cabinets]
+    for layer in ("base", "wall"):
+        wi = 0
+        used = 0.0
+        seq = 0
+        for cab in [c for c in result if _layer_of(c) == layer]:
+            w = cab.get("width_mm", 0)
+            # Wrap when this cabinet would overflow the current wall — but
+            # always keep at least one cabinet per wall (used > 0), and
+            # never past the last wall (the last wall takes the remainder).
+            while (wi < len(wall_order) - 1 and used > 0
+                   and used + w > wall_len[wall_order[wi]]):
+                wi += 1
+                used = 0.0
+                seq = 0
+            cab["wall"] = wall_order[wi]
+            cab["run_seq"] = seq
+            used += w
+            seq += 1
+    return result
+
+
+# Corner-cabinet footprint (square) + per-layer height, millimetres.
+_CORNER_FOOTPRINT_MM = 914.0            # 36"
+_CORNER_HEIGHT_MM = {"base": 876.0, "wall": 762.0}   # 34.5" / 30"
+
+
+def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
+                       wall_order=("back", "left"), **layout_kwargs):
+    """Full auto pipeline: distribute a flat cabinet list across walls,
+    detect inside corners, insert a corner-cabinet node at each resolved
+    corner (reserving its footprint so nothing overlaps), and lay everything
+    out. Pure + deterministic. The engine does NOT assign product SKUs — it
+    tags the inserted node `corner_cabinet=True` + corner/layer/handed and
+    the Odoo layer maps that to SB-CORNER* / SB-WALL-CORNER.
+
+    v1 resolves the back-left corner (what wall_order=('back','left')
+    produces for an L). Other corners are detected + returned but not yet
+    footprint-reserved — that lands with the U-shape increment.
+
+    Returns {"cabinets", "placements", "corners", "inserted"}.
+    """
+    assigned = auto_assign_walls(cabinets, room, wall_order)
+    corners = detect_corners(assigned, room)
+    inserted = []
+    removed_ids = set()
+    offsets = {}
+
+    def _run_first(cabs, wall, layer):
+        run = [c for c in cabs if (c.get("wall") or "back") == wall
+               and _layer_of(c) == layer and not c.get("corner_cabinet")]
+        return min(run, key=lambda c: c.get("run_seq", 0), default=None)
+
+    for corner in corners:
+        if corner["corner"] != "back-left":
+            continue   # v1: only back-left is footprint-reserved
+        layer = corner["layer"]
+        # The corner cabinet REPLACES the two standard cabinets that meet at
+        # the corner (the low-end cabinet of each run) — otherwise they'd
+        # overlap the corner cell and the wall would overflow.
+        back_first = _run_first(assigned, "back", layer)
+        left_first = _run_first(assigned, "left", layer)
+        for c in (back_first, left_first):
+            if c is not None:
+                removed_ids.add(c["id"])
+        inserted.append({
+            "id": "corner-%s-%s" % (corner["corner"], layer),
+            "corner_cabinet": True,
+            "corner": corner["corner"],
+            "handed": "L",
+            "layer": layer,
+            "cabinet_type": "wall" if layer == "wall" else "base",
+            "family": "wall" if layer == "wall" else "base",
+            "width_mm": corner_size_mm,
+            "depth_mm": corner_size_mm,
+            "height_mm": _CORNER_HEIGHT_MM[layer],
+            "zone": "wall" if layer == "wall" else "base_run",
+            # Joins the BACK run at its low (x=0) end so it sits in the
+            # corner; run_seq -1 makes it first.
+            "wall": "back",
+            "run_seq": -1,
+            "replaced_ids": [c["id"] for c in (back_first, left_first)
+                             if c is not None],
+        })
+        # The LEFT run must start past the corner footprint.
+        offsets["left"] = max(offsets.get("left", 0), corner_size_mm)
+
+    final = [dict(c) for c in assigned if c["id"] not in removed_ids]
+    final.extend(dict(n) for n in inserted)
+    placements = layout(final, room, wall_start_offsets=offsets,
+                        **layout_kwargs)
+    return {"cabinets": final, "placements": placements, "corners": corners,
+            "inserted": inserted, "removed_ids": sorted(removed_ids)}

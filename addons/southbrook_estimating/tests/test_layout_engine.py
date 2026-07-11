@@ -130,3 +130,42 @@ class TestKitchenLayoutEngine(TransactionCase):
                          [("back-left", "base"), ("back-right", "base")])
         br = [c for c in got if c["corner"] == "back-right"][0]
         self.assertEqual(br["position_mm"], {"x": 4000.0, "z": 0.0})
+
+    # ── Auto-distribution + corner resolution (P1) ──────────────────────
+    def test_auto_assign_wraps_to_side_wall(self):
+        # 10x 600mm on a 4000-wide back wall → 6 fit, 4 wrap to left.
+        cabs = [{"id": i, "width_mm": 600, "family": "base",
+                 "cabinet_type": "base"} for i in range(10)]
+        out = E.auto_assign_walls(cabs, ROOM)
+        walls = {}
+        for c in out:
+            walls.setdefault(c["wall"], 0)
+            walls[c["wall"]] += 1
+        self.assertEqual(walls.get("back"), 6)
+        self.assertEqual(walls.get("left"), 4)
+        # inputs untouched (no wall key added to originals)
+        self.assertNotIn("wall", cabs[0])
+
+    def test_resolve_generates_manufacturable_L(self):
+        cabs = [{"id": i, "width_mm": 600, "height_mm": 876, "depth_mm": 600,
+                 "family": "base", "cabinet_type": "base"}
+                for i in range(1, 11)]
+        r = E.resolve_and_layout(cabs, ROOM)
+        # one back-left corner cabinet inserted, replacing 2 standards
+        self.assertEqual([n["id"] for n in r["inserted"]],
+                         ["corner-back-left-base"])
+        self.assertEqual(len(r["removed_ids"]), 2)
+        self.assertEqual(len(r["cabinets"]), 9)   # 10 - 2 + 1
+        pl = {p["id"]: p for p in r["placements"]}
+        cc = pl["corner-back-left-base"]
+        self.assertAlmostEqual(cc["z"], 0)
+        self.assertAlmostEqual(cc["rotation_deg"], 0)
+        # nothing overlaps the corner cell; runs stay within wall lengths
+        back = [pl[c["id"]] for c in r["cabinets"]
+                if c.get("wall") == "back" and not c.get("corner_cabinet")]
+        left = [pl[c["id"]] for c in r["cabinets"] if c.get("wall") == "left"]
+        self.assertGreaterEqual(min(p["x"] - 300 for p in back), 914 - 1)
+        self.assertGreaterEqual(min(p["z"] - 300 for p in left), 914 - 1)
+        self.assertTrue(all(abs(p["rotation_deg"] - 90) < 1 for p in left))
+        self.assertLessEqual(max(p["x"] + 300 for p in back + [cc]), 4000)
+        self.assertLessEqual(max(p["z"] + 300 for p in left), 3000)
