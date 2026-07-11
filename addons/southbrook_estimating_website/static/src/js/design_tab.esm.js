@@ -157,6 +157,13 @@ export class KitchenDesignTab extends Component {
                                t-on-change="(ev) => this._changeRoom('height_in', ev.target.value)"/>
                     </label>
                 </div>
+                <button type="button"
+                        class="btn btn-sm btn-primary o_owl_design3d_autoarrange"
+                        t-att-disabled="state.loading || state.saving || !state.items.length"
+                        t-on-click="() => this._onAutoArrange()"
+                        title="Wrap cabinets across walls into an L/U layout, replacing the corner with a corner cabinet">
+                    Auto-arrange L/U
+                </button>
             </div>
             <div class="o_owl_design3d_body">
                 <div class="o_owl_design3d_stage_col">
@@ -478,6 +485,37 @@ export class KitchenDesignTab extends Component {
 
     _materialLabel(k) {
         return MATERIAL_LABELS[k] || k || "—";
+    }
+
+    // P1 — "Auto-arrange L/U" button. Runs the server-side pure layout
+    // engine: wraps cabinets across walls and substitutes a real corner
+    // cabinet at each inside corner (destructive — may remove/replace
+    // cabinets), then re-loads from the server as the source of truth.
+    async _onAutoArrange() {
+        if (!this.props.orderId) return;
+        const ok = window.confirm(
+            "Auto-arrange will wrap your cabinets into an L/U layout and " +
+            "replace the corner cabinets with a dedicated corner unit. " +
+            "This may change your cabinet list. Continue?");
+        if (!ok) return;
+        this.state.saving = true;
+        this.state.error = null;
+        try {
+            const resp = await rpcCall(
+                `/southbrook/api/order/${encodeURIComponent(this.props.orderId)}/design-3d/auto-arrange`,
+                {},
+            );
+            if (resp && resp.error) {
+                this.state.error = resp.error;
+                return;
+            }
+        } catch (e) {
+            this.state.error = e?.message || String(e);
+            return;
+        } finally {
+            this.state.saving = false;
+        }
+        await this._load();
     }
 
     async _load() {
