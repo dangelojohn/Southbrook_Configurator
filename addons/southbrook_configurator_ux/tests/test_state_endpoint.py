@@ -188,6 +188,27 @@ class TestConfiguratorStateEndpoint(TransactionCase):
             "Repeated calls should return the SAME draft session "
             "(otherwise a customer's selections orphan on every reload)")
 
+    def test_anon_sessions_isolated_by_http_session(self):
+        """Security regression: two anonymous visitors (both base.public_user)
+        must NOT share/authorize each other's config session. Visitor A's
+        session_id must be rejected in Visitor B's (fresh) HTTP session — the
+        old code authorized on user_id alone (identical for all anons)."""
+        public_user = self.env.ref("base.public_user")
+        # Visitor A creates a session under its own HTTP session.
+        with stubbed_request(self.env, user=public_user):
+            res_a = self.controller.configurator_state(
+                product_tmpl_id=self.tmpl_base_1dr.id)
+            self.assertTrue(res_a["ok"])
+            sid_a = res_a["session_id"]
+        self.assertTrue(sid_a)
+        # Visitor B — a DIFFERENT browser session (fresh, empty session dict).
+        with stubbed_request(self.env, user=public_user):
+            authorized = self.controller._authorize_session(sid_a)
+        self.assertIsInstance(
+            authorized, dict,
+            "Visitor B must be refused A's session (got a recordset back)")
+        self.assertEqual(authorized.get("error"), "forbidden")
+
     def test_selected_value_ids_persisted_from_session(self):
         # Pre-seed the session with a value picked already.
         sess = self.env["product.config.session"].sudo().create({
