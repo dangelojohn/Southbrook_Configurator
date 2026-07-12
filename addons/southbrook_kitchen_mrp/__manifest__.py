@@ -60,7 +60,7 @@ M4 (catalog-wide BoM generator)
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.1.5.1",
+    "version": "19.0.1.6.0",
     "depends": [
         "mrp",
         "sale",
@@ -85,6 +85,7 @@ M4 (catalog-wide BoM generator)
     },
     "data": [
         "security/ir.model.access.csv",
+        "data/ir_sequence.xml",
         "views/sb_cutlist_views.xml",
         "views/sb_hardware_package_views.xml",
         "views/sb_production_package_views.xml",

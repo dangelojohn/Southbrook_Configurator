@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sequences for the cut list / hardware package / production package names.
+  Without these, create()'s `next_by_code(...) or _("New")` fell through to
+  "New" for EVERY record (the module shipped no ir.sequence data), so all
+  cutlists/packages displayed as "New". noupdate so admin renames/edits survive.
+-->
+<odoo>
+  <data noupdate="1">
+
+    <record id="seq_sb_cutlist" model="ir.sequence">
+      <field name="name">Southbrook Cut List</field>
+      <field name="code">sb.cutlist</field>
+      <field name="prefix">CUT/%(year)s/</field>
+      <field name="padding">4</field>
+      <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_sb_hardware_package" model="ir.sequence">
+      <field name="name">Southbrook Hardware Package</field>
+      <field name="code">sb.hardware.package</field>
+      <field name="prefix">HWP/%(year)s/</field>
+      <field name="padding">4</field>
+      <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_sb_production_package" model="ir.sequence">
+      <field name="name">Southbrook Production Package</field>
+      <field name="code">sb.production.package</field>
+      <field name="prefix">PKG/%(year)s/</field>
+      <field name="padding">4</field>
+      <field name="company_id" eval="False"/>
+    </record>
+
+  </data>
+</odoo>

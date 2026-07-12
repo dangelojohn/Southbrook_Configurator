@@ -327,7 +327,7 @@
                      sibling product_graph_release addon; on databases
                      where that addon isn't installed `hasattr(o, ...)`
                      short-circuits to False and the row is omitted. -->
-                <tr class="sbk-rev-row" t-if="hasattr(o, 'pg_revision_code') and o.pg_revision_code">
+                <tr class="sbk-rev-row" t-if="'pg_revision_code' in o._fields and o.pg_revision_code">
                     <td colspan="4">Rev: <span t-out="o.pg_revision_code"/></td>
                 </tr>
             </table>

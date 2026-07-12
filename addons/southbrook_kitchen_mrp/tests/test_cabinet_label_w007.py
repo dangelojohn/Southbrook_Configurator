@@ -85,9 +85,14 @@ class TestCabinetLabelW007(TransactionCase):
             report.id, mo.ids,
         )
         html = html_bytes.decode("utf-8") if isinstance(html_bytes, bytes) else html_bytes
-        # The Rev row marker must NOT be present.
+        # The Rev ROW element must NOT be present. Assert on the opening tag
+        # (`<tr class="sbk-rev-row"`), NOT the bare class name — the CSS
+        # `.sbk-rev-row { ... }` selector in the <style> block always contains
+        # "sbk-rev-row", so the old assertNotIn("sbk-rev-row") matched the
+        # stylesheet, not the row. (Before the report's hasattr→`in o._fields`
+        # fix this test ERRORed on the QWeb render and never got here.)
         self.assertNotIn(
-            "sbk-rev-row", html,
+            '<tr class="sbk-rev-row"', html,
             "Rev row must be omitted when pg_revision_code is empty",
         )
         # Sanity — the label still rendered the cabinet code section.
