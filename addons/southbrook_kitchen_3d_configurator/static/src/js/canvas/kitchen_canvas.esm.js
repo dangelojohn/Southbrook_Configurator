@@ -80,10 +80,15 @@ export class KitchenCanvas extends Component {
         onResizeRoomDepth: { type: Function, optional: true },
         onViewChange:   { type: Function, optional: true },
         onReady:        { type: Function, optional: true },
+        // Phase 1 interactive walls — the parent's active wall + the
+        // click-to-select callback.
+        onWallSelect:   { type: Function, optional: true },
+        activeWall:     { type: [String, { value: null }], optional: true },
     };
     static defaultProps = {
         items: [], room: {}, view: "iso",
         selected: null, draggedProduct: null, dragHover: false,
+        activeWall: null,
     };
 
     setup() {
@@ -99,6 +104,7 @@ export class KitchenCanvas extends Component {
             viewSpecs: null, vsScale: 1,
             orbit: null, raycaster: null,
             roomObjs: [], cabObjs: [], clickable: [],
+            wallMeshes: {}, hoverWall: null,
             handleMesh: null, arrowMeshes: [],
             depthHandleMesh: null, depthArrowMeshes: [],
             laneMeshes: null,
@@ -190,6 +196,11 @@ export class KitchenCanvas extends Component {
             } else if (selChanged) {
                 highlightSelected(this.T.cabObjs, next.selected, P);
             }
+            // Active-wall change: just repaint the wall glow (no rebuild).
+            if (!(roomChanged || itemsChanged)
+                && next.activeWall !== this.props.activeWall) {
+                this._applyWallHighlight(next.activeWall);
+            }
             if (dragUiChanged) this._updateLaneVisibility(next);
             if (viewChanged) {
                 this._currentView = next.view;
@@ -247,15 +258,17 @@ export class KitchenCanvas extends Component {
             this.T.laneMeshes = null;
         }
         this.T.roomObjs = []; this.T.cabObjs = []; this.T.clickable = [];
+        this.T.wallMeshes = {};
         this.T.handleMesh = null; this.T.arrowMeshes = [];
         this.T.depthHandleMesh = null; this.T.depthArrowMeshes = [];
 
         const mk = (geo, color, pos, rotE, opts) =>
             makeMesh(THREE, scene, geo, color, pos, rotE, opts);
 
-        const { objects: shellObjects } =
+        const { objects: shellObjects, walls } =
             buildRoomShell(THREE, scene, mk, P, rw, rh, rd);
         this.T.roomObjs.push(...shellObjects);
+        this.T.wallMeshes = walls || {};
 
         const items = props.items || [];
         const knownTypes = new Set(["base", "wall", "filler", "panel"]);
@@ -285,6 +298,24 @@ export class KitchenCanvas extends Component {
         this._recomputeViews(rw, rh, rd);
         this._setView(props.view || this._currentView, /*instant=*/true, /*skipCallback=*/true);
         if (props.selected) highlightSelected(this.T.cabObjs, props.selected, P);
+        this._applyWallHighlight(props.activeWall);
+    }
+
+    // Phase 1 — paint each room wall by its interaction state: the active
+    // (selected) wall gets a strong blue glow, the hovered wall a soft one,
+    // everything else no glow. Purely material emissive; re-applied after
+    // every rebuild and on hover/select changes.
+    _applyWallHighlight(active) {
+        if (active === undefined) active = this.props.activeWall;
+        const hover  = this.T.hoverWall;
+        for (const [name, mesh] of Object.entries(this.T.wallMeshes)) {
+            if (!mesh || !mesh.material) continue;
+            let hex = 0x000000, intensity = 0.0;
+            if (name === active) { hex = 0x1866D4; intensity = 0.45; }
+            else if (name === hover) { hex = 0x1866D4; intensity = 0.16; }
+            mesh.material.emissive.setHex(hex);
+            mesh.material.emissiveIntensity = intensity;
+        }
     }
 
     _updateLaneVisibility(props) {
@@ -453,6 +484,22 @@ export class KitchenCanvas extends Component {
                 }
             }
         }
+
+        // Wall pick — lowest priority, only when no handle or cabinet was hit.
+        // Clicking a room wall makes it the active wall (Phase 1).
+        if (!hits.length) {
+            const wall = this._raycastWall(raycaster);
+            if (wall && wall !== this.props.activeWall && this.props.onWallSelect) {
+                this.props.onWallSelect(wall);
+            }
+        }
+    }
+
+    _raycastWall(raycaster) {
+        const meshes = Object.values(this.T.wallMeshes).filter(Boolean);
+        if (!meshes.length) return null;
+        const hit = raycaster.intersectObjects(meshes, false);
+        return hit.length ? (hit[0].object.userData && hit[0].object.userData.wall) || null : null;
     }
 
     _onMouseMove(e) {
@@ -543,10 +590,24 @@ export class KitchenCanvas extends Component {
             this.T.raycaster.intersectObjects([this.T.depthHandleMesh, ...this.T.depthArrowMeshes], false).length > 0;
         const onCabinet = !onHandle && !onDepthHandle &&
             this.T.raycaster.intersectObjects(this.T.clickable, false).length > 0;
+
+        // Wall hover — soft-glow the wall under the cursor (only when not over
+        // a handle or cabinet). Repaint only when the hovered wall changes.
+        const wall = (!onHandle && !onDepthHandle && !onCabinet)
+            ? this._raycastWall(this.T.raycaster) : null;
+        if (wall !== this.T.hoverWall) {
+            this.T.hoverWall = wall;
+            this._applyWallHighlight();
+        }
+
         const cvs = this.T.renderer?.domElement;
-        if (cvs) cvs.style.cursor = cursorForPointerState({
-            dragging: this.T.dragging, draggingDepth: this.T.draggingDepth,
-            onHandle, onDepthHandle, onCabinet,
-        });
+        if (cvs) {
+            const cur = cursorForPointerState({
+                dragging: this.T.dragging, draggingDepth: this.T.draggingDepth,
+                onHandle, onDepthHandle, onCabinet,
+            });
+            // A hoverable wall gets the pointer cursor when nothing else claims it.
+            cvs.style.cursor = (cur === "default" && wall) ? "pointer" : cur;
+        }
     }
 }

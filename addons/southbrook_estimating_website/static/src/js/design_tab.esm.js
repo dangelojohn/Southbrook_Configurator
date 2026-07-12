@@ -128,6 +128,9 @@ export class KitchenDesignTab extends Component {
                 <span class="o_owl_design3d_meta" t-else="">
                     <t t-esc="state.items.length"/> cabinets
                     <t t-if="state.saving"> · saving…</t>
+                    <span t-if="state.activeWall" class="o_owl_design3d_activewall">
+                        · Active Wall: <t t-esc="_wallLabel(state.activeWall)"/>
+                    </span>
                 </span>
                 <!-- Suppressed for the default retail/no-channel case,
                      matching kitchen_configurator.js's own topbar rule
@@ -183,6 +186,8 @@ export class KitchenDesignTab extends Component {
                                        onResizeRoom.bind="_onResizeRoom"
                                        onResizeRoomDepth.bind="_onResizeRoomDepth"
                                        onViewChange.bind="_onViewChange"
+                                       onWallSelect.bind="_onWallSelect"
+                                       activeWall="state.activeWall"
                                        onReady.bind="_onCanvasReady"/>
                         <div class="o_owl_design3d_viewbar" role="toolbar" aria-label="Camera view">
                             <button t-foreach="viewButtons" t-as="vb" t-key="vb.key"
@@ -226,7 +231,7 @@ export class KitchenDesignTab extends Component {
                         </div>
                         <div class="o_owl_design3d_hint">
                             <t t-if="!state.loading &amp;&amp; !state.items.length">no cabinets yet — drag one in from the panel on the right to get started</t>
-                            <t t-elif="state.view === 'iso' || state.view === 'top'">drag cabinet to move · drag ● to resize room · click select · ←/→ cycle · 1-6 views · +/- zoom</t>
+                            <t t-elif="state.view === 'iso' || state.view === 'top'">click a wall to select it · drag cabinet to move · drag ● to resize room · ←/→ cycle · 1-6 views</t>
                             <t t-elif="state.view === 'persp'">drag cabinet to move · drag empty space to orbit · scroll to zoom · ←/→ cycle · R reset</t>
                             <t t-else="">scroll to zoom · click select · ←/→ cycle · switch to Iso/Top/Persp to move cabinets</t>
                         </div>
@@ -367,6 +372,7 @@ export class KitchenDesignTab extends Component {
             // so even the brief pre-_load() loading frame agrees with
             // what a first-ever design actually resolves to.
             room: { width_in: 96, depth_in: 72, height_in: 96 },
+            activeWall: null,
             selected: null,
             designId: null,
             // 2026-07-06 — default camera preset is #6 (persp — the
@@ -590,6 +596,17 @@ export class KitchenDesignTab extends Component {
 
     _onViewChange(key) {
         this.state.view = key;
+    }
+
+    // Phase 1 interactive walls — the canvas reports which wall was clicked;
+    // it becomes the active wall (where the next cabinets will be added).
+    _onWallSelect(wall) {
+        this.state.activeWall = wall;
+    }
+
+    _wallLabel(wall) {
+        return ({ back: "Back", left: "Left", right: "Right",
+                  front: "Front" })[wall] || wall;
     }
 
     _onKeyDown(e) {

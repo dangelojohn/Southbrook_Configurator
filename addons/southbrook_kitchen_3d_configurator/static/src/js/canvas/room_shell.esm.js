@@ -40,15 +40,20 @@ export function buildRoomShell(THREE, scene, mk, palette, rw, rh, rd) {
         [rw/2, 0, rd/2], [-Math.PI/2, 0, 0],
         { rs: true, rough: 0.95, metal: 0.0 },
     );
+    // Room walls carry a `wall` tag so the canvas can raycast + select them
+    // (Phase 1 interactive walls). Only back + left are rendered today (open
+    // cutaway); right + front arrive with U-shape + dynamic wall visibility.
     const bwall = mk(
         new THREE.PlaneGeometry(rw, rh), palette.wall1,
         [rw/2, rh/2, 0], null,
-        { rs: true, rough: 0.9, metal: 0.0 },
+        { rs: true, rough: 0.9, metal: 0.0,
+          ud: { isRoomWall: true, wall: "back" } },
     );
     const lwall = mk(
         new THREE.PlaneGeometry(rd, rh), palette.wall2,
         [0, rh/2, rd/2], [0, Math.PI/2, 0],
-        { rs: true, rough: 0.9, metal: 0.0 },
+        { rs: true, rough: 0.9, metal: 0.0,
+          ud: { isRoomWall: true, wall: "left" } },
     );
 
     // Wainscoting rail on back wall — semi-gloss wood trim
@@ -67,5 +72,6 @@ export function buildRoomShell(THREE, scene, mk, palette, rw, rh, rd) {
     grid.material.opacity     = 0.18;
     scene.add(grid);
 
-    return { objects: [floor, bwall, lwall, rail, grid], grid };
+    return { objects: [floor, bwall, lwall, rail, grid], grid,
+             walls: { back: bwall, left: lwall } };
 }
