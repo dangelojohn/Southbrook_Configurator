@@ -10,7 +10,8 @@ dashboard open.
 """
 import logging
 
-from odoo import http
+from odoo import _, http
+from odoo.exceptions import AccessError
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -34,12 +35,47 @@ def _domain_for_role(role):
     return [("severity", "in", ["high", "critical"])]
 
 
+_CC_GROUPS = (
+    "southbrook_command_center.group_command_center_user",
+    "southbrook_command_center.group_command_center_owner",
+    "southbrook_command_center.group_command_center_production_manager",
+    "southbrook_command_center.group_command_center_shop_foreman",
+    "southbrook_command_center.group_command_center_purchasing_manager",
+    "southbrook_command_center.group_command_center_warehouse_manager",
+)
+
+
 class CommandCenterController(http.Controller):
 
-    @http.route("/command_center/bootstrap", type="json", auth="user")
-    def bootstrap(self, company_id=None, role=None, **kw):
+    def _require_cc_member(self):
+        """The routes are auth='user' (any session incl. portal). Require an
+        internal Central Command member — otherwise factory_health / flow were
+        served to non-members (and factory_health even WRITES the exec snapshot
+        via get_or_create_today from a read endpoint)."""
+        user = request.env.user
+        if not user._is_internal() or not any(
+                user.has_group(g) for g in _CC_GROUPS):
+            raise AccessError(_("Central Command access required."))
+
+    def _validated_company_id(self, company_id):
+        """Never trust a client-supplied company_id — clamp it to a company the
+        user is actually allowed in (no ir.rule scopes the exception model, and
+        the client-returned cid also drives the bus-channel name)."""
         env = request.env
-        cid = int(company_id) if company_id else env.company.id
+        if company_id:
+            try:
+                cid = int(company_id)
+            except (TypeError, ValueError):
+                return env.company.id
+            if cid in env.user.company_ids.ids:
+                return cid
+        return env.company.id
+
+    @http.route("/command_center/bootstrap", type="jsonrpc", auth="user")
+    def bootstrap(self, company_id=None, role=None, **kw):
+        self._require_cc_member()
+        env = request.env
+        cid = self._validated_company_id(company_id)
         return {
             "company_id": cid,
             "role": role,
@@ -47,7 +83,7 @@ class CommandCenterController(http.Controller):
             "flow": self._flow(env, cid),
             "exceptions": self._exceptions(env, cid, role),
             "exceptions_total": self._exceptions_total(env, cid, role),
-            "recommendations": self._recommendations(env),
+            "recommendations": self._recommendations(env, cid),
             "alerts": self._alerts(env, cid),
         }
 
@@ -65,8 +101,12 @@ class CommandCenterController(http.Controller):
             return 0
 
     # -- contextual help: semantic "learn this term" lookup ------------
-    @http.route("/command_center/help_lookup", type="json", auth="user")
+    @http.route("/command_center/help_lookup", type="jsonrpc", auth="user")
     def help_lookup(self, term=None, **kw):
+        self._require_cc_member()
+        return self._help_lookup(term)
+
+    def _help_lookup(self, term=None):
         """Return the single best training lesson for a jargon term, using the
         training hub's semantic find_training. Degrades to an eLearning search
         URL if the tool or a match is unavailable — never raises."""
@@ -122,7 +162,8 @@ class CommandCenterController(http.Controller):
         out = {"mo_state_counts": [], "bottleneck": None, "oee": []}
         try:
             out["mo_state_counts"] = env["mrp.production"].read_group(
-                [("state", "in", ("confirmed", "progress", "to_close"))],
+                [("state", "in", ("confirmed", "progress", "to_close")),
+                 ("company_id", "=", cid)],
                 ["state"], ["state"])
         except Exception:  # noqa: BLE001
             _logger.exception("command_center: mo_state_counts failed")
@@ -141,10 +182,14 @@ class CommandCenterController(http.Controller):
         return out
 
     # -- panel 4 (Hermes) ----------------------------------------------
-    def _recommendations(self, env):
+    def _recommendations(self, env, cid=None):
         try:
-            return env["southbrook.hermes.recommendation"].search_read(
-                domain=[("state", "in", ("draft", "ready"))],
+            Rec = env["southbrook.hermes.recommendation"]
+            domain = [("state", "in", ("draft", "ready"))]
+            if cid and "company_id" in Rec._fields:
+                domain.append(("company_id", "=", cid))
+            return Rec.search_read(
+                domain=domain,
                 fields=["summary", "rationale", "priority", "state",
                         "recommendation_type", "proposed_action",
                         "source_model", "source_res_id"],
@@ -156,8 +201,12 @@ class CommandCenterController(http.Controller):
     # -- panel 5 (Alert Stream) ----------------------------------------
     def _alerts(self, env, cid):
         try:
-            return env["southbrook.ops.event"].search_read(
-                domain=[],
+            Evt = env["southbrook.ops.event"]
+            domain = []
+            if cid and "company_id" in Evt._fields:
+                domain.append(("company_id", "=", cid))
+            return Evt.search_read(
+                domain=domain,
                 fields=["event_type", "summary", "severity", "res_model",
                         "res_id", "create_date"],
                 order="create_date desc", limit=30)

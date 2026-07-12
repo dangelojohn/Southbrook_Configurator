@@ -96,5 +96,18 @@
             </field>
         </record>
 
+        <!--
+          Multi-company isolation. There was no record rule, so a Central
+          Command user could read/write another company's exceptions (the
+          controller's client-supplied company_id is now validated, but the
+          model itself needs this rule so direct call_kw is scoped too).
+        -->
+        <record id="rule_command_exception_company" model="ir.rule">
+            <field name="name">Command Exception: per-company</field>
+            <field name="model_id" ref="model_southbrook_command_exception"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
     </data>
 </odoo>
