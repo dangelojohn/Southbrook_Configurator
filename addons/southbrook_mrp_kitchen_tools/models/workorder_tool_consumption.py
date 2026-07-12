@@ -13,6 +13,7 @@ The MO/cost rollup in commit 6 reads from this table to allocate tool
 cost and consumable cost to the manufacturing order.
 """
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class WorkorderToolConsumption(models.Model):
@@ -69,12 +70,33 @@ class WorkorderToolConsumption(models.Model):
         for rec in self:
             rec.total_cost = rec.quantity * rec.unit_cost
 
+    @api.constrains("quantity", "unit_cost")
+    def _check_nonnegative(self):
+        # A NEGATIVE quantity was the real integrity hole: it flowed into
+        # _apply_to_asset_life as `remaining_life - quantity` (INCREASING
+        # remaining life → silently "un-wearing" a dull blade back over its
+        # threshold) and `total_usage + quantity` (decreasing usage), and
+        # produced a negative total_cost that reduced the MO's rolled-up cost.
+        for rec in self:
+            if rec.quantity < 0:
+                raise ValidationError(_(
+                    "Quantity consumed cannot be negative."))
+            if rec.unit_cost < 0:
+                raise ValidationError(_("Unit cost cannot be negative."))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get("name", _("New")) == _("New"):
                 vals["name"] = self.env["ir.sequence"].next_by_code(
                     "sbk.workorder.tool.consumption") or _("New")
+            # Source unit_cost from the consumable's cost when the caller
+            # didn't supply one, rather than defaulting to 0.0 (which zeroed
+            # the MO cost rollup). Explicit non-zero values are preserved.
+            if not vals.get("unit_cost") and vals.get("product_id"):
+                product = self.env["product.product"].browse(
+                    vals["product_id"])
+                vals["unit_cost"] = product.standard_price or 0.0
         recs = super().create(vals_list)
         recs._apply_to_asset_life()
         return recs

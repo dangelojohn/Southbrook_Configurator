@@ -149,3 +149,46 @@ class TestWorkorderToolReadiness(TransactionCase):
         self.assertEqual(wo.southbrook_tool_readiness_state, "blocked")
         with self.assertRaises(UserError):
             wo.button_start()
+
+    def test_button_start_accepts_v19_raise_on_invalid_state_kwarg(self):
+        """v19 regression: the standard Start UI action calls
+        button_start(raise_on_invalid_state=True). The override must accept +
+        forward it — a missing kwarg raised TypeError on every UI Start.
+        Blocked readiness makes our gate raise UserError (not TypeError),
+        proving the kwarg got past the signature."""
+        self._new_requirement(qty=1)
+        wo = self._new_workorder()
+        wo.action_check_tool_readiness()
+        with self.assertRaises(UserError):
+            wo.button_start(raise_on_invalid_state=True)
+
+    def test_readiness_counts_grandchild_category_asset(self):
+        """M2 regression: an asset filed under a GRANDCHILD of the
+        requirement's category must count toward readiness (child_of), not
+        just the immediate children (the seed ships a 3-level tree)."""
+        Cat = self.env["southbrook.tool.category"]
+        parent = Cat.create({"code": "M2-PARENT", "name": "M2 Parent"})
+        child = Cat.create({
+            "code": "M2-CHILD", "name": "M2 Child", "parent_id": parent.id})
+        grandchild = Cat.create({
+            "code": "M2-GC", "name": "M2 GC", "parent_id": child.id})
+        gc_product = self.Product.create({
+            "name": "M2 GC tool", "default_code": "UTEST-M2-GC",
+            "type": "consu", "x_southbrook_is_tool": True,
+            "x_southbrook_is_reusable_tool": True,
+            "x_southbrook_tool_category_id": grandchild.id,
+        })
+        # Requirement on the PARENT category.
+        self.WCReq.create({
+            "workcenter_id": self.wc.id, "tool_category_id": parent.id,
+            "quantity": 1, "is_mandatory": True,
+        })
+        # Asset filed under the GRANDCHILD.
+        self.Asset.create({
+            "name": "M2 GC asset", "product_id": gc_product.id,
+            "tool_crib_id": self.crib.id, "workcenter_id": self.wc.id,
+            "lifecycle_state": "available", "condition": "good",
+        })
+        wo = self._new_workorder()
+        wo.action_check_tool_readiness()
+        self.assertEqual(wo.southbrook_tool_readiness_state, "ready")

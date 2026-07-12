@@ -77,11 +77,13 @@ class MrpWorkorder(models.Model):
         if product:
             domain.append(("product_id", "=", product.id))
         elif category:
-            # accept any descendant of the requirement's category
-            cat_ids = (
-                category | category.child_ids
-            ).ids if hasattr(category, "child_ids") else [category.id]
-            domain.append(("tool_category_id", "in", cat_ids))
+            # Accept the category AND any descendant. `child_ids` is only ONE
+            # level deep, but the seed ships a 3-level tree (Cutting Tools →
+            # Saw Blades → Panel Saw Blades) — assets filed under a grandchild
+            # were not counted, so a requirement keyed on a top-level category
+            # falsely reported BLOCKED and button_start hard-refused the WO.
+            # `child_of` matches the whole subtree.
+            domain.append(("tool_category_id", "child_of", category.id))
         if workcenter:
             domain.append("|")
             domain.append(("workcenter_id", "=", workcenter.id))
@@ -130,11 +132,17 @@ class MrpWorkorder(models.Model):
             wo.southbrook_tool_readiness_msg = msg
 
     # Gate the workorder start when blocked.
-    def button_start(self):
+    # v19's base signature is button_start(self, raise_on_invalid_state=False)
+    # and the standard "Start" UI server action calls it WITH
+    # raise_on_invalid_state=True (mrp_workorder_views.xml). An override that
+    # takes no kwarg → TypeError on every UI Start (and silently drops the flag
+    # even where it doesn't crash). Accept and forward it.
+    def button_start(self, raise_on_invalid_state=False):
         for wo in self:
             if wo.southbrook_tool_readiness_state == "blocked":
                 raise UserError(_(
                     "Cannot start work order %s — tool readiness is "
                     "BLOCKED:\n\n%s"
                 ) % (wo.display_name, wo.southbrook_tool_readiness_msg))
-        return super().button_start()
+        return super().button_start(
+            raise_on_invalid_state=raise_on_invalid_state)

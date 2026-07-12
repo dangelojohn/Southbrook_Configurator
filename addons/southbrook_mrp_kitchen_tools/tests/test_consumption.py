@@ -122,6 +122,33 @@ class TestWorkorderToolConsumption(TransactionCase):
         })
         self.assertEqual(cons.total_cost, 10.0)
 
+    def test_negative_quantity_rejected(self):
+        """H3 regression: a negative quantity is the tool-life 'un-wear' +
+        negative-cost vector — it must be rejected, not applied."""
+        from odoo.exceptions import ValidationError
+        asset = self._new_asset(remaining_life_qty=50.0)
+        wo = self._new_workorder()
+        with self.assertRaises(ValidationError):
+            self.Consumption.create({
+                "workorder_id": wo.id,
+                "asset_id": asset.id,
+                "quantity": -25.0,
+            })
+        # The asset's life/usage must be untouched by the rejected row.
+        self.assertEqual(asset.remaining_life_qty, 50.0)
+        self.assertEqual(asset.total_usage_qty, 0.0)
+
+    def test_negative_unit_cost_rejected(self):
+        """H3 regression: a negative unit_cost can't deflate the MO rollup."""
+        from odoo.exceptions import ValidationError
+        asset = self._new_asset()
+        wo = self._new_workorder()
+        with self.assertRaises(ValidationError):
+            self.Consumption.create({
+                "workorder_id": wo.id, "asset_id": asset.id,
+                "quantity": 1.0, "unit_cost": -5.0,
+            })
+
     # ------------------------------------------------------------------
     # Acceptance — unlink restores asset life (P8 rollback 2026-06-18).
     # The latent gap surfaced during the P8 fix verify: create() debits

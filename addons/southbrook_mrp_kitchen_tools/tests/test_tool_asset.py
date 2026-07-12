@@ -41,6 +41,44 @@ class TestToolAsset(TransactionCase):
         vals.update(kw)
         return self.Asset.create(vals)
 
+    # ─── QR checkout/checkin (H1/H2) ────────────────────────────────────
+    def _tool_kind(self):
+        return self.env["southbrook.qr.kind.tool"]
+
+    def test_qr_checkout_marks_asset_checked_out_and_attributes_operator(self):
+        """H1/H2: checkout must flip the asset to checked_out (so readiness
+        stops counting it available), set the holder, and attribute the usage
+        to the real acting user (not the OdooBot the sudo() create defaults)."""
+        asset = self._new_asset(lifecycle_state="available")
+        res = self._tool_kind().handle_action(asset, "checkout", {})
+        self.assertIn("usage_id", res)
+        self.assertEqual(asset.lifecycle_state, "checked_out")
+        self.assertFalse(asset.is_available)
+        self.assertEqual(asset.current_holder_id, self.env.user)
+        usage = self.env["southbrook.tool.usage"].browse(res["usage_id"])
+        self.assertEqual(usage.checked_out_by, self.env.user)
+
+    def test_qr_double_checkout_is_rejected(self):
+        """H1: a second checkout of a tool with an open usage must be refused,
+        not silently issued twice."""
+        asset = self._new_asset(lifecycle_state="available")
+        first = self._tool_kind().handle_action(asset, "checkout", {})
+        self.assertIn("usage_id", first)
+        second = self._tool_kind().handle_action(asset, "checkout", {})
+        self.assertEqual(second.get("error"), "already_checked_out")
+        # Still exactly one open usage row.
+        open_rows = self.env["southbrook.tool.usage"].search([
+            ("tool_id", "=", asset.id), ("checked_in_at", "=", False)])
+        self.assertEqual(len(open_rows), 1)
+
+    def test_qr_checkin_returns_asset_to_available(self):
+        asset = self._new_asset(lifecycle_state="available")
+        self._tool_kind().handle_action(asset, "checkout", {})
+        self.assertEqual(asset.lifecycle_state, "checked_out")
+        self._tool_kind().handle_action(asset, "checkin", {})
+        self.assertEqual(asset.lifecycle_state, "available")
+        self.assertFalse(asset.current_holder_id)
+
     # ─── Creation / defaults ────────────────────────────────────────────
 
     def test_default_lifecycle_state_is_available(self):
