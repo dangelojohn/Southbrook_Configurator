@@ -29,6 +29,10 @@ import { user } from "@web/core/user";
 //   KitchenCanvas (the child component)
 import { packRow } from "@southbrook_kitchen_3d_configurator/js/canvas/pack_row.esm";
 import { KitchenCanvas } from "@southbrook_kitchen_3d_configurator/js/canvas/kitchen_canvas.esm";
+// PR2 — WALLS is the single source of truth for wall identifiers; see
+// constants.esm.js. Used below to default a new cabinet's persisted
+// `wall` to the active wall selection.
+import { WALLS } from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
 
 const actionRegistry = registry.category("actions");
 
@@ -622,6 +626,12 @@ class SouthbrookKitchenConfigurator extends Component {
             width_in:      product.width_in || 24,
             height_in:     product.height_in || (type === "wall" ? 30 : 34.5),
             depth_in:      product.depth_in  || (type === "wall" ? 12 : 24),
+            // PR2 — persistence only. Placement/packing/rendering
+            // intentionally ignore `wall` until PR3/PR4, so the
+            // cabinet still appears on the back wall even when
+            // wall="left". Written here so it round-trips through
+            // save_design / load_design_lines from day one.
+            wall:          this.state.activeWall || WALLS.BACK,
         };
         this.state.items = [...(this.state.items || []), newItem];
         this.state.selected = newItem;

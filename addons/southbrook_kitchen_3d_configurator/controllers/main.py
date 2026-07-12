@@ -4,6 +4,11 @@ import math
 from odoo import http
 from odoo.http import request
 
+# PR2 — the pure layout engine's WALLS tuple is the single source of
+# truth for valid wall identifiers server-side too. Imported the same
+# way models/kitchen_design.py:11 does.
+from odoo.addons.southbrook_estimating.models import kitchen_layout_engine
+
 _logger = logging.getLogger(__name__)
 
 
@@ -291,6 +296,31 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         the customer + room dims + date so the design tree view doesn't
         fill with "New Kitchen Design" collisions.
         """
+        # PR2 — validate every incoming item's `wall` BEFORE any
+        # create/write happens, so a bad payload never partially
+        # writes (validate-all-items-first). `wall` is a layout-domain
+        # input the pure kitchen_layout_engine consumes (P0.2,
+        # 2026-07-11) — an unrecognised value here would otherwise
+        # silently fall back to the model field's own "back" default,
+        # masking a client bug. Same error-dict shape as the /layout
+        # endpoint's NO_CABINETS response.
+        for item in items or []:
+            wall = item.get("wall") or "back"
+            if wall not in kitchen_layout_engine.WALLS:
+                _logger.warning(
+                    "save_design: rejected payload — invalid wall=%r "
+                    "(item layout_key=%s); must be one of %s. No "
+                    "design/lines were created or modified.",
+                    wall, item.get("layout_key"), kitchen_layout_engine.WALLS,
+                )
+                return {
+                    "error": "invalid_wall",
+                    "detail": (
+                        "wall=%r is not a recognised room wall (must "
+                        "be one of %s)."
+                    ) % (wall, ", ".join(kitchen_layout_engine.WALLS)),
+                }
+
         Design = request.env["southbrook.kitchen.design"]
         room_w = room.get("width_in",  12)
         room_d = room.get("depth_in",  24)
@@ -410,6 +440,11 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "rotation_deg":   float(item.get("rotation_deg") or 0.0),
                 "layout_key":     layout_key,
                 "origin":         "configurator",
+                # PR2 — persist the layout-domain wall assignment.
+                # Already validated against kitchen_layout_engine.WALLS
+                # above; re-derive the same default here for items that
+                # omitted the key.
+                "wall":           item.get("wall") or "back",
             }
             if layout_key in existing_by_key:
                 existing_by_key[layout_key].write(line_vals)
@@ -485,6 +520,10 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "pinned":         line.pinned,
                 "price":          line.price_unit,
                 "quantity":       line.quantity,
+                # PR2 — read-side emission. NULL on pre-PR2 rows (no
+                # migration) reads back as "back" for backward compat,
+                # matching the model field's own default.
+                "wall":           line.wall or "back",
             })
         return {"lines": out}
 
