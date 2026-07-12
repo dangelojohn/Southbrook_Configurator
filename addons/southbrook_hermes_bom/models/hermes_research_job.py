@@ -37,6 +37,9 @@ class HermesResearchJob(models.Model):
         required=True,
         ondelete="cascade",
         tracking=True,
+        # Filtered by the smart-button count + the "view jobs" action; applied
+        # jobs are retained forever, so this table grows unbounded.
+        index=True,
     )
     product_product_id = fields.Many2one(
         comodel_name="product.product",
@@ -56,6 +59,8 @@ class HermesResearchJob(models.Model):
         default="draft",
         required=True,
         tracking=True,
+        # Filtered by the nightly GC cron.
+        index=True,
     )
     hermes_request_payload = fields.Text(
         string="Request Payload (JSON)",
