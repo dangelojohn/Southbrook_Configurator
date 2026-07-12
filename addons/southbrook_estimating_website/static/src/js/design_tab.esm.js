@@ -181,7 +181,7 @@ export class KitchenDesignTab extends Component {
             <div class="o_owl_design3d_body">
                 <div class="o_owl_design3d_stage_col">
                     <div class="o_owl_design3d_stage" t-ref="stage"
-                         t-att-class="'o_owl_design3d_stage' + (state.dragHover ? ' is-drag-hover' : '')"
+                         t-att-class="'o_owl_design3d_stage' + (state.dragHover ? ' is-drag-hover' : '') + (state.cornerFlash ? ' o_owl_design3d_corner_flash' : '')"
                          t-on-dragover="_onCanvasDragOver"
                          t-on-dragleave="_onCanvasDragLeave"
                          t-on-drop="_onCanvasDrop">
@@ -402,6 +402,12 @@ export class KitchenDesignTab extends Component {
             touchDragProduct: null,
             toasts: [],
             channel: null,
+            // 2026-07-12 (Task 4) — briefly true right after a corner
+            // cabinet is auto-inserted (res.relaid); toggles the
+            // o_owl_design3d_corner_flash CSS class on the stage
+            // wrapper for a quick fade-out/in cue. Skipped entirely
+            // under prefers-reduced-motion (toast still fires).
+            cornerFlash: false,
         });
         this.viewButtons = VIEW_BUTTONS;
         this.categoryLabels = CATEGORY_LABELS;
@@ -410,6 +416,7 @@ export class KitchenDesignTab extends Component {
         this._lastPayloadVersion = this.props.payloadVersion || 0;
         this._toastSeq = 0;
         this._toastTimers = new Set();      // audit A16 — cancel on unmount
+        this._cornerFlashTimer = null;      // Task 4 — cancel on unmount
         this._roomSaveSeq = 0;              // audit A6 — last-write-wins guard
         this._itemsMutSeq = 0;              // audit A7 — reload/add race guard
         this._lastAdd = null;               // audit A9 — hybrid double-add guard
@@ -441,6 +448,7 @@ export class KitchenDesignTab extends Component {
             this._detachTouchListeners();
             for (const t of this._toastTimers) clearTimeout(t);
             this._toastTimers.clear();
+            if (this._cornerFlashTimer) clearTimeout(this._cornerFlashTimer);
         });
     }
 
@@ -462,6 +470,32 @@ export class KitchenDesignTab extends Component {
     _dismissToast(id) {
         const idx = this.state.toasts.findIndex((t) => t.id === id);
         if (idx >= 0) this.state.toasts.splice(idx, 1);
+    }
+
+    // Task 4 (2026-07-12) — brief opacity dip/restore on the 3D stage
+    // wrapper when a corner cabinet was just auto-inserted (res.relaid).
+    // The KitchenCanvas is an imperative THREE.js scene with no per-mesh
+    // DOM, so the "fade" is a CSS transition on the stage's own wrapper
+    // element rather than on the new cabinet itself. Respects
+    // prefers-reduced-motion — skips the animation but the caller still
+    // shows the toast regardless.
+    _triggerCornerFlash() {
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            return;
+        }
+        if (this._cornerFlashTimer) {
+            clearTimeout(this._cornerFlashTimer);
+            this._cornerFlashTimer = null;
+        }
+        this.state.cornerFlash = false;
+        // Restart the CSS transition even if it's already mid-flash.
+        requestAnimationFrame(() => {
+            this.state.cornerFlash = true;
+            this._cornerFlashTimer = setTimeout(() => {
+                this._cornerFlashTimer = null;
+                this.state.cornerFlash = false;
+            }, 350);
+        });
     }
 
     get summary() {
@@ -986,10 +1020,13 @@ export class KitchenDesignTab extends Component {
                 this._pushToast(`Couldn't add ${product.name}: ${res.error}`, "error");
             } else if (res && res.relaid && res.payload) {
                 // Continuous corner resolution re-laid the whole scene.
+                // Task 4 — toast + brief stage fade are additive; neither
+                // blocks or delays the scene swap below.
+                this._pushToast("Corner cabinet inserted automatically.", "success");
+                this._triggerCornerFlash();
                 this._itemsMutSeq += 1;
                 this.state.items = res.payload.items || [];
                 this.state.room = res.payload.room || this.state.room;
-                this._pushToast("Added — corner resolved automatically", "success");
             } else if (res && res.item) {
                 // Audit A7 — mark the mutation so an in-flight _load()
                 // snapshot from before this add re-fetches instead of

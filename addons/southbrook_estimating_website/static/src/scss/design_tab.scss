@@ -123,6 +123,18 @@
             box-shadow: inset 0 0 0 2px var(--sb-sky, #3b82f6);
         }
 
+        // Task 4 (2026-07-12) — brief opacity dip/restore cue when a
+        // corner cabinet is auto-inserted (design_tab.esm.js's
+        // _triggerCornerFlash toggles this class on for ~350ms). The
+        // canvas itself is an imperative THREE.js scene with no per-mesh
+        // DOM, so this is a whole-stage fade rather than a per-cabinet
+        // one. JS already gates this behind prefers-reduced-motion, but
+        // the media query below is a belt-and-suspenders guard so the
+        // animation is inert even if the class is ever toggled elsewhere.
+        &.o_owl_design3d_corner_flash {
+            animation: o_owl_design3d_corner_flash_kf 350ms ease-in-out;
+        }
+
         .o_sbk_canvas3d {
             display: block;
             width: 100%;
@@ -466,5 +478,19 @@
 
     .o_owl_design3d .o_owl_design3d_inventory {
         flex: 1 1 auto;
+    }
+}
+
+// Task 4 (2026-07-12) — corner-insert transition keyframes. A subtle
+// dip-and-restore, not a hard blink: opacity never fully drops to zero.
+@keyframes o_owl_design3d_corner_flash_kf {
+    0% { opacity: 1; }
+    40% { opacity: 0.35; }
+    100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .o_owl_design3d .o_owl_design3d_stage.o_owl_design3d_corner_flash {
+        animation: none;
     }
 }
