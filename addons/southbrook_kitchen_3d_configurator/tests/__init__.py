@@ -20,3 +20,7 @@ from . import test_auto_arrange_service
 
 # 2026-07-12 — COORDINATE_CONTRACT.md enforceability (living ledger).
 from . import test_coordinate_contract
+
+# PR2 (2026-07-12) — `wall` becomes part of the canonical persistence
+# path: save_design write + validation, load_design_lines read emission.
+from . import test_wall_persistence

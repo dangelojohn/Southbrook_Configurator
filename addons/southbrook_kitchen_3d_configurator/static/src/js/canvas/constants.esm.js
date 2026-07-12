@@ -27,6 +27,17 @@ export const CTR = 1.5 * IN;        // countertop thickness
 export const GAP = 18 * IN;         // clearance between counter and wall cab bottom
 export const WBY = BH + CTR + GAP;  // wall cabinet bottom Y
 
+// ─── Room-wall identifiers ────────────────────────────────────────────────────
+// Room-wall identifiers — single source of truth for the client. Mirrors
+// the pure layout engine's WALLS tuple (kitchen_layout_engine.py). Use
+// this instead of scattering "back"/"left" string literals in NEW code.
+export const WALLS = Object.freeze({
+    BACK: "back",
+    LEFT: "left",
+    RIGHT: "right",
+    FRONT: "front",
+});
+
 // ─── Colour palette ───────────────────────────────────────────────────────────
 export const P = {
     scene:   0xECE9E3,
