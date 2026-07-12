@@ -36,7 +36,9 @@ export function buildOtherCabinet(THREE, mk, palette, item) {
     const w  = (item.width_in  || 24) * IN;
     const h  = (item.height_in || 34.5) * IN;
     const d  = (item.depth_in  || 24) * IN;
-    const z0 = (item.z_position_in || 0) * IN;
+    // Local-frame build (side-wall group render): z comes from the enclosing
+    // group, so build at local z=0; otherwise use the item's own Z offset.
+    const z0 = item.__localFrame ? 0 : (item.z_position_in || 0) * IN;
 
     const objects = [];
     const clickable = [];
@@ -121,7 +123,9 @@ export function buildEndCapPanel(THREE, mk, palette, item) {
     const w  = (item.width_in  || 0.75) * IN;
     const h  = (item.height_in || 34.5) * IN;
     const d  = (item.depth_in  || 24)   * IN;
-    const z0 = (item.z_position_in || 0) * IN;
+    // Local-frame build (side-wall group render): z comes from the enclosing
+    // group, so build at local z=0; otherwise use the item's own Z offset.
+    const z0 = item.__localFrame ? 0 : (item.z_position_in || 0) * IN;
 
     const body = mk(
         new THREE.BoxGeometry(w - 0.01, h, d - 0.01), palette.cab,

@@ -284,11 +284,21 @@ export class KitchenCanvas extends Component {
             this._needsTransform(it)
                 ? this._placeCabinetGroup(it, buildWallCabinet)
                 : push(buildWallCabinet(THREE, mk, P, it)));
-        items.filter(it => !knownTypes.has(it.cabinet_type)).forEach(it => push(buildOtherCabinet(THREE, mk, P, it)));
+        items.filter(it => !knownTypes.has(it.cabinet_type)).forEach(it =>
+            this._needsTransform(it)
+                ? this._placeCabinetGroup(it, buildOtherCabinet)
+                : push(buildOtherCabinet(THREE, mk, P, it)));
         items.filter(it => it.cabinet_type === "filler").forEach(it => {
-            this.T.cabObjs.push(buildFillerPanel(THREE, mk, P, it));
+            if (this._needsTransform(it)) {
+                this._placeCabinetGroup(it, buildFillerPanel);
+            } else {
+                this.T.cabObjs.push(buildFillerPanel(THREE, mk, P, it));
+            }
         });
-        items.filter(it => it.cabinet_type === "panel").forEach(it => push(buildEndCapPanel(THREE, mk, P, it)));
+        items.filter(it => it.cabinet_type === "panel").forEach(it =>
+            this._needsTransform(it)
+                ? this._placeCabinetGroup(it, buildEndCapPanel)
+                : push(buildEndCapPanel(THREE, mk, P, it)));
 
         const { handleMesh, arrowMeshes } =
             buildDragHandle(THREE, scene, P, rw, rd);

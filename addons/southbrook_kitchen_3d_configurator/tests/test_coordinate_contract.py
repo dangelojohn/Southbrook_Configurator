@@ -57,6 +57,20 @@ class TestCoordinateContractCompliance(TransactionCase):
                     missing, set(),
                     "%s is debt-free but omits %s" % (fname, sorted(missing)))
 
+    def test_central_placement_consumes_all_fields(self):
+        # Placement (x/y/z_position_in + rotation_deg) is applied CENTRALLY in
+        # KitchenCanvas._placeCabinetGroup per the contract; builders build in
+        # a local frame and let the group carry the world transform. This
+        # asserts the central transform consumes all four contract fields —
+        # the real conformance signal now that per-builder placement is gone.
+        path = os.path.join(os.path.dirname(__file__), "..", "static", "src",
+                            "js", "canvas", "kitchen_canvas.esm.js")
+        with open(path) as fh:
+            src = fh.read()
+        for field in _REQUIRED:
+            self.assertIn(field, src,
+                          "central placement (kitchen_canvas) omits %s" % field)
+
     def test_no_stale_debt_entries(self):
         """A builder that quietly became compliant leaves a stale debt entry.
         Fail so the ledger is shrunk (this is how the renderer migration
