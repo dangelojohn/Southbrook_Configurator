@@ -280,7 +280,10 @@ export class KitchenCanvas extends Component {
             this._needsTransform(it)
                 ? this._placeCabinetGroup(it, buildBaseCabinet)
                 : push(buildBaseCabinet(THREE, mk, P, it)));
-        items.filter(it => it.cabinet_type === "wall").forEach(it => push(buildWallCabinet(THREE, mk, P, it)));
+        items.filter(it => it.cabinet_type === "wall").forEach(it =>
+            this._needsTransform(it)
+                ? this._placeCabinetGroup(it, buildWallCabinet)
+                : push(buildWallCabinet(THREE, mk, P, it)));
         items.filter(it => !knownTypes.has(it.cabinet_type)).forEach(it => push(buildOtherCabinet(THREE, mk, P, it)));
         items.filter(it => it.cabinet_type === "filler").forEach(it => {
             this.T.cabObjs.push(buildFillerPanel(THREE, mk, P, it));
@@ -436,7 +439,8 @@ export class KitchenCanvas extends Component {
         const grp = new THREE.Group();
         const mkG = (geo, color, pos, rotE, opts) =>
             makeMesh(THREE, grp, geo, color, pos, rotE, opts);
-        const res = builder(THREE, mkG, P, { ...it, x_position_in: 0 });
+        const res = builder(THREE, mkG, P,
+            { ...it, x_position_in: 0, __localFrame: true });
         grp.position.set(
             (it.x_position_in || 0) * IN,
             (it.y_position_in || 0) * IN,
@@ -448,12 +452,15 @@ export class KitchenCanvas extends Component {
         if (res && res.clickable) this.T.clickable.push(...res.clickable);
     }
 
-    // A cabinet needs the group transform only when it isn't a plain
-    // back-wall unit. Back-wall cabinets (rotation 0, z 0 — all current
-    // production data) take the ORIGINAL absolute path and render exactly as
-    // before, so straight kitchens are byte-identical by construction.
+    // A cabinet needs the group transform only when it is NOT on the back
+    // wall — i.e. it is rotated (front=180, left=90, right=270). Back-wall
+    // cabinets (rotation 0) take the ORIGINAL absolute path and render
+    // exactly as before, so straight kitchens are byte-identical by
+    // construction. Gating on rotation (not z) is deliberate: on WALL
+    // cabinets z_position_in is the D8 mount height, not depth — gating on z
+    // would misfire on D8-customised back uppers.
     _needsTransform(it) {
-        return (it.rotation_deg || 0) !== 0 || (it.z_position_in || 0) !== 0;
+        return (it.rotation_deg || 0) !== 0;
     }
 
     _onMouseDown(e) {

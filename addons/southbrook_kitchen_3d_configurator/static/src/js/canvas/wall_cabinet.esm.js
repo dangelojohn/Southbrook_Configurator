@@ -31,9 +31,15 @@ export function buildWallCabinet(THREE, mk, palette, item) {
     const wbW = item.width_in  * IN;
     const wbH = item.height_in * IN;
     const wbD = item.depth_in  * IN;
-    const wbY = (item.z_position_in != null && item.z_position_in !== 0)
-                ? item.z_position_in * IN
-                : WBY;
+    // Local-frame build (side-wall group render): the cabinet sits at local
+    // y=0 and the enclosing THREE.Group's Y position supplies the mount
+    // height (from the design line's vertical elevation). Otherwise (legacy
+    // back-wall path) keep the D8 mount height (to_ceiling / to_soffit),
+    // falling back to WBY.
+    const wbY = item.__localFrame ? 0
+        : ((item.z_position_in != null && item.z_position_in !== 0)
+            ? item.z_position_in * IN
+            : WBY);
 
     const objects = [];
     const clickable = [];
