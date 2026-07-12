@@ -2842,6 +2842,12 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         same_wall = design.cabinet_line_ids.filtered(
             lambda l: l.origin == "configurator"
             and (l.wall or "back") == line_wall)
+        # 2026-07-12 Task 3 (corner-resolution-geometric-rule) — captured
+        # BEFORE the new line exists: did this wall already have a
+        # configurator cabinet? Gates corner resolution below so the FIRST
+        # cabinet on a brand-new wall is never eligible to be consumed by
+        # the SAME add that placed it.
+        wall_had_cabinets = bool(same_wall)
         run_seq = max(same_wall.mapped("run_seq") or [-1]) + 1
         Line = request.env["southbrook.kitchen.design.line"].sudo()
         line = Line.create({
@@ -2877,17 +2883,26 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             # per-drop manufacturing mirror — the 5-min cron / an explicit
             # auto-arrange catches BOM/price up). Return the full re-laid
             # payload so the scene reflects the corner + any re-flow.
-            walls_used = {
-                (dl.wall or "back")
-                for dl in design.cabinet_line_ids.filtered(
-                    lambda l: l.origin == "configurator"
-                    and l.layout_role != "derived"
-                    and l.cabinet_type not in ("filler", "panel"))
-            }
-            if len(walls_used) >= 2:
-                design.action_auto_arrange(sync=False)
-                return {"ok": True, "relaid": True,
-                        "payload": self._southbrook_design_payload(design)}
+            #
+            # 2026-07-12 Task 3 — gated on wall_had_cabinets: resolution may
+            # only run when this wall ALREADY had a configurator cabinet
+            # before this add. The first cabinet placed on a brand-new wall
+            # must always come back as the plain item response below (never
+            # relaid/consumed by the same request that placed it) — that
+            # was the "vanishing cabinet" bug. Later adds to an
+            # already-occupied wall may still trigger resolution.
+            if wall_had_cabinets:
+                walls_used = {
+                    (dl.wall or "back")
+                    for dl in design.cabinet_line_ids.filtered(
+                        lambda l: l.origin == "configurator"
+                        and l.layout_role != "derived"
+                        and l.cabinet_type not in ("filler", "panel"))
+                }
+                if len(walls_used) >= 2:
+                    design.action_auto_arrange(sync=False)
+                    return {"ok": True, "relaid": True,
+                            "payload": self._southbrook_design_payload(design)}
         return {"ok": True, "item": {
             "id":            product.id,
             "product_id":    product.id,
