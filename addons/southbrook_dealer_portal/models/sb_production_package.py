@@ -35,6 +35,30 @@ class SbProductionPackage(models.Model):
     )
 
     # ------------------------------------------------------------------
+    # Portal authorization — which dealer owns this package
+    # ------------------------------------------------------------------
+    def _belongs_to_partner(self, partner):
+        """True IFF this package traces to a sale order owned by `partner`'s
+        commercial partner — via its source order line (P1 auto-emit) or, when
+        that's unset, its MO's sale line (sale_mrp). A package with no
+        traceable owning order is NOT exportable through the dealer portal
+        (deny by default). This is the object-level authorization the KD /
+        installation export routes must apply on top of the channel gate —
+        without it any dealer could enumerate pkg ids and download every other
+        customer's package data."""
+        self.ensure_one()
+        if not partner:
+            return False
+        line = self.sale_order_line_id
+        if not line and self.mo_id and "sale_line_id" in self.mo_id._fields:
+            line = self.mo_id.sale_line_id
+        order_partner = line.order_id.partner_id if line else False
+        if not order_partner:
+            return False
+        return (order_partner.commercial_partner_id
+                == partner.commercial_partner_id)
+
+    # ------------------------------------------------------------------
     # Helpers — cabinet box dimensions from cutlist
     # ------------------------------------------------------------------
     def _derive_box_dimensions(self) -> Optional[Tuple[float, float, float]]:
