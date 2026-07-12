@@ -109,9 +109,11 @@ class SouthbrookPayrollRun(models.Model):
         Payslip = self.env["southbrook.payroll.payslip"]
         Contract = self.env["southbrook.payroll.contract"]
         for run in self:
-            if run.state == "posted":
+            if run.state in ("posted", "paid"):
                 raise UserError(
-                    _("Cannot recompute payroll run %s: already posted.", run.name)
+                    _("Cannot recompute payroll run %s: it is already %s. "
+                      "Recomputing would delete the posted/paid payslips and "
+                      "orphan the journal entry.", run.name, run.state)
                 )
             # Drop any existing payslips so a recompute is idempotent.
             run.payslip_ids.unlink()
@@ -156,6 +158,14 @@ class SouthbrookPayrollRun(models.Model):
             if run.state not in ("computed",):
                 raise UserError(
                     _("Run %s must be Computed before Post.", run.name)
+                )
+            # Idempotency: even if the state was laundered back to 'computed'
+            # by a raw write(), a run that already booked a journal entry must
+            # not mint a second (orphaning the first via move_id overwrite).
+            if run.move_id:
+                raise UserError(
+                    _("Run %s already has journal entry %s; refusing to post "
+                      "a duplicate.", run.name, run.move_id.name)
                 )
             if not run.payslip_ids:
                 raise UserError(_("Run %s has no payslips to post.", run.name))

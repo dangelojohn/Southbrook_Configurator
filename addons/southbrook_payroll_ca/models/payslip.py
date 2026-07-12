@@ -6,6 +6,8 @@ the journal-entry-ready totals. A payroll_run is a parent that loops over
 employees and creates one payslip per employee for the period.
 """
 
+import re
+
 from odoo import _, api, fields, models
 
 from . import cra_calc
@@ -66,7 +68,7 @@ class SouthbrookPayrollPayslip(models.Model):
     # ------------------------------------------------------------------
     # Deduction math
     # ------------------------------------------------------------------
-    @api.depends("gross", "contract_id")
+    @api.depends("gross", "contract_id", "contract_id.pay_periods_per_year")
     def _compute_deductions(self):
         for rec in self:
             periods = (rec.contract_id.pay_periods_per_year or 26) if rec.contract_id else 26
@@ -82,16 +84,16 @@ class SouthbrookPayrollPayslip(models.Model):
             rec.federal_tax = fed_annual / periods
             rec.provincial_tax = prov_annual / periods
 
-    @api.depends("contract_id")
+    @api.depends("contract_id", "contract_id.additional_federal_tax_request")
     def _compute_additional_tax(self):
         for rec in self:
             raw = (rec.contract_id.additional_federal_tax_request or "") if rec.contract_id else ""
-            # Strip currency symbols / commas; tolerate empty.
-            cleaned = "".join(c for c in raw if c.isdigit() or c == "." or c == "-")
-            try:
-                rec.additional_tax = float(cleaned) if cleaned else 0.0
-            except ValueError:
-                rec.additional_tax = 0.0
+            # The field is free-text so it can carry a source annotation
+            # ("$25.00 / period — TD1 Jan 2026"). Extract the FIRST numeric
+            # token; the old digit-filter concatenated every digit in the
+            # string, turning "$25.00 ... 2026" into $25,002026 of withholding.
+            match = re.search(r"-?\d+(?:\.\d+)?", raw)
+            rec.additional_tax = float(match.group()) if match else 0.0
 
     @api.depends("gross", "cpp", "ei", "federal_tax", "provincial_tax", "additional_tax")
     def _compute_totals(self):
@@ -101,7 +103,7 @@ class SouthbrookPayrollPayslip(models.Model):
             )
             rec.net = rec.gross - rec.total_deductions
 
-    @api.depends("gross", "contract_id")
+    @api.depends("gross", "contract_id", "contract_id.wsib_rate_pct")
     def _compute_employer(self):
         for rec in self:
             rate = (rec.contract_id.wsib_rate_pct or cra_calc.WSIB_DEFAULT_RATE_PCT_2026) if rec.contract_id else cra_calc.WSIB_DEFAULT_RATE_PCT_2026
