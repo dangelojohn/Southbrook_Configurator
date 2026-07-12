@@ -213,3 +213,82 @@ class TestKitchenLayoutEngine(TransactionCase):
         self.assertEqual(br["wall"], "right")
         self.assertGreater(pl[br["id"]]["x"], 3000)
         self.assertLess(pl[br["id"]]["z"], 1000)
+
+    @staticmethod
+    def _mkw(cid, wall, seq, ct="base"):
+        return {"id": cid, "width_mm": 600,
+                "height_mm": 876 if ct != "wall" else 720,
+                "depth_mm": 600 if ct != "wall" else 320,
+                "family": ct if ct == "wall" else "base", "cabinet_type": ct,
+                "zone": "wall" if ct == "wall" else "base_run",
+                "wall": wall, "run_seq": seq}
+
+    def _assert_clean(self, r, room):
+        """No two footprints overlap and every cabinet is within the room —
+        the load-bearing manufacturability invariant."""
+        pl = {p["id"]: p for p in r["placements"]}
+        fps = [(c["id"], E.footprint_mm(c, pl[c["id"]])) for c in r["cabinets"]]
+        for i in range(len(fps)):
+            for j in range(i + 1, len(fps)):
+                self.assertFalse(
+                    E.footprints_overlap(fps[i][1], fps[j][1]),
+                    "overlap: %s vs %s" % (fps[i][0], fps[j][0]))
+        for c in r["cabinets"]:
+            self.assertTrue(E.within_room(c, pl[c["id"]], room),
+                            "outside room: %s" % (c["id"],))
+        return pl
+
+    def test_resolve_front_left_corner(self):
+        # front-left has a low-end host (front run's origin), same model as
+        # back-right — corner joins the front run at run_seq -1.
+        cabs = ([self._mkw(("F", s), "front", s) for s in range(4)]
+                + [self._mkw(("L", s), "left", s) for s in range(3)])
+        r = E.resolve_and_layout(cabs, ROOM, auto_assign=False)
+        fl = [c for c in r["cabinets"] if c.get("corner") == "front-left"]
+        self.assertEqual(len(fl), 1)
+        self.assertEqual(fl[0]["wall"], "front")
+        self.assertEqual(fl[0]["run_seq"], -1)
+        pl = self._assert_clean(r, ROOM)
+        # sits in the front-left cell: low x, high z (near the front wall)
+        self.assertLess(pl[fl[0]["id"]]["x"], 1000)
+        self.assertGreater(pl[fl[0]["id"]]["z"], 2000)
+
+    def test_resolve_front_right_standalone_and_cap(self):
+        # front-right is "both-high" — neither wall's low end is at it, so the
+        # corner is placed STANDALONE (explicit pose) and the two runs are
+        # capped. Long runs (front 6, right 5) force the cap pass to fire.
+        cabs = ([self._mkw(("F", s), "front", s) for s in range(6)]
+                + [self._mkw(("R", s), "right", s) for s in range(5)])
+        r = E.resolve_and_layout(cabs, ROOM, auto_assign=False)
+        fr = [c for c in r["cabinets"] if c.get("corner") == "front-right"]
+        self.assertEqual(len(fr), 1)
+        self.assertIsNotNone(fr[0].get("__pose"))         # standalone
+        self.assertNotIn("run_seq", fr[0])                 # not joined to a run
+        self.assertGreaterEqual(len(fr[0]["replaced_ids"]), 1)   # cap fired
+        # the capped cabinets are truly gone from the output
+        out_ids = {c["id"] for c in r["cabinets"]}
+        for cid in fr[0]["replaced_ids"]:
+            self.assertNotIn(cid, out_ids)
+        pl = self._assert_clean(r, ROOM)
+        self.assertGreater(pl[fr[0]["id"]]["x"], 3000)     # near (W, D)
+        self.assertGreater(pl[fr[0]["id"]]["z"], 2000)
+
+    def test_resolve_full_g_shape_four_corners(self):
+        # All four walls occupied → all four corners reserved, nothing
+        # overlaps, each corner in its own quadrant.
+        big = {"width_mm": 6000, "depth_mm": 5000, "height_mm": 2400}
+        cabs = []
+        for wall in ("back", "left", "right", "front"):
+            cabs += [self._mkw((wall, s), wall, s) for s in range(5)]
+        r = E.resolve_and_layout(cabs, big, auto_assign=False)
+        corners = sorted(c["corner"] for c in r["cabinets"]
+                         if c.get("corner_cabinet"))
+        self.assertEqual(
+            corners, ["back-left", "back-right", "front-left", "front-right"])
+        pl = self._assert_clean(r, big)
+        q = {c["corner"]: pl[c["id"]] for c in r["cabinets"]
+             if c.get("corner_cabinet")}
+        self.assertTrue(q["back-left"]["x"] < 3000 and q["back-left"]["z"] < 2500)
+        self.assertTrue(q["back-right"]["x"] > 3000 and q["back-right"]["z"] < 2500)
+        self.assertTrue(q["front-left"]["x"] < 3000 and q["front-left"]["z"] > 2500)
+        self.assertTrue(q["front-right"]["x"] > 3000 and q["front-right"]["z"] > 2500)

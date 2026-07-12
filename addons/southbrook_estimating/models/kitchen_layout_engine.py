@@ -237,13 +237,23 @@ def layout(cabinets, room,
     if wall_start_offsets is None:
         wall_start_offsets = {}
 
-    runs = _resolve_runs(cabinets)
+    # A cabinet may carry an explicit `__pose` (x/y/z/rotation_deg) — used for
+    # "standalone" corner cabinets that don't belong to any run (a both-high
+    # corner like front-right, where neither wall's low end is at the corner
+    # so it can't be positioned by joining a run). Placed verbatim; consumes
+    # no cursor.
+    runs = _resolve_runs([c for c in cabinets if not c.get("__pose")])
 
     # Accumulate along-wall cursors per (wall, cursor_name) and place. A
     # wall's run may start past a reserved footprint (a corner cabinet on
     # the adjoining wall) via wall_start_offsets[wall].
     cursors = {}
     placed_by_id = {}
+    for cab in cabinets:
+        if cab.get("__pose"):
+            pose = dict(cab["__pose"])
+            pose["id"] = cab.get("id")
+            placed_by_id[id(cab)] = pose
     for wall, run in runs.items():
         for cab in run:
             run_key = _cabinet_run_key(cab, zone_layout, worktop_cursor)
@@ -367,10 +377,22 @@ def auto_assign_walls(cabinets, room, wall_order=("back", "left")):
 #                end → also offset it by cs) or "last" (its high end simply
 #                terminates at the cell → no offset).
 #   handed     — corner handedness hint for downstream SKU selection.
-# Front corners are detected but not yet reserved (need a front wall UX).
+# Covers every corner that has a LOW-end host (a run whose origin is at the
+# corner). front-right has neither wall's low end at it → _CORNER_STANDALONE.
 _CORNER_RESOLVE = {
-    "back-left":  ("back",  "left", "first", "L"),
-    "back-right": ("right", "back", "last",  "R"),
+    "back-left":   ("back",  "left",  "first", "L"),
+    "back-right":  ("right", "back",  "last",  "R"),
+    "front-left":  ("front", "left",  "last",  "R"),
+}
+
+# "Both-high" corners: neither wall's LOW end is at the corner, so the corner
+# cabinet can't be positioned by joining a run at run_seq -1. It is placed
+# STANDALONE (explicit __pose filling the reserved cell), and both adjoining
+# runs are capped — any standard cabinet overlapping the cell is removed
+# (replaced by the corner). Keyed by name → (x_key, z_key) of the cell's FAR
+# corner (the room corner); the cell is the cs-square inset from there.
+_CORNER_STANDALONE = {
+    "front-right": ("W", "D"),
 }
 
 
@@ -395,10 +417,11 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                         interactive flow, where the user placed each cabinet
                         on a wall) and just resolve corners in place.
 
-    Resolves the two BACK corners (back-left + back-right) — an L
-    (back+left) or a U (left+back+right). The two FRONT corners are still
-    detected + returned but not footprint-reserved (they need a front-wall
-    UX before they're reachable).
+    Resolves ALL FOUR inside corners: back-left, back-right and front-left
+    have a low-end host (a run whose origin sits at the corner) so the corner
+    cabinet joins that run at run_seq -1; front-right is "both-high" (neither
+    wall's low end is there) so it is placed standalone in its cell and both
+    adjoining runs are capped. Handles an L, a U, or a full G-shape.
 
     Returns {"cabinets", "placements", "corners", "inserted"}.
     """
@@ -408,6 +431,10 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     inserted = []
     removed_ids = set()
     offsets = {}
+    standalone_cells = []   # [(cell_aabb, corner_node)] for the cap pass
+    room_w = room.get("width_mm", 0)
+    room_d = room.get("depth_mm", 0)
+    zl = layout_kwargs.get("zone_layout") or _DEFAULT_ZONE_LAYOUT
 
     def _run_end(cabs, wall, layer, end):
         run = [c for c in cabs if (c.get("wall") or "back") == wall
@@ -416,11 +443,39 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         return pick(run, key=lambda c: c.get("run_seq", 0), default=None)
 
     for corner in corners:
+        layer = corner["layer"]
+        if corner["corner"] in _CORNER_STANDALONE:
+            # Both-high corner (front-right): place the corner cabinet
+            # STANDALONE filling its cell, and mark the cell for the cap pass.
+            cell = (room_w - corner_size_mm, room_w,
+                    room_d - corner_size_mm, room_d)
+            y_floor = zl.get("wall" if layer == "wall" else "base_run",
+                             ("ground", 0, 0))[1]
+            node = {
+                "id": "corner-%s-%s" % (corner["corner"], layer),
+                "corner_cabinet": True,
+                "corner": corner["corner"],
+                "handed": "L",
+                "layer": layer,
+                "cabinet_type": "wall" if layer == "wall" else "base",
+                "family": "wall" if layer == "wall" else "base",
+                "width_mm": corner_size_mm,
+                "depth_mm": corner_size_mm,
+                "height_mm": _CORNER_HEIGHT_MM[layer],
+                "zone": "wall" if layer == "wall" else "base_run",
+                "wall": "right",
+                # Explicit pose (rot 0) whose AABB is exactly the cell.
+                "__pose": {"x": room_w - corner_size_mm / 2.0, "y": y_floor,
+                           "z": room_d - corner_size_mm, "rotation_deg": 0},
+                "replaced_ids": [],
+            }
+            inserted.append(node)
+            standalone_cells.append((cell, node))
+            continue
         spec = _CORNER_RESOLVE.get(corner["corner"])
         if spec is None:
-            continue   # front corners detected but not yet footprint-reserved
+            continue   # remaining corners not yet footprint-reserved
         host_wall, other_wall, other_end, handed = spec
-        layer = corner["layer"]
         # The corner cabinet REPLACES the two standard cabinets that meet at
         # the corner — otherwise they'd overlap the corner cell / overflow.
         # It JOINS the run whose LOW end is at this corner (host_wall) at
@@ -460,6 +515,28 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     final.extend(dict(n) for n in inserted)
     placements = layout(final, room, wall_start_offsets=offsets,
                         **layout_kwargs)
+
+    # Cap pass — a standalone (both-high) corner reserves its cell but can't
+    # push a run past it the way a low-end join does, so any standard cabinet
+    # overlapping the cell is removed (replaced by that corner) and the layout
+    # re-run. The overlappers are always the runs' HIGH-end cabinets, so
+    # dropping them never shifts a survivor into the cell — one pass converges.
+    if standalone_cells:
+        place_by_id = {p["id"]: p for p in placements}
+        capped = set()
+        for cell, node in standalone_cells:
+            for c in final:
+                if c.get("corner_cabinet") or c["id"] in capped:
+                    continue
+                if footprints_overlap(
+                        footprint_mm(c, place_by_id[c["id"]]), cell):
+                    capped.add(c["id"])
+                    node["replaced_ids"].append(c["id"])
+        if capped:
+            removed_ids |= capped
+            final = [c for c in final if c["id"] not in capped]
+            placements = layout(final, room, wall_start_offsets=offsets,
+                                **layout_kwargs)
 
     # Enforced postcondition: every emitted layout is physically valid.
     # If a cabinet spilled outside the room, the walls can't hold the run —
