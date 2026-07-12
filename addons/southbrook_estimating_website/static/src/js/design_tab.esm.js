@@ -959,6 +959,9 @@ export class KitchenDesignTab extends Component {
                 {
                     product_id: product.product_id,
                     x_position_in: dropX,
+                    // Phase 3 — if a wall is selected, the cabinet lands on it
+                    // (the server places + orients it via the layout engine).
+                    wall: this.state.activeWall || null,
                 },
             );
             if (res && res.error) {

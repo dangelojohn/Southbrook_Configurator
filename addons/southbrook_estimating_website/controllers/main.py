@@ -2753,7 +2753,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         methods=["POST"],
     )
     def southbrook_api_design_3d_add(self, order_id, product_id,
-                                      x_position_in=None, **kw):
+                                      x_position_in=None, wall=None, **kw):
         """Add a cabinet from the inventory panel into the scene. Only
         southbrook_is_cabinet products can be dropped — this is a plain
         catalog pick (a fixed, already-priced SKU), not the attribute-
@@ -2833,6 +2833,16 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         while layout_key in existing_keys:
             suffix += 1
             layout_key = "%s-%d" % (base_key, suffix)
+        # Phase 3 — if the user has a wall selected, the cabinet lands on it.
+        # Assign the wall + the next run position; the engine then computes
+        # the exact x/y/z + rotation (below).
+        if wall not in ("back", "left", "right", "front"):
+            wall = None
+        line_wall = wall or "back"
+        same_wall = design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator"
+            and (l.wall or "back") == line_wall)
+        run_seq = max(same_wall.mapped("run_seq") or [-1]) + 1
         Line = request.env["southbrook.kitchen.design.line"].sudo()
         line = Line.create({
             "design_id":     design.id,
@@ -2840,6 +2850,8 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             "quantity":      1,
             "price_unit":    price,
             "cabinet_type":  cabinet_type,
+            "wall":          line_wall,
+            "run_seq":       run_seq,
             "width_in":      tmpl.southbrook_width_in or 24.0,
             "height_in":     tmpl.southbrook_height_in or (
                 30.0 if cabinet_type == "wall" else 34.5),
@@ -2853,6 +2865,12 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             "layout_key":    layout_key,
             "origin":        "configurator",
         })
+        # Phase 3 — when a wall is selected, place the new cabinet on it via
+        # the pure engine (snaps to the next free position, auto-orients).
+        # Only the NEW line is repositioned; existing cabinets (incl. D8
+        # mount heights) are untouched.
+        if wall:
+            self._sb_place_line_on_wall(design, line)
         return {"ok": True, "item": {
             "id":            product.id,
             "product_id":    product.id,
@@ -2873,6 +2891,54 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             "price":         line.price_unit,
             "quantity":      line.quantity,
         }}
+
+    def _sb_place_line_on_wall(self, design, new_line):
+        """Compute the new cabinet's x/y/z + rotation on its assigned wall
+        via the pure layout engine, then write ONLY that line. The engine
+        lays out the whole wall run (so the new unit snaps to the next free
+        position after the cabinets already there), but we persist just the
+        new line — existing cabinets keep their positions and any D8 mount
+        heights untouched."""
+        SaleOrder = request.env["sale.order"]
+        MM, IN = 25.4, 1.0 / 25.4
+        cabs = []
+        for dl in design.cabinet_line_ids:
+            if dl.origin != "configurator":
+                continue
+            if dl.cabinet_type in ("filler", "panel"):
+                continue
+            is_wall = dl.cabinet_type == "wall"
+            cabs.append({
+                "id": dl.id,
+                "width_mm": (dl.width_in or 0) * MM,
+                "height_mm": (dl.height_in or 0) * MM,
+                "depth_mm": (dl.depth_in or 0) * MM,
+                "family": "wall" if is_wall else "base",
+                "cabinet_type": dl.cabinet_type,
+                "zone": dl.zone or ("wall" if is_wall else "base_run"),
+                "wall": dl.wall or "back",
+                "run_seq": dl.run_seq or 0,
+            })
+        if not cabs:
+            return
+        room = {
+            "width_mm":  (design.room_width_in or 0) * MM,
+            "depth_mm":  (design.room_depth_in or 0) * MM,
+            "height_mm": (design.room_height_in or 0) * MM,
+        }
+        places = {p["id"]: p for p in kitchen_layout_engine.layout(
+            cabs, room,
+            zone_layout=SaleOrder._ZONE_LAYOUT,
+            worktop_cursor=SaleOrder._WORKTOP_CURSOR,
+            worktop_y=SaleOrder._WORKTOP_Y_FLOOR)}
+        p = places.get(new_line.id)
+        if p:
+            new_line.write({
+                "x_position_in": p["x"] * IN,
+                "y_position_in": p["y"] * IN,
+                "z_position_in": p["z"] * IN,
+                "rotation_deg":  p["rotation_deg"],
+            })
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d/remove",
