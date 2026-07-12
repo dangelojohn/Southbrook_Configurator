@@ -131,6 +131,41 @@ restore repair its own review, where the risk actually lives.
 
 ---
 
+## 5a. Canonical boot contract (normative as of PR2.5)
+
+The backend configurator's boot sequence is a **contract**, not an implementation detail.
+Any change to it is an architectural change and must be reviewed as one.
+
+```
+NEW design (no design_id):            EXISTING design (design_id present):
+  products                              products
+  user_defaults                         user_defaults
+  /layout   (generator seeds items)     load_design_lines  (canonical lines seed items)
+                                        render — /layout MUST NOT run, on boot or at any
+                                        later point in the session (the generator has no
+                                        knowledge of saved state and save_design is a
+                                        full-replace writer: regenerate-then-save is the
+                                        destructive-overwrite path PR2.5 closed)
+```
+
+Edge case: a `design_id` whose design has **zero saved configurator lines** boots via the
+NEW-design path (generator), and stays on it until the first real save.
+
+## 5b. Architectural note — the `extractProps` params gap (systemic, not wall-specific)
+
+Root cause verified against the vendored Odoo 19 web source (`action_service.js`):
+client-action components receive `props = {action, actionId, …}`; **`action.params` is
+only flattened onto props when the client action defines `extractProps`** — this
+component never did, so **every** value `action_open_configurator` passed
+(`design_id`, `room_width_in/depth/height`, `partner_id`, `filler_strategy`,
+`soffit_height_in`, `wall_cab_top_alignment`) silently arrived as `undefined` and fell
+back to defaults. Consequences went well beyond walls: saved room dimensions ignored,
+the D3 partner→channel-pricelist forwarding dead (always retail), filler/soffit/
+alignment presets ignored. PR2.5 fixed the intake (`props.action.params` with flat-prop
+fallback). **Standing rule:** any Odoo 19 client action in this codebase that consumes
+`params` must read them from `props.action.params` (or define `extractProps`) — audit
+this whenever a client action "mysteriously uses defaults."
+
 ## 6. Verification ledger
 
 - **Verified (read at cited lines, this session):** every `file:line` in §§1–4.
