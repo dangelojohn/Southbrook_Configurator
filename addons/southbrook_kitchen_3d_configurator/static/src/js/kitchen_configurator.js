@@ -53,6 +53,13 @@ class SouthbrookKitchenConfigurator extends Component {
             products:  [],
             items:     [],
             selected:  null,
+            // PR1 — which room wall is the active target. Owned here as
+            // pure UI state only; the shared <KitchenCanvas> does all the
+            // wall hover/click/highlight/raycast and reports the pick via
+            // onWallSelect. Nothing downstream reads this yet, so
+            // placement / save / rendering are intentionally unaffected
+            // (that arrives in PR2/PR3/PR4).
+            activeWall: null,
             summary:   { base_count: 0, wall_count: 0, total: 0, price: 0, remainder_in: 0 },
             designId:  this.props.design_id || null,
             designName: this.props.design_name || "",
@@ -1251,6 +1258,22 @@ class SouthbrookKitchenConfigurator extends Component {
             thermoplastic:  "Thermoplastic",
         })[k] || k;
     }
+
+    // PR1 — the shared <KitchenCanvas> owns the wall hover/click/highlight
+    // + raycasting; it reports the picked wall through the onWallSelect
+    // prop, which routes here. The configurator only records it as UI
+    // state — no placement / save / render path reads state.activeWall
+    // yet (PR2/PR3/PR4), so straight-kitchen behaviour is unchanged.
+    _onWallSelect(wall) {
+        this.state.activeWall = wall;
+    }
+
+    // Display label for the active-wall indicator; falsy (no wall picked
+    // yet) renders as "None". Mirrors _materialLabel's map-with-fallback
+    // shape above.
+    _wallLabel(wall) {
+        return { back: "Back", left: "Left", right: "Right", front: "Front" }[wall] || "None";
+    }
 }
 
 // ─── OWL Template ─────────────────────────────────────────────────────────────
@@ -1531,6 +1554,8 @@ SouthbrookKitchenConfigurator.template = xml`
                      view="state.view" selected="state.selected"
                      draggedProduct="state.draggedProduct"
                      dragHover="state.dragHover"
+                     activeWall="state.activeWall"
+                     onWallSelect="(w) => this._onWallSelect(w)"
                      onSelectItem="(item) => this._onCanvasSelect(item)"
                      onMoveItem="(p) => this._onCanvasMove(p)"
                      onResizeRoom="(nw, f) => this._onCanvasResize(nw, f)"
@@ -1554,6 +1579,16 @@ SouthbrookKitchenConfigurator.template = xml`
           <t t-esc="(state.room.width_in / 12).toFixed(1)"/>′ W
           <span class="o_sbk_count_dim_x">×</span>
           <t t-esc="(state.room.depth_in / 12).toFixed(1)"/>′ D
+        </span>
+        <!-- PR1 — active-wall indicator. The room itself is the selector
+             (hover glow + click-to-select are handled inside
+             <KitchenCanvas>); this mirrors the picked wall as text so the
+             active target is obvious even away from the 3D outline. Reads
+             "None" until a wall is clicked. -->
+        <span class="o_sbk_count_sep">•</span>
+        <span class="o_sbk_count_item" role="status" aria-live="polite">
+          <span class="o_sbk_count_label">Active Wall: </span>
+          <strong t-esc="_wallLabel(state.activeWall)"/>
         </span>
         <t t-if="state.summary.price &gt; 0">
           <span class="o_sbk_count_sep">•</span>
