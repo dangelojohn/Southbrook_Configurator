@@ -28,11 +28,14 @@ Time-bound expiry:
   payload.ts + ttl against current time. Expired payloads are logged
   with result='expired'.
 """
+import html
 import json
 import logging
 import os
 import re
 import time
+
+from markupsafe import escape as _html_escape
 
 from odoo import http
 from odoo.exceptions import AccessError
@@ -109,6 +112,43 @@ def _remember_client_uuid(client_uuid, response):
         return
     _CLIENT_UUID_CACHE[client_uuid] = (int(time.time()), response)
 
+# PIN brute-force throttle for the public /sb/qr/identify route. Short
+# operator PINs (3-12 digits) over an unauthenticated endpoint are trivially
+# brute-forced without a limit. Per-IP failed-attempt counter, process-local
+# (same rationale as the client_uuid cache above): tight enough to stop a
+# single-source sweep, loose enough not to lock out a fat-fingered operator.
+_PIN_FAIL = {}  # ip -> (window_start_unix, fail_count)
+_PIN_MAX_FAILS = 5
+_PIN_WINDOW_SEC = 300
+_PIN_FAIL_CAP = 4096
+
+
+def _pin_rate_limited(ip):
+    """True if this IP is over its failed-PIN budget for the current window."""
+    now = int(time.time())
+    start, cnt = _PIN_FAIL.get(ip, (now, 0))
+    if now - start > _PIN_WINDOW_SEC:
+        return False
+    return cnt >= _PIN_MAX_FAILS
+
+
+def _pin_record_fail(ip):
+    now = int(time.time())
+    start, cnt = _PIN_FAIL.get(ip, (now, 0))
+    if now - start > _PIN_WINDOW_SEC:
+        _PIN_FAIL[ip] = (now, 1)
+    else:
+        _PIN_FAIL[ip] = (start, cnt + 1)
+    if len(_PIN_FAIL) > _PIN_FAIL_CAP:
+        cutoff = now - _PIN_WINDOW_SEC
+        for k in [k for k, (s, _c) in list(_PIN_FAIL.items()) if s < cutoff]:
+            _PIN_FAIL.pop(k, None)
+
+
+def _pin_record_success(ip):
+    _PIN_FAIL.pop(ip, None)
+
+
 # W035 (R8.14) — operator identity in the session.
 # Session keys:
 #   sbk_operator_employee_id   int  hr.employee.id resolved from PIN
@@ -147,13 +187,21 @@ class QrScanController(http.Controller):
                                  source="http")
         if result.get("ok") and result.get("act_window"):
             aw = result["act_window"]
-            redirect_url = f"/odoo/action-{aw['res_model']}/{aw['res_id']}"
+            # v19 record-open URL is /odoo/<model>/<id>; the `action-` prefix
+            # is reserved for numeric action ids, so `action-<model>` never
+            # resolves (the tablet GET redirect landed on a dead URL).
+            redirect_url = f"/odoo/{aw['res_model']}/{aw['res_id']}"
             return request.redirect(redirect_url)
+        # Escape every interpolated value: result['error'] echoes the raw
+        # (attacker-controlled, pre-signature-check) payload, so an
+        # unescaped f-string here is a reflected XSS in the authenticated
+        # session. markupsafe.escape covers the text nodes; the JSON blob is
+        # escaped too (JSON does not neutralise </>&).
         body = (
             "<html><body style='font-family:system-ui;padding:2rem'>"
-            f"<h2>QR scan: {result.get('result', 'error')}</h2>"
-            f"<p>{result.get('error') or result.get('record_name','')}</p>"
-            f"<pre>{json.dumps(result, indent=2)[:1000]}</pre>"
+            f"<h2>QR scan: {_html_escape(result.get('result', 'error'))}</h2>"
+            f"<p>{_html_escape(result.get('error') or result.get('record_name', ''))}</p>"
+            f"<pre>{_html_escape(json.dumps(result, indent=2)[:1000])}</pre>"
             "</body></html>"
         )
         return request.make_response(body, headers=[
@@ -169,7 +217,7 @@ class QrScanController(http.Controller):
     # confirms the move.
     # ------------------------------------------------------------------
 
-    @http.route("/sb/qr/inventory/bin-inspect", type="json", auth="user",
+    @http.route("/sb/qr/inventory/bin-inspect", type="jsonrpc", auth="user",
                 methods=["POST"])
     def bin_inspect(self, bin=None, **kw):
         """Read-only helper for the W073 BinScanScreen.
@@ -269,10 +317,15 @@ class QrScanController(http.Controller):
             "title": title,
             "app_name": app_name,
         })
+        # request.render() returns a LAZY QWeb response whose body is only
+        # materialised at WSGI-serialisation time — reading get_data() before
+        # that returns empty, and set_data() would then clobber the template
+        # with just the doctype (the OWL mount div would be lost). flatten()
+        # forces the render into the body first.
+        resp.flatten()
         body = resp.get_data(as_text=True)
         if not body.lstrip().lower().startswith("<!doctype"):
-            body = "<!DOCTYPE html>\n" + body
-            resp.set_data(body)
+            resp.set_data("<!DOCTYPE html>\n" + body)
         return resp
 
     @http.route("/sb/qr/sw.js", type="http", auth="public",
@@ -309,7 +362,7 @@ class QrScanController(http.Controller):
             ],
         )
 
-    @http.route("/sb/qr/shipping/load-unit", type="json", auth="user",
+    @http.route("/sb/qr/shipping/load-unit", type="jsonrpc", auth="user",
                 methods=["POST"])
     def load_unit(self, truck=None, unit=None, client_uuid=None, **kw):
         """Scan-to-load at the loading bay.
@@ -356,7 +409,7 @@ class QrScanController(http.Controller):
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
 
-    @http.route("/sb/qr/inventory/bin-scan", type="json", auth="user",
+    @http.route("/sb/qr/inventory/bin-scan", type="jsonrpc", auth="user",
                 methods=["POST"])
     def bin_scan(self, src=None, dst=None, product=None, qty=1.0,
                  client_uuid=None, **kw):
@@ -408,7 +461,12 @@ class QrScanController(http.Controller):
             except (TypeError, ValueError):
                 return {"ok": False, "error": "product must be int or sb:// payload"}
         try:
-            move = env["stock.move"].sudo()._scan_quick_move(
+            # NO sudo: this endpoint is auth="user" but that only means
+            # "logged in", not "may move stock". Run as the acting user so
+            # stock ACL/record rules apply — a user without Inventory rights
+            # gets AccessError instead of a silent privileged move. (The QR
+            # signature authenticates the *location*, not the *actor*.)
+            move = env["stock.move"]._scan_quick_move(
                 src_id, dst_id, product_id, qty=float(qty))
             result = {"ok": True, "move_id": move.id,
                       "message": f"Moved {qty} of product {product_id} from {src_id} to {dst_id}"}
@@ -417,7 +475,7 @@ class QrScanController(http.Controller):
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
 
-    @http.route("/sb/qr/pod/submit", type="json", auth="public",
+    @http.route("/sb/qr/pod/submit", type="jsonrpc", auth="public",
                 methods=["POST"], csrf=False)
     def pod_submit(self, payload=None, signature=None, photo=None,
                    recipient=None, client_uuid=None, **kw):
@@ -598,7 +656,7 @@ class QrScanController(http.Controller):
             "<div id='status' style='display:none'></div>"
             "</form>"
             "<script>"
-            "const PAYLOAD = " + repr(payload) + ";"
+            "const PAYLOAD = " + json.dumps(payload).replace("</", "<\\/") + ";"
             "const canvas = document.getElementById('sig');"
             "const ctx = canvas.getContext('2d');"
             # Make the canvas backing-store match its rendered size
@@ -698,6 +756,13 @@ class QrScanController(http.Controller):
         except ValueError:
             return request.make_response(
                 "Bad ids", headers=[("Content-Type", "text/plain")])
+        # Cap the batch: each label re-signs a payload and renders a QR PNG
+        # synchronously on the worker, so an unbounded `ids` list is a
+        # single-request worker-block DoS. 200 covers any real print run.
+        if len(id_list) > 200:
+            return request.make_response(
+                "Too many ids (max 200)", status=400,
+                headers=[("Content-Type", "text/plain")])
         Records = env[model].browse(id_list).exists()
         if not Records:
             return request.make_response(
@@ -712,7 +777,10 @@ class QrScanController(http.Controller):
         cells = []
         for rec in Records:
             qr = getattr(rec, "qr_image_base64", "") or ""
-            name = getattr(rec, "display_name", "") or f"id-{rec.id}"
+            # Escape display_name: record names are free text and land in
+            # this HTML unescaped otherwise (stored XSS when the labels page
+            # is later opened by another user).
+            name = html.escape(getattr(rec, "display_name", "") or f"id-{rec.id}")
             text_html = (
                 f'<div style="font-size:11pt;font-family:system-ui;'
                 f'text-align:center;padding:4px;word-break:break-all">'
@@ -742,7 +810,7 @@ class QrScanController(http.Controller):
         return request.make_response(body, headers=[
             ("Content-Type", "text/html; charset=utf-8")])
 
-    @http.route("/sb/qr/scan", type="json", auth="user", methods=["POST"])
+    @http.route("/sb/qr/scan", type="jsonrpc", auth="user", methods=["POST"])
     def scan_post(self, **kw):
         """JSON API entry — mobile + Flutter PWA."""
         payload = kw.get("payload")
@@ -759,7 +827,7 @@ class QrScanController(http.Controller):
     # W035 (R8.14) — operator identity via hr.employee.pin
     # ------------------------------------------------------------------
 
-    @http.route("/sb/qr/identify", type="json", auth="public",
+    @http.route("/sb/qr/identify", type="jsonrpc", auth="public",
                 csrf=False, methods=["POST"])
     def identify_operator(self, pin=None, **kw):
         """Resolve `hr.employee` from PIN and pin the employee id into
@@ -782,6 +850,10 @@ class QrScanController(http.Controller):
         # — Odoo's native PIN is stored as a string but is documented
         # numeric, and keeping it that way means we never PIN-match a
         # username/passphrase by accident.
+        ip = request.httprequest.remote_addr
+        if _pin_rate_limited(ip):
+            return {"ok": False,
+                    "error": "Too many attempts. Try again in a few minutes."}
         pin = (pin or "").strip()
         if not pin:
             return {"ok": False, "error": "PIN required"}
@@ -794,7 +866,9 @@ class QrScanController(http.Controller):
         if not emp:
             # Constant-time-ish: do NOT include hint about whether the
             # PIN exists for a deactivated employee. Single message.
+            _pin_record_fail(ip)
             return {"ok": False, "error": "Unknown PIN"}
+        _pin_record_success(ip)
         now = int(time.time())
         request.session[_SESSION_KEY_EMP] = emp.id
         request.session[_SESSION_KEY_AT] = now
@@ -806,7 +880,7 @@ class QrScanController(http.Controller):
             "timeout_min": timeout_sec // 60,
         }
 
-    @http.route("/sb/qr/switch-operator", type="json", auth="public",
+    @http.route("/sb/qr/switch-operator", type="jsonrpc", auth="public",
                 csrf=False, methods=["POST"])
     def switch_operator(self, **kw):
         """Clear the session operator binding. The next scan reverts
@@ -819,7 +893,7 @@ class QrScanController(http.Controller):
                 pass
         return {"ok": True}
 
-    @http.route("/sb/qr/whoami", type="json", auth="public",
+    @http.route("/sb/qr/whoami", type="jsonrpc", auth="public",
                 csrf=False, methods=["POST", "GET"])
     def whoami(self, **kw):
         """Return the currently-bound operator (if any). UI uses this
@@ -946,10 +1020,13 @@ class QrScanController(http.Controller):
             return {"ok": False, "result": "invalid_signature",
                     "error": "Forged or tampered QR code."}
 
-        # Resolve kind handler
+        # Resolve kind handler. resolve_kind returns the handler's
+        # AbstractModel recordset on a hit (which is *falsy* — empty
+        # recordset — so it must NOT be truthiness-tested; the
+        # AbstractModel-falsy trap) or the literal False on a miss.
         Kind = env["southbrook.qr.kind"]
         handler = Kind.resolve_kind(parsed["kind"])
-        if not handler:
+        if handler is False:
             Log.create({**log_vals, "result": "unknown_kind",
                         "error_message": parsed["kind"]})
             return {"ok": False, "result": "unknown_kind",

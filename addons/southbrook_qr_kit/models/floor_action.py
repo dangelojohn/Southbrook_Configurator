@@ -43,6 +43,8 @@ Backward compat:
   into the same shipping-unit.action_mark_delivered call so behaviour
   is byte-equal to the legacy path.
 """
+import json
+
 from odoo import _, api, models
 from odoo.exceptions import AccessError, UserError
 
@@ -262,7 +264,7 @@ class InstallCheckFloorKind(models.AbstractModel):
             "<div id='status' style='display:none'></div>"
             "</form>"
             "<script>"
-            "const PAYLOAD = " + repr(payload) + ";"
+            "const PAYLOAD = " + json.dumps(payload).replace("</", "<\\/") + ";"
             "async function submitIC(e) {"
             "  e.preventDefault();"
             "  const btn = document.getElementById('submit-btn');"
@@ -400,7 +402,7 @@ class TempLaborSigninFloorKind(models.AbstractModel):
             "<div id='status' style='display:none'></div>"
             "</form>"
             "<script>"
-            "const PAYLOAD = " + repr(payload) + ";"
+            "const PAYLOAD = " + json.dumps(payload).replace("</", "<\\/") + ";"
             "async function submitTL(e) {"
             "  e.preventDefault();"
             "  const btn = document.getElementById('submit-btn');"

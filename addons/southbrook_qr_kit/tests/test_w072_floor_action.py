@@ -16,6 +16,8 @@ Tests cover:
 from contextlib import contextmanager
 from unittest.mock import patch
 
+from werkzeug.wrappers import Response as _WResponse
+
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.southbrook_qr_kit.controllers import (
@@ -39,22 +41,12 @@ class _FakeRequest:
         self.uid = env.uid
 
     def make_response(self, body, status=200, headers=None):
-        # Mimic Odoo's http.Response surface so the controller helpers
-        # can keep calling request.make_response.
-        return _FakeResponse(body, status=status, headers=headers)
-
-
-class _FakeResponse:
-    def __init__(self, body, status=200, headers=None):
-        self.body = body
-        self.status_code = status
-        self.headers = headers or []
-
-    def get_data(self, as_text=False):
-        return self.body if as_text else self.body.encode("utf-8")
-
-    def set_data(self, body):
-        self.body = body
+        # Return a real werkzeug Response: v19's route return-validator
+        # (odoo.http Response._make_response) only accepts Response /
+        # werkzeug Response / str / bytes / None and rejects an ad-hoc
+        # object. werkzeug's Response already provides the status_code /
+        # get_data / set_data surface the controller + assertions use.
+        return _WResponse(body, status=status, headers=headers or [])
 
 
 @contextmanager
@@ -109,8 +101,11 @@ class TestW072FloorAction(TransactionCase):
              "southbrook.floor.action.kind.temp_labor_signin"),
         ):
             handler = self.Kind.resolve_kind(slug)
-            self.assertTrue(handler,
-                            "Kind '%s' must be registered" % slug)
+            # A hit returns the handler's (falsy, empty) AbstractModel
+            # recordset; a miss returns literal False. Assert the sentinel,
+            # not truthiness (AbstractModel-falsy trap).
+            self.assertIsNot(handler, False,
+                             "Kind '%s' must be registered" % slug)
             self.assertEqual(handler._name, model)
 
     def test_11_unknown_kind_returns_none(self):

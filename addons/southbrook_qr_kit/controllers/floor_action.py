@@ -142,8 +142,11 @@ class FloorActionController(http.Controller):
             return _plain("Rate limit exceeded. Try again shortly.",
                           status=429)
         Kind = env["southbrook.floor.action.kind"]
+        # resolve_kind returns a falsy (empty) AbstractModel recordset on
+        # a hit, or literal False on a miss — test the False sentinel, not
+        # truthiness (AbstractModel-falsy trap).
         handler = Kind.resolve_kind(action)
-        if not handler:
+        if handler is False:
             _log_floor(env, None, p or "", action or "", "unknown_kind",
                        error="No handler for action=%r" % action)
             return _plain("Unknown floor action: %s" % action, status=404)
@@ -198,7 +201,7 @@ class FloorActionController(http.Controller):
             body_or_resp = "<!DOCTYPE html>\n" + str(body_or_resp)
         return _html(body_or_resp)
 
-    @http.route("/sb/floor/<string:action>/submit", type="json",
+    @http.route("/sb/floor/<string:action>/submit", type="jsonrpc",
                 auth="public", methods=["POST"], csrf=False)
     def floor_submit(self, action=None, **body):
         """Process the kind's submission. JSON in, JSON out.
@@ -215,8 +218,10 @@ class FloorActionController(http.Controller):
             return {"ok": False, "error":
                     "Rate limit exceeded. Try again shortly."}
         Kind = env["southbrook.floor.action.kind"]
+        # AbstractModel-falsy trap: hit → falsy empty recordset, miss →
+        # literal False. Test the sentinel, not truthiness.
         handler = Kind.resolve_kind(action)
-        if not handler:
+        if handler is False:
             _log_floor(env, None, "", action or "", "unknown_kind",
                        error="No handler for action=%r" % action)
             return {"ok": False, "error":

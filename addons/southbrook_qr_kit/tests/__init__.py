@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+from . import test_security_hardening
 from . import test_w035_pin_operator
 from . import test_w037_offline_scan_queue
 from . import test_w038_dark_mode

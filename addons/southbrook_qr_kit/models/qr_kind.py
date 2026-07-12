@@ -22,7 +22,7 @@ Controller resolves the kind by walking env's registry for any
 AbstractModel inheriting southbrook.qr.kind with _kind_name == X.
 """
 from odoo import _, api, models
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import UserError
 
 
 class QrKind(models.AbstractModel):
@@ -65,12 +65,11 @@ class QrKind(models.AbstractModel):
         if not rec:
             raise UserError(
                 _("%s id=%s not found") % (self._target_model, ident))
-        # ACL check: read access to the record
-        try:
-            rec.check_access_rights("read")
-            rec.check_access_rule("read")
-        except AccessError:
-            raise
+        # ACL check: read access to the record. check_access() (v19)
+        # replaces the deprecated check_access_rights()/check_access_rule()
+        # pair and raises AccessError on denial, which the controller maps
+        # to result='access_denied'.
+        rec.check_access("read")
         return rec
 
     @api.model
@@ -80,7 +79,10 @@ class QrKind(models.AbstractModel):
         if action == "open":
             return {
                 "ok": True,
-                "redirect": f"/odoo/action-base.action_open_view/{record.id}",
+                # v19 record-open URL (the old `action-base.action_open_view`
+                # xmlid does not exist and the `action-` prefix is for numeric
+                # action ids only). JSON-API clients can follow this directly.
+                "redirect": f"/odoo/{self._target_model}/{record.id}",
                 "act_window": {
                     "type": "ir.actions.act_window",
                     "res_model": self._target_model,
