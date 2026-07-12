@@ -20,6 +20,7 @@ import logging
 from dateutil.relativedelta import relativedelta
 
 from odoo import api, fields, models
+from odoo.tools import config
 
 
 _logger = logging.getLogger(__name__)
@@ -46,14 +47,36 @@ class MailActivity(models.Model):
         Never touches open (active=True) activities. Safe to run daily.
         """
         cutoff = fields.Date.today() - relativedelta(days=days)
-        old = self.with_context(active_test=False).search([
+        domain = [
             ("active", "=", False),
             ("date_done", "!=", False),
             ("date_done", "<", cutoff),
-        ])
-        count = len(old)
-        if count:
+        ]
+        # Batched delete: the motivating scenario (per this module's docstring)
+        # is a table that has ballooned past 10M+ rows. Searching + unlinking
+        # the whole backlog in one shot would load it all into memory and hold
+        # one giant lock/transaction (OOM / replication lag / rollback-wedge on
+        # failure). Delete in bounded chunks, committing between them so each
+        # batch releases its locks and a mid-run failure keeps the progress
+        # already made. (TestCursor.commit is a savepoint, so this is test-safe.)
+        batch = 1000
+        count = 0
+        while True:
+            old = self.with_context(active_test=False).search(domain, limit=batch)
+            if not old:
+                break
+            n = len(old)
             old.unlink()
+            count += n
+            # Commit between batches in production so each chunk releases its
+            # locks and a mid-run failure keeps the progress already made. The
+            # search(limit) loop already bounds MEMORY; the commit bounds
+            # transaction/lock size. Skipped under --test-enable, where the
+            # TestCursor forbids commit (it would break test rollback).
+            if not config["test_enable"]:
+                self.env.cr.commit()
+            if n < batch:
+                break
         _logger.info(
             "W057 activity retention: trimmed %d done activities "
             "older than %d days",

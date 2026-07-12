@@ -118,11 +118,19 @@ class TestW019TodayPlanSections(TransactionCase):
     # ------------------------------------------------------------------
     def test_at_risk_when_mi_blocked_within_window(self):
         mo = self._make_mo("W019 At Risk")
+        # The 'at_risk' bucket is driven by the Manufacturing Intelligence
+        # signal (x_mi_status), which is owned by
+        # southbrook_manufacturing_intelligence — NOT a dependency of this
+        # module. Without it there is no way to put the MO into the blocked
+        # state this scenario needs, so skip rather than silently assert a
+        # bucket the standalone install can never reach.
+        if "x_mi_status" not in mo._fields:
+            self.skipTest(
+                "requires southbrook_manufacturing_intelligence (x_mi_status)")
         mo.action_confirm()
         self._set_all_clear(mo)
-        if "x_mi_status" in mo._fields:
-            mo.x_mi_status = "blocked"
-            mo.x_mi_blocker_count = 1
+        mo.x_mi_status = "blocked"
+        mo.x_mi_blocker_count = 1
         mo.date_deadline = datetime.combine(
             fields.Date.context_today(mo) + timedelta(days=2),
             datetime.min.time().replace(hour=12),

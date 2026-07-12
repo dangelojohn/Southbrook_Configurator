@@ -58,6 +58,14 @@ class TestW057ActivityRetention(TransactionCase):
         """Done + outside window -> gone."""
         old_act = self._make_activity()
         old_act._action_done()
+        # date_done is a STORED COMPUTED field (@api.depends('active') —
+        # archiving stamps it to now, but only when it is currently empty).
+        # Flush the computed value to the DB FIRST, otherwise the SQL backdate
+        # below is discarded: a later invalidate + read/search re-runs
+        # _compute_date_done from scratch (reading date_done as empty
+        # mid-compute) and resets it to today. Flushing persists it and clears
+        # the pending-compute flag, so the SQL value survives.
+        old_act.flush_recordset()
         # Force date_done to 100 days ago — bypass the compute.
         old_date = date.today() - timedelta(days=100)
         self.env.cr.execute(

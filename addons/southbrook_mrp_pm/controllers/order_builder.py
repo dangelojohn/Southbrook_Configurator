@@ -9,6 +9,7 @@ and return the new MO ids.
 """
 from odoo.exceptions import AccessError, MissingError, UserError
 from odoo.http import request
+from odoo.tools.translate import _
 
 from odoo.addons.southbrook_estimating_website.controllers.main import (
     SouthbrookOrderBuilderPortal,
@@ -30,10 +31,34 @@ class SouthbrookOrderBuilderPortalMRP(SouthbrookOrderBuilderPortal):
         except AccessError:
             return {"error": "forbidden"}
 
+        # Security (mirrors the parent's send_to_manufacturing guard, added in
+        # the 2026-07-11 audit): releasing an order to the shop floor is a
+        # STAFF action. _southbrook_resolve_order grants a portal
+        # customer/dealer (share=True) access to their own order for review,
+        # but the sudo() below runs as OdooBot — a share user must NOT be able
+        # to create MOs. Reject share callers, and honour the production-
+        # approval gate here too (defense-in-depth; the MO-create gate also
+        # enforces it, but returning a clean 'not_approved' beats a UserError).
+        if request.env.user.share:
+            return {
+                "error": "forbidden",
+                "message": _("Only staff may send an order to production."),
+            }
+        if ("production_approval_state" in order._fields
+                and order.production_approval_state != "approved"):
+            return {
+                "error": "not_approved",
+                "message": _(
+                    "Order has not passed production approval (state: %s)."
+                ) % order.production_approval_state,
+            }
+
         try:
             mos = order.with_user(request.env.user).sudo().action_send_to_production()
         except UserError as e:
             return {"error": "wrong_state", "message": str(e)}
+        except AccessError:
+            return {"error": "forbidden"}
 
         if not mos:
             return {

@@ -30,7 +30,7 @@ M3 + M7 of the Manufacturing PM JTBD gap analysis (2026-06-01):
 from datetime import timedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 PRODUCTION_APPROVAL_SELECTION = [
@@ -43,6 +43,38 @@ PRODUCTION_APPROVAL_SELECTION = [
 
 class SaleOrder(models.Model):
     _inherit = "sale.order"
+
+    _SBK_APPROVER_GROUP = "southbrook_mrp_pm.group_southbrook_production_approver"
+
+    # ──────────────────────────────────────────────────────────────────
+    # W009 hardening — governance controls must not be launderable by RPC
+    # ──────────────────────────────────────────────────────────────────
+    # The Approve/Reject buttons and the Force-Release page are gated in the
+    # view, but views only constrain the UI — a caller can still reach these
+    # fields via call_kw / XML-RPC write(). Without this guard, any user with
+    # write access to their own order (e.g. group_sale_salesman) could
+    # `write({"production_approval_state": "approved"})` or
+    # `write({"force_production_release": True})` directly and defeat the
+    # entire separation-of-duties the gate exists to enforce (the MO-create
+    # gate in mrp_production.py trusts exactly these two fields). We block the
+    # sensitive transitions at the model layer. Superuser/sudo is exempt so
+    # internal flows and the guarded actions (run as the acting user, who is
+    # an approver) keep working; the block bites RPC-capable NON-approvers.
+    def write(self, vals):
+        if not self.env.su:
+            if (vals.get("production_approval_state") == "approved"
+                    and not self.env.user.has_group(self._SBK_APPROVER_GROUP)):
+                raise AccessError(_(
+                    "Only a Production Approver may set an order to "
+                    "Production-Approved. Use Request Production, then have "
+                    "an approver Approve it."))
+            if ("force_production_release" in vals
+                    and vals["force_production_release"]
+                    and not self.env.user.has_group(
+                        "sales_team.group_sale_manager")):
+                raise AccessError(_(
+                    "Only a Sales Manager may set Force Production Release."))
+        return super().write(vals)
 
     # ──────────────────────────────────────────────────────────────────
     # Production approval state machine
@@ -239,6 +271,13 @@ class SaleOrder(models.Model):
         side-effects are bundled because the original view exposed
         only an Approve button — the operator's mental model is
         'approve = manufacture starts'."""
+        # Separation of duties: approving RELEASES production (creates MOs),
+        # so it is restricted to Production Approvers — enforced in the method
+        # body, not just the view button (views don't constrain call_kw).
+        if not self.env.su and not self.env.user.has_group(
+                self._SBK_APPROVER_GROUP):
+            raise AccessError(_(
+                "Only a Production Approver may approve production."))
         created = self.env["mrp.production"]
         for so in self:
             if so.production_approval_state != "pending":
