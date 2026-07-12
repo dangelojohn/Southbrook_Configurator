@@ -17,3 +17,6 @@ from . import test_m1_m2_reconcile_fixes
 # 2026-07-12 — auto-arrange lifecycle: idempotence, no canonical loss, no
 # derived accumulation, atomic rollback, mirror-reflects-visible.
 from . import test_auto_arrange_service
+
+# 2026-07-12 — COORDINATE_CONTRACT.md enforceability (living ledger).
+from . import test_coordinate_contract
