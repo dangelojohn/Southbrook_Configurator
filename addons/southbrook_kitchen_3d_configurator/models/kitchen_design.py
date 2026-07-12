@@ -465,9 +465,15 @@ class SouthbrookKitchenDesign(models.Model):
             # (reactivate) any superseded canonical cabinets. This prevents
             # lineage chains (A+B→C, then C+D→E) and guarantees idempotence:
             # running N times yields identical state.
-            all_lines = design.with_context(active_test=False).cabinet_line_ids
-            all_lines.filtered(lambda l: l.layout_role == "derived").unlink()
-            all_lines.filtered(lambda l: not l.active).write({"active": True})
+            ctx = design.with_context(active_test=False)
+            # (a) restore superseded canonical cabinets FIRST (write only —
+            #     no deletions), then (b) delete derived artifacts. Order
+            #     matters: never re-filter a recordset across an unlink or we
+            #     touch a deleted record (MissingError). Each access is fresh.
+            ctx.cabinet_line_ids.filtered(
+                lambda l: not l.active).write({"active": True})
+            ctx.cabinet_line_ids.filtered(
+                lambda l: l.layout_role == "derived").unlink()
             design.invalidate_recordset(["cabinet_line_ids"])
 
             # Semantic cabinet list from the CANONICAL cabinets (now all
