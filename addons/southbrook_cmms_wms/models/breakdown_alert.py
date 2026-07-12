@@ -129,11 +129,17 @@ class SouthbrookCmmsBreakdownAlert(models.Model):
         except ValueError:
             warning_act_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
         mo_model = self.env["ir.model"]._get("mrp.production")
+        # NOTE: this is an ADVISORY flag — it posts a warning + activity on each
+        # affected MO but does NOT hard-stop the MO/workorder (imposing a real
+        # production block is a policy decision, see REVIEW_REPORT). The user-
+        # facing copy says "flagged", not "blocked", so it doesn't overstate.
         for rec in self:
             for mo in rec.affected_production_ids:
                 mo.message_post(
-                    body="Blocked by breakdown <b>%s</b> on equipment <b>%s</b>." % (
-                        rec.name, rec.equipment_id.display_name))
+                    body="Flagged by breakdown <b>%s</b> on equipment <b>%s</b> "
+                         "— do not run production on this equipment until the "
+                         "breakdown is cleared." % (
+                             rec.name, rec.equipment_id.display_name))
                 vals = {
                     "res_model_id": mo_model.id,
                     "res_id": mo.id,
@@ -149,7 +155,7 @@ class SouthbrookCmmsBreakdownAlert(models.Model):
             "tag": "display_notification",
             "params": {
                 "title": "Breakdown alert dispatched",
-                "message": "Blocked %d MO(s)." % sum(
+                "message": "Flagged %d MO(s) on the affected equipment." % sum(
                     len(r.affected_production_ids) for r in self),
                 "type": "warning",
                 "sticky": False,
