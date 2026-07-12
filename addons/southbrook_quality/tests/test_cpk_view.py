@@ -21,6 +21,9 @@ class TestCpkView(TransactionCase):
                     "measured_value": dim.nominal + rng.uniform(-0.1, 0.1),
                 }
             )
+        # The Cpk report is a SQL view reading the spc_sample TABLE directly;
+        # flush the ORM-pending sample INSERTs first or the view sees nothing.
+        self.env.flush_all()
         # Refresh view definition (idempotent) and re-query.
         Cpk.init()
         rows = Cpk.search(
