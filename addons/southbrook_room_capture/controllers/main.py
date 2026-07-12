@@ -9,7 +9,7 @@ Mirrors the pattern in addons/southbrook_estimating_website/controllers/
 room_api.py + main.py exactly:
   * ownership resolved via `_SouthbrookOrderAccessMixin._southbrook_resolve_order`
     (AccessError -> forbidden, MissingError -> not_found);
-  * type="json", auth="user", methods=["POST"];
+  * type="jsonrpc", auth="user", methods=["POST"];
   * handlers return plain dicts, success shape {"ok": True, ...},
     error shape {"error": "<code>", "detail": "<msg>"};
   * every ORM op is .sudo() (ownership already checked at this layer).
@@ -205,7 +205,7 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/analyze-photos",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -360,7 +360,7 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
     # ------------------------------------------------------------------
     @http.route(
         "/southbrook/api/order/<int:order_id>/scan-part",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -462,7 +462,7 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
 
     @http.route(
         "/southbrook/api/scan/lookup",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
