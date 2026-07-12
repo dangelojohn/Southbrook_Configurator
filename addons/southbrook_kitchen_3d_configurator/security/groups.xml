@@ -41,17 +41,13 @@
             <field name="comment">Full CRUD on any design.</field>
         </record>
 
-        <!-- Migration: assign every existing non-share internal user
-             to Manager so a -u upgrade preserves the pre-taxonomy
-             full-access default. Runs on -i and -u; idempotent. -->
-        <function model="res.groups" name="write">
-            <value eval="[ref('group_kitchen_manager')]"/>
-            <value eval="{'user_ids': [(4, u.id) for u in
-                obj().env['res.users'].search([
-                    ('group_ids', 'in', [ref('base.group_user')]),
-                    ('share', '=', False),
-                ])]}"/>
-        </function>
+        <!-- Migration: assign every existing non-share internal user to
+             Manager so -i/-u preserve the pre-taxonomy full-access default.
+             Idempotent. Implemented in Python (models/res_groups.py) because
+             `obj()` is unavailable inside a <value> child of <function> in
+             Odoo 19 — the former inline eval NameError'd and broke install. -->
+        <function model="res.groups"
+                  name="_southbrook_kitchen_sweep_managers"/>
 
     </data>
 </odoo>
