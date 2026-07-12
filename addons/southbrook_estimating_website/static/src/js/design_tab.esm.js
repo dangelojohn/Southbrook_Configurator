@@ -506,7 +506,15 @@ export class KitchenDesignTab extends Component {
                 {},
             );
             if (resp && resp.error) {
-                this.state.error = resp.error;
+                if (resp.error === "ROOM_TOO_SMALL") {
+                    const needIn = Math.round((resp.requested_mm || 0) / 25.4);
+                    const haveIn = Math.round((resp.capacity_mm || 0) / 25.4);
+                    this.state.error =
+                        `Not enough wall space for these cabinets (need ~${needIn}″, ` +
+                        `walls hold ~${haveIn}″). Remove cabinets or enlarge the room.`;
+                } else {
+                    this.state.error = resp.error;
+                }
                 return;
             }
         } catch (e) {

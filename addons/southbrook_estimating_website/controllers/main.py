@@ -2310,7 +2310,20 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         except AccessError:
             return {"error": "forbidden"}
         design = self._southbrook_get_or_create_design(order)
-        arrange = self._southbrook_auto_arrange(design)
+        # Atomic: the whole re-arrange (drop corners → engine → mutate design
+        # lines → mirror) runs in a savepoint. Any failure — including an
+        # impossible layout — rolls back cleanly, never leaving half-created
+        # cabinets.
+        try:
+            with request.env.cr.savepoint():
+                arrange = self._southbrook_auto_arrange(design)
+        except kitchen_layout_engine.LayoutCapacityExceeded as ex:
+            _logger.info("[auto-arrange] ROOM_TOO_SMALL order=%s cap=%.0f "
+                         "req=%.0f", order.id, ex.capacity_mm, ex.requested_mm)
+            return {"error": "ROOM_TOO_SMALL",
+                    "capacity_mm": ex.capacity_mm,
+                    "requested_mm": ex.requested_mm,
+                    "detail": ex.detail}
         return {"ok": True, "arrange": arrange,
                 "payload": self._southbrook_design_payload(design)}
 
@@ -2328,6 +2341,8 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         SaleOrder = request.env["sale.order"]
         IN = 1.0 / 25.4
         MM = 25.4
+        _t0 = time.time()
+        _logger.info("[auto-arrange] started design=%s", design.id)
 
         # Fresh start — drop corner cabinets left by a prior auto-arrange
         # so re-running is idempotent.
@@ -2435,9 +2450,17 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 design, {"created_orders": 0, "created_rooms": 0,
                          "created_lines": 0, "mirrored": 0, "divergence": 0})
         except Exception:
-            _logger.exception("[auto-arrange] sync reconcile failed for "
-                              "design %s", design.id)
+            # Do NOT swallow — re-raise so the enclosing savepoint rolls the
+            # whole re-arrange back. Never leave the design mutated but the
+            # manufacturing mirror stale.
+            _logger.exception("[auto-arrange] reconcile failed for design %s "
+                              "— rolling back", design.id)
+            raise
 
+        _logger.info("[auto-arrange] finished design=%s corners=%d removed=%d "
+                     "inserted=%d elapsed=%dms", design.id, len(r["corners"]),
+                     len(r["removed_ids"]), len(r["inserted"]),
+                     int((time.time() - _t0) * 1000))
         return {"corners": len(r["corners"]), "removed": len(r["removed_ids"]),
                 "inserted": len(r["inserted"])}
 

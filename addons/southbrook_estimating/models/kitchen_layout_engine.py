@@ -49,6 +49,78 @@ _WALL_SPEC = {
     "right": {"along": "z", "rot": 270},
 }
 
+ALLOWED_ROTATIONS = (0, 90, 180, 270)
+
+
+class LayoutCapacityExceeded(Exception):
+    """Raised when cabinets cannot physically fit the available walls.
+
+    Impossible layouts fail explicitly here rather than silently overflowing
+    the room (which would ship a non-manufacturable design). Carries the
+    numbers so a caller can surface e.g. ROOM_TOO_SMALL(capacity, requested).
+    """
+    def __init__(self, capacity_mm, requested_mm, detail=""):
+        self.capacity_mm = capacity_mm
+        self.requested_mm = requested_mm
+        self.detail = detail
+        super().__init__(
+            "layout exceeds wall capacity: requested %.0fmm > capacity "
+            "%.0fmm%s" % (requested_mm, capacity_mm,
+                          (" (%s)" % detail) if detail else ""))
+
+
+# ── Geometry helpers (shared by the engine + the invariant suite) ───────
+# Footprint math matches the engine's placement convention exactly: the
+# along-wall axis is CENTRED on the placement coord; the depth extends from
+# the wall face into the room, in the direction set by rotation_deg.
+
+def footprint_mm(cab, place):
+    """World-space AABB (x0, x1, z0, z1) of a placed cabinet."""
+    w = cab.get("width_mm", 0)
+    d = cab.get("depth_mm", 0)
+    x = place["x"]
+    z = place["z"]
+    rot = int(round(place.get("rotation_deg", 0))) % 360
+    if rot == 0:        # back: along +X, depth +Z
+        return (x - w / 2, x + w / 2, z, z + d)
+    if rot == 180:      # front: along +X, depth -Z
+        return (x - w / 2, x + w / 2, z - d, z)
+    if rot == 90:       # left: along +Z, depth +X
+        return (x, x + d, z - w / 2, z + w / 2)
+    # rot == 270        # right: along +Z, depth -X
+    return (x - d, x, z - w / 2, z + w / 2)
+
+
+def footprints_overlap(a, b, eps=1.0):
+    return (a[0] < b[1] - eps and b[0] < a[1] - eps and
+            a[2] < b[3] - eps and b[2] < a[3] - eps)
+
+
+def within_room(cab, place, room, eps=2.0):
+    W = room.get("width_mm", 0)
+    D = room.get("depth_mm", 0)
+    x0, x1, z0, z1 = footprint_mm(cab, place)
+    return (x0 >= -eps and x1 <= W + eps and z0 >= -eps and z1 <= D + eps)
+
+
+def wall_capacity_mm(room, wall_order):
+    """Total along-wall run length available across the walls in wall_order."""
+    lengths = _wall_lengths(room)
+    return sum(lengths.get(w, 0) for w in wall_order)
+
+
+def check_capacity(cabinets, room, wall_order=("back", "left")):
+    """Pre-flight capacity check (no raising). Returns
+    {ok, capacity_mm, requested_mm} where requested is the widest single
+    layer's total run length (base and wall layers each run the walls)."""
+    cap = wall_capacity_mm(room, wall_order)
+    per_layer = {"base": 0.0, "wall": 0.0}
+    for c in cabinets:
+        per_layer[_layer_of(c)] += c.get("width_mm", 0)
+    requested = max(per_layer.values()) if per_layer else 0.0
+    return {"ok": requested <= cap, "capacity_mm": cap,
+            "requested_mm": requested}
+
 # Fallback zone layout — the ORM caller MUST pass the model's authoritative
 # `sale.order._ZONE_LAYOUT` so there is exactly one source of truth. This
 # copy exists only so the pure module is self-contained for offline tests.
@@ -354,5 +426,19 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     final.extend(dict(n) for n in inserted)
     placements = layout(final, room, wall_start_offsets=offsets,
                         **layout_kwargs)
+
+    # Enforced postcondition: every emitted layout is physically valid.
+    # If a cabinet spilled outside the room, the walls can't hold the run —
+    # fail explicitly instead of returning an unmanufacturable layout.
+    by_id = {c["id"]: c for c in final}
+    place_by_id = {p["id"]: p for p in placements}
+    outside = [c["id"] for c in final
+               if not within_room(by_id[c["id"]], place_by_id[c["id"]], room)]
+    if outside:
+        cap = wall_capacity_mm(room, wall_order)
+        req = check_capacity(cabinets, room, wall_order)["requested_mm"]
+        raise LayoutCapacityExceeded(
+            cap, req, detail="%d cabinet(s) outside room" % len(outside))
+
     return {"cabinets": final, "placements": placements, "corners": corners,
             "inserted": inserted, "removed_ids": sorted(removed_ids)}
