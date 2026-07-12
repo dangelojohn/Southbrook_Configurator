@@ -4,6 +4,8 @@
 import { Component, onWillStart, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+// v19 removed the "user" service — it is now a plain import.
+import { user } from "@web/core/user";
 
 export class MorningBriefing extends Component {
     static template = "southbrook_exec_dashboard.MorningBriefing";
@@ -12,7 +14,6 @@ export class MorningBriefing extends Component {
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
-        this.user = useService("user");
         this.state = useState({
             loading: true,
             error: null,
@@ -27,10 +28,13 @@ export class MorningBriefing extends Component {
         this.state.loading = true;
         this.state.error = null;
         try {
+            // get_or_create_today reuses the day's snapshot instead of
+            // inserting a fresh row on every dashboard open / Refresh (which
+            // grew the table unbounded).
             const snapshotId = await this.orm.call(
                 "southbrook.exec_dashboard.snapshot",
-                "create",
-                [{}]
+                "get_or_create_today",
+                []
             );
             const records = await this.orm.read(
                 "southbrook.exec_dashboard.snapshot",
@@ -77,7 +81,7 @@ export class MorningBriefing extends Component {
     }
 
     get userName() {
-        return (this.user && this.user.name) ? this.user.name : "";
+        return user.name || "";
     }
 
     get asOfDisplay() {
@@ -146,7 +150,8 @@ export class MorningBriefing extends Component {
                 [false, "form"],
             ],
             domain: [
-                ["state", "in", ["open", "new", "in_progress"]],
+                ["state", "in", ["draft", "quarantine", "rework"]],
+                ["severity", "=", "critical"],
             ],
             target: "current",
         });

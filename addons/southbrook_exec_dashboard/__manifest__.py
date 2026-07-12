@@ -5,7 +5,7 @@
         "Single-pane mobile-first morning briefing for the GM/COO/CFO — "
         "9 tiles, 12 KPIs, sub-3s load"
     ),
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry / OdooIQ",
     "category": "Tools/Dashboards",
