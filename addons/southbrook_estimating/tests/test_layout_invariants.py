@@ -78,3 +78,21 @@ class TestLayoutInvariants(TransactionCase):
         a = E.resolve_and_layout(_base(10), _room(4000, 3000))
         b = E.resolve_and_layout(_base(10), _room(4000, 3000))
         self.assertEqual(a, b)
+
+    def test_auto_assign_false_respects_manual_walls(self):
+        # An L the user built by hand: cabinets pre-assigned to back + left.
+        # auto_assign=False must keep those walls and just resolve the corner.
+        room = _room(4000, 3000)
+        cabs = []
+        for i in range(4):
+            c = dict(_base(1)[0]); c.update(id="b%d" % i, wall="back", run_seq=i)
+            cabs.append(c)
+        for i in range(4):
+            c = dict(_base(1)[0]); c.update(id="l%d" % i, wall="left", run_seq=i)
+            cabs.append(c)
+        r = E.resolve_and_layout(cabs, room, auto_assign=False)
+        self.assertEqual(I.check_all(r, len(cabs), room), {})
+        self.assertEqual(len(r["inserted"]), 1)         # back-left corner
+        self.assertEqual(len(r["removed_ids"]), 2)
+        walls = {c.get("wall") for c in r["cabinets"]}
+        self.assertEqual(walls, {"back", "left"})       # not redistributed

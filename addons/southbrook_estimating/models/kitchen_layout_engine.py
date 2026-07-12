@@ -363,13 +363,20 @@ _CORNER_HEIGHT_MM = {"base": 876.0, "wall": 762.0}   # 34.5" / 30"
 
 
 def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
-                       wall_order=("back", "left"), **layout_kwargs):
-    """Full auto pipeline: distribute a flat cabinet list across walls,
-    detect inside corners, insert a corner-cabinet node at each resolved
-    corner (reserving its footprint so nothing overlaps), and lay everything
-    out. Pure + deterministic. The engine does NOT assign product SKUs — it
-    tags the inserted node `corner_cabinet=True` + corner/layer/handed and
-    the Odoo layer maps that to SB-CORNER* / SB-WALL-CORNER.
+                       wall_order=("back", "left"), auto_assign=True,
+                       **layout_kwargs):
+    """Full pipeline: (optionally distribute a flat cabinet list across
+    walls), detect inside corners, insert a corner-cabinet node at each
+    resolved corner (reserving its footprint so nothing overlaps), and lay
+    everything out. Pure + deterministic. The engine does NOT assign product
+    SKUs — it tags the inserted node `corner_cabinet=True` + corner/layer/
+    handed and the Odoo layer maps that to SB-CORNER* / SB-WALL-CORNER.
+
+    auto_assign=True  → wrap a flat list across walls (the button on an
+                        unassigned order).
+    auto_assign=False → RESPECT the cabinets' existing wall/run_seq (the
+                        interactive flow, where the user placed each cabinet
+                        on a wall) and just resolve corners in place.
 
     v1 resolves the back-left corner (what wall_order=('back','left')
     produces for an L). Other corners are detected + returned but not yet
@@ -377,7 +384,8 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
 
     Returns {"cabinets", "placements", "corners", "inserted"}.
     """
-    assigned = auto_assign_walls(cabinets, room, wall_order)
+    assigned = (auto_assign_walls(cabinets, room, wall_order) if auto_assign
+                else [dict(c) for c in cabinets])
     corners = detect_corners(assigned, room)
     inserted = []
     removed_ids = set()

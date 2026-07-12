@@ -495,6 +495,8 @@ class SouthbrookKitchenDesign(models.Model):
                     "family": "wall" if is_wall else "base",
                     "cabinet_type": dl.cabinet_type,
                     "zone": dl.zone or ("wall" if is_wall else "base_run"),
+                    "wall": dl.wall or "back",
+                    "run_seq": dl.run_seq or 0,
                 })
             if not cabs:
                 return {"corners": 0, "removed": 0, "inserted": 0, "empty": True}
@@ -504,8 +506,13 @@ class SouthbrookKitchenDesign(models.Model):
                 "depth_mm":  (design.room_depth_in or 0) * MM,
                 "height_mm": (design.room_height_in or 0) * MM,
             }
+            # If the user already placed cabinets on specific walls (the
+            # interactive flow), RESPECT that arrangement and just resolve
+            # corners; otherwise auto-distribute a flat list across walls.
+            manual = any((c.get("wall") or "back") != "back" for c in cabs)
             r = kitchen_layout_engine.resolve_and_layout(
                 cabs, room,
+                auto_assign=not manual,
                 zone_layout=SaleOrder._ZONE_LAYOUT,
                 worktop_cursor=SaleOrder._WORKTOP_CURSOR,
                 worktop_y=SaleOrder._WORKTOP_Y_FLOOR,
