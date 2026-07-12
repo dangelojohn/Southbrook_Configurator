@@ -45,15 +45,22 @@ export function buildWallCabinet(THREE, mk, palette, item) {
     const wbW = item.width_in  * IN;
     const wbH = item.height_in * IN;
     const wbD = item.depth_in  * IN;
-    // Local-frame build (side-wall group render): the cabinet sits at local
-    // y=0 and the enclosing THREE.Group's Y position supplies the mount
-    // height (from the design line's vertical elevation). Otherwise (legacy
-    // back-wall path) keep the D8 mount height (to_ceiling / to_soffit),
-    // falling back to WBY.
-    const wbY = item.__localFrame ? 0
-        : ((item.y_position_in != null && item.y_position_in !== 0)
-            ? item.y_position_in * IN
-            : WBY);
+    // PR3.1 — every cabinet now routes through the central THREE.Group
+    // transform (kitchen_canvas.esm.js::_placeCabinetGroup), which sets
+    // grp.position.y = item.y_position_in*IN unconditionally (it doesn't
+    // know per-type fallback rules). To stay byte-identical with the old
+    // legacy-path formula in BOTH branches, the local Y offset this builder
+    // contributes must be the complement of what the group already
+    // supplies: 0 when y_position_in is a real D8 mount height (group
+    // carries it), or WBY itself when y_position_in is falsy (group
+    // contributes 0, so the fallback has to live locally instead). Not
+    // just defensive — every current writer emits a real mount height, but
+    // this keeps the WBY fallback meaningful instead of silently dropping
+    // pre-D8/malformed rows to the floor.
+    const hasExplicitY = item.y_position_in != null && item.y_position_in !== 0;
+    const wbY = item.__localFrame
+        ? (hasExplicitY ? 0 : WBY)
+        : (hasExplicitY ? item.y_position_in * IN : WBY);
 
     const objects = [];
     const clickable = [];

@@ -272,33 +272,21 @@ export class KitchenCanvas extends Component {
 
         const items = props.items || [];
         const knownTypes = new Set(["base", "wall", "filler", "panel"]);
-        const push = ({ objects, clickable }) => {
-            this.T.cabObjs.push(...objects);
-            if (clickable) this.T.clickable.push(...clickable);
-        };
+        // PR3.1 — every cabinet type routes through the single central
+        // group-transform path (_placeCabinetGroup); the old per-type
+        // rotation-gated dual dispatch (legacy absolute path vs. group
+        // path) is gone. See _placeCabinetGroup's docstring for why this
+        // is byte-identical for rotation_deg=0 (back-wall) cabinets.
         items.filter(it => it.cabinet_type === "base").forEach(it =>
-            this._needsTransform(it)
-                ? this._placeCabinetGroup(it, buildBaseCabinet)
-                : push(buildBaseCabinet(THREE, mk, P, it)));
+            this._placeCabinetGroup(it, buildBaseCabinet));
         items.filter(it => it.cabinet_type === "wall").forEach(it =>
-            this._needsTransform(it)
-                ? this._placeCabinetGroup(it, buildWallCabinet)
-                : push(buildWallCabinet(THREE, mk, P, it)));
+            this._placeCabinetGroup(it, buildWallCabinet));
         items.filter(it => !knownTypes.has(it.cabinet_type)).forEach(it =>
-            this._needsTransform(it)
-                ? this._placeCabinetGroup(it, buildOtherCabinet)
-                : push(buildOtherCabinet(THREE, mk, P, it)));
-        items.filter(it => it.cabinet_type === "filler").forEach(it => {
-            if (this._needsTransform(it)) {
-                this._placeCabinetGroup(it, buildFillerPanel);
-            } else {
-                this.T.cabObjs.push(buildFillerPanel(THREE, mk, P, it));
-            }
-        });
+            this._placeCabinetGroup(it, buildOtherCabinet));
+        items.filter(it => it.cabinet_type === "filler").forEach(it =>
+            this._placeCabinetGroup(it, buildFillerPanel));
         items.filter(it => it.cabinet_type === "panel").forEach(it =>
-            this._needsTransform(it)
-                ? this._placeCabinetGroup(it, buildEndCapPanel)
-                : push(buildEndCapPanel(THREE, mk, P, it)));
+            this._placeCabinetGroup(it, buildEndCapPanel));
 
         const { handleMesh, arrowMeshes } =
             buildDragHandle(THREE, scene, P, rw, rd);
@@ -438,12 +426,27 @@ export class KitchenCanvas extends Component {
         return out;
     }
 
-    // Phase 2 renderer — place a cabinet as a THREE.Group carrying its world
-    // transform (x/y/z_position_in + rotation_deg per COORDINATE_CONTRACT).
-    // The builder builds in a LOCAL frame (x_position_in forced to 0); the
-    // group applies the world position + Y-rotation. Teardown already handles
-    // groups (traverse); raycasting still hits the real body mesh (its
-    // matrixWorld includes the group transform).
+    // PR3.1 — the single placement path for every cabinet: a THREE.Group
+    // carrying its world transform (x/y/z_position_in + rotation_deg per
+    // COORDINATE_CONTRACT). The builder builds in a LOCAL frame
+    // (x_position_in forced to 0; each builder that reads y_position_in
+    // also zeroes it locally via item.__localFrame — see base/wall/other
+    // builders); the group applies the world position + Y-rotation.
+    // Teardown already handles groups (traverse); raycasting still hits
+    // the real body mesh (its matrixWorld includes the group transform).
+    //
+    // Byte-identical for rotation_deg=0 (back-wall) cabinets by
+    // construction: PR3.0 guarantees z_position_in=0 for every back-wall
+    // cabinet_type, and y_position_in is 0 for floor-standing types
+    // (base/tall/corner/panel/filler — every writer emits y=0,z=0 for
+    // these) or the real D8 mount height for wall cabinets (every writer
+    // emits a nonzero y for wall cabinets; wall_cabinet.esm.js's wbY
+    // fallback additionally reproduces the pre-D8 WBY default locally
+    // when y_position_in is ever falsy, so the group's grp.position.y=0
+    // in that case doesn't drop the cabinet to the floor). With those
+    // offsets zero (or reproduced locally), grp.position + local mesh
+    // coordinates sum to exactly the old legacy absolute-path world
+    // coordinates.
     _placeCabinetGroup(it, builder) {
         const THREE = this.T.THREE, scene = this.T.scene;
         const grp = new THREE.Group();
@@ -460,17 +463,6 @@ export class KitchenCanvas extends Component {
         scene.add(grp);
         this.T.cabObjs.push(grp);
         if (res && res.clickable) this.T.clickable.push(...res.clickable);
-    }
-
-    // A cabinet needs the group transform only when it is NOT on the back
-    // wall — i.e. it is rotated (front=180, left=90, right=270). Back-wall
-    // cabinets (rotation 0) take the ORIGINAL absolute path and render
-    // exactly as before, so straight kitchens are byte-identical by
-    // construction. Gating on rotation (not z) is deliberate: on WALL
-    // cabinets z_position_in is the D8 mount height, not depth — gating on z
-    // would misfire on D8-customised back uppers.
-    _needsTransform(it) {
-        return (it.rotation_deg || 0) !== 0;
     }
 
     _onMouseDown(e) {
