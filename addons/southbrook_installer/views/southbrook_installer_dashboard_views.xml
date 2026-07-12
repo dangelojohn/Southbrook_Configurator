@@ -5,6 +5,11 @@
     <record id="action_installer_dispatch_board" model="ir.actions.client">
         <field name="name">Dispatch Board</field>
         <field name="tag">southbrook_installer.dispatch_board</field>
+        <!-- NB: ir.actions.client has no groups_id in v19, so the action
+             itself can't be group-gated here. Gating is by the menu entry
+             (groups="group_sami_dispatcher") plus the record rules, which
+             scope the dashboard's searchRead so a non-dispatcher who force-
+             invokes the action still only sees their own assigned jobs. -->
     </record>
 
 </odoo>

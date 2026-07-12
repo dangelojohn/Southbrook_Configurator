@@ -374,13 +374,22 @@ class SouthbrookDamageFlag(models.Model):
             "state": self.state,
             "timestamp": fields.Datetime.now().isoformat(),
         }
-        self.env["bus.bus"]._sendmany([
-            ("sami_installer", "installer_update", payload),
-        ])
+        # v19 removed bus.bus._sendmany; _sendone is the only sender.
+        # (The old _sendmany call raised AttributeError on every flag
+        # create/resolve — swallowed by the caller's broad except — so the
+        # whole live-dispatcher-bus feature silently degraded to polling.)
+        self.env["bus.bus"]._sendone(
+            "sami_installer", "installer_update", payload,
+        )
 
     def _spawn_dispatcher_activity(self):
-        """Create a mail.activity on the JOB with a 2-hour deadline,
-        assigned to the dispatcher group's first available user."""
+        """Create a same-day mail.activity on the JOB, assigned to the
+        dispatcher group's first available user.
+
+        NOTE: mail.activity.date_deadline is a Date (no time component), so an
+        hour-granularity "2-hour" SLA can't ride on it — the deadline is set to
+        today. A real intra-day SLA would need a dedicated Datetime field; left
+        as same-day-urgent for now (the ⚠ summary flags the urgency)."""
         self.ensure_one()
         Activity = self.env["mail.activity.type"]
         # Reuse the generic 'Action To Do' activity if no installer-
