@@ -2871,6 +2871,23 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         # mount heights) are untouched.
         if wall:
             self._sb_place_line_on_wall(design, line)
+            # Continuous corners — if the new cabinet completes an inside
+            # corner (cabinets now on two different walls), resolve it in the
+            # design/visual layer immediately. sync=False keeps it light (no
+            # per-drop manufacturing mirror — the 5-min cron / an explicit
+            # auto-arrange catches BOM/price up). Return the full re-laid
+            # payload so the scene reflects the corner + any re-flow.
+            walls_used = {
+                (dl.wall or "back")
+                for dl in design.cabinet_line_ids.filtered(
+                    lambda l: l.origin == "configurator"
+                    and l.layout_role != "derived"
+                    and l.cabinet_type not in ("filler", "panel"))
+            }
+            if len(walls_used) >= 2:
+                design.action_auto_arrange(sync=False)
+                return {"ok": True, "relaid": True,
+                        "payload": self._southbrook_design_payload(design)}
         return {"ok": True, "item": {
             "id":            product.id,
             "product_id":    product.id,

@@ -429,7 +429,7 @@ class SouthbrookKitchenDesign(models.Model):
     # are a later refinement driven by run length + storage choice.)
     _CORNER_SKU = {"base": "SB-CORNER", "wall": "SB-WALL-CORNER"}
 
-    def action_auto_arrange(self):
+    def action_auto_arrange(self, sync=True):
         """Auto-distribute this design's cabinets across walls into an L/U
         layout, substituting a real corner cabinet at each inside corner,
         then mirror the result to the manufacturing sale.order.line.
@@ -585,17 +585,22 @@ class SouthbrookKitchenDesign(models.Model):
 
             # 4) mirror to the manufacturing model NOW (don't wait for the
             #    5-min reconcile cron) so BOM/price/cutlist reflect the corner.
-            try:
-                self.env["southbrook.design.reconcile"].sudo()._reconcile_one(
-                    design, {"created_orders": 0, "created_rooms": 0,
-                             "created_lines": 0, "mirrored": 0, "divergence": 0})
-            except Exception:
-                # Do NOT swallow — re-raise so the savepoint rolls the whole
-                # re-arrange back. Never leave the design mutated but the
-                # manufacturing mirror stale.
-                _logger.exception("[auto-arrange] reconcile failed for design "
-                                  "%s — rolling back", design.id)
-                raise
+            #    sync=False skips this — used by the CONTINUOUS interactive
+            #    resolve (light, design-layer only) where the 5-min cron (or an
+            #    explicit sync=True pass) catches the manufacturing side up.
+            if sync:
+                try:
+                    self.env["southbrook.design.reconcile"].sudo()._reconcile_one(
+                        design, {"created_orders": 0, "created_rooms": 0,
+                                 "created_lines": 0, "mirrored": 0,
+                                 "divergence": 0})
+                except Exception:
+                    # Do NOT swallow — re-raise so the savepoint rolls the
+                    # whole re-arrange back. Never leave the design mutated but
+                    # the manufacturing mirror stale.
+                    _logger.exception("[auto-arrange] reconcile failed for "
+                                      "design %s — rolling back", design.id)
+                    raise
 
         _logger.info("[auto-arrange] finished design=%s corners=%d removed=%d "
                      "inserted=%d elapsed=%dms", design.id, len(r["corners"]),

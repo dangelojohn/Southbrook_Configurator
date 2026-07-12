@@ -967,6 +967,12 @@ export class KitchenDesignTab extends Component {
             if (res && res.error) {
                 this.state.error = res.error;
                 this._pushToast(`Couldn't add ${product.name}: ${res.error}`, "error");
+            } else if (res && res.relaid && res.payload) {
+                // Continuous corner resolution re-laid the whole scene.
+                this._itemsMutSeq += 1;
+                this.state.items = res.payload.items || [];
+                this.state.room = res.payload.room || this.state.room;
+                this._pushToast("Added — corner resolved automatically", "success");
             } else if (res && res.item) {
                 // Audit A7 — mark the mutation so an in-flight _load()
                 // snapshot from before this add re-fetches instead of
