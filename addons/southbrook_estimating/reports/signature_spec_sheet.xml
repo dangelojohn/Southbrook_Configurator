@@ -36,7 +36,10 @@
         <!-- Helper variables. Defined before t-call so they flow into
              the external_layout's body content via QWeb scope. -->
         <t t-set="company" t-value="o.company_id or env.company"/>
-        <t t-set="web_logo" t-value="env['website'].sudo().search([], limit=1).logo"/>
+        <!-- 'website' is not a declared dependency of southbrook_estimating,
+             so env['website'] KeyErrors on an estimating-only install (and
+             crashes this report). Guard it and fall back to the company logo. -->
+        <t t-set="web_logo" t-value="env['website'].sudo().search([], limit=1).logo if 'website' in env else env.company.logo"/>
         <t t-set="base_url" t-value="env['ir.config_parameter'].sudo().get_param('web.base.url')"/>
         <t t-set="page_url" t-value="base_url + '/my/southbrook/order-builder/' + str(o.id)"/>
         <t t-call="web.external_layout">
