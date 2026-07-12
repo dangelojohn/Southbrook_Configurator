@@ -646,3 +646,21 @@ class TestTrackBEndToEnd(TransactionCase):
                 "state must advance to 'configured' when starter "
                 "cabinets are seeded",
             )
+            # PR3.0 — y/z field-semantics migration: wall-type starter
+            # cabinets from _KITCHEN_TEMPLATE_PRESETS must seed the
+            # canonical shape (mount height in y_position_in, z flush
+            # at 0), not the legacy z-as-height shape the migration
+            # cleans up. Otherwise every new l_shape/u_shape/galley
+            # design would immediately re-introduce the exact data
+            # shape this PR migrates away from.
+            wall_lines = design.cabinet_line_ids.filtered(
+                lambda l: l.cabinet_type == "wall")
+            for wl in wall_lines:
+                self.assertGreater(
+                    wl.y_position_in, 0,
+                    "starter wall cabinet %s must carry mount height in "
+                    "y_position_in" % wl.layout_key)
+                self.assertEqual(
+                    wl.z_position_in, 0.0,
+                    "starter wall cabinet %s must be flush "
+                    "(z_position_in=0)" % wl.layout_key)

@@ -227,3 +227,32 @@ class TestWallPersistence(TransactionCase):
             result = controller.load_design_lines(design_id=self.design.id)
         self.assertEqual(len(result["lines"]), 1)
         self.assertEqual(result["lines"][0]["wall"], "back")
+
+    # ------------------------------------------------------------------
+    # PR3.0 — y/z field-semantics migration. A line carrying a nonzero
+    # mount-height-shaped value in y_position_in (canonical, post-PR3.0
+    # shape: y nonzero, z flush at 0) must persist and reload byte-
+    # identical, same as any other placement field — save/load never
+    # interprets these values. (This class's fixture product is
+    # cabinet_type='base'; the field round-trip asserted here is
+    # type-agnostic, matching TestCoordinateContractCompliance's
+    # writer-level assertions for the real wall-type case.)
+    def test_save_persists_canonical_wall_mount_height_in_y(self):
+        _, lines = self._save([{
+            "product_id":    self.product.id,
+            "layout_key":    "wall-test-y-canonical",
+            "x_position_in": 0,
+            "y_position_in": 66,
+            "z_position_in": 0,
+            "wall":          "back",
+        }])
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0].y_position_in, 66)
+        self.assertEqual(lines[0].z_position_in, 0)
+
+        controller = self._controller()
+        with stubbed_request(self.env):
+            result = controller.load_design_lines(design_id=self.design.id)
+        self.assertEqual(len(result["lines"]), 1)
+        self.assertEqual(result["lines"][0]["y_position_in"], 66)
+        self.assertEqual(result["lines"][0]["z_position_in"], 0)

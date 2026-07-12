@@ -30,3 +30,8 @@ from . import test_wall_persistence
 # exact same canonical model. Permanent regression pin for the
 # controller-layer persistence round-trip.
 from . import test_save_load_identity
+
+# PR3.0 (2026-07-12) — y/z field-semantics migration
+# (migrations/19.0.5.18.0/post-migrate.py): design-line + sale-order-
+# line-mirror transform + idempotency.
+from . import test_yz_semantics_migration
