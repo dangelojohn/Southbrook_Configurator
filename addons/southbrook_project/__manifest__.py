@@ -16,8 +16,9 @@ project instance. Four tiers, each in a separate commit:
   desktop widths (>=1280 px) and eager card load for projects with
   small task counts. Pure SCSS asset; no JS patching.
 * **Tier 2** — Configuration data: 6 `project.tags` (Rush, Custom,
-  Warranty, Repair, Kitchen, Vanity); description + planned date +
-  email alias on project ID 1. Stages were already seeded.
+  Warranty, Repair, Kitchen, Vanity); description + planned dates on
+  project ID 1 (backfilled by the post_init hook). Stages were already
+  seeded. (No email alias is set — that was descoped.)
 * **Tier 3** — Feature toggles: `allow_task_dependencies` +
   `allow_milestones` enabled on project 1. Recurring + billable
   left as operator toggles.
@@ -38,7 +39,7 @@ These are flagged in the README for a human operator.
     "author": "Southbrook Cabinetry / OdooIQ",
     "license": "LGPL-3",
     "category": "Services/Project",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "depends": [
         "project",
         # x_southbrook_sale_order_id is a Many2one to sale.order, so sale MUST
