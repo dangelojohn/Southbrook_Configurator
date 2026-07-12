@@ -52,7 +52,12 @@ def verify_jwt(env, token):
     """Verify a JWT and return its decoded claims dict. Raises on bad sig or expired."""
     if _pyjwt is None:
         raise RuntimeError("PyJWT not installed.")
-    return _pyjwt.decode(token, _get_secret(env), algorithms=[JWT_ALGORITHM])
+    # algorithms= pins HS256 (no alg-confusion / "none" bypass); require exp so a
+    # forged token that simply omits the expiry claim is rejected rather than
+    # treated as non-expiring (defense-in-depth — forgery still needs the secret).
+    return _pyjwt.decode(
+        token, _get_secret(env), algorithms=[JWT_ALGORITHM],
+        options={"require": ["exp"]})
 
 
 def resolve_persona(user):

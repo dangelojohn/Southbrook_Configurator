@@ -31,6 +31,16 @@ class TestFabioAsk(TransactionCase):
         self.assertIn("Create or link a production package", question.answer)
 
     def test_internal_answer_describes_base_production_users(self):
+        # The internal-users answer lists actual res.users (share=False). These
+        # "base production" users are demo-seeded in the full stack; the hermes
+        # test DB has no demo, so create the ones the answer is expected to
+        # describe (their roles come from the model's known_roles map).
+        for name in ("Alex Estimator", "Chris CNC", "Morgan Production"):
+            self.env["res.users"].create({
+                "name": name,
+                "login": name.lower().replace(" ", "_") + "@sbk.test",
+                "group_ids": [(4, self.env.ref("base.group_user").id)],
+            })
         question = self.env["southbrook.hermes.question"].create({
             "question": "What does each base production user do?",
             "scope": "internal",
@@ -142,4 +152,7 @@ class TestFabioAsk(TransactionCase):
         })
         question.action_answer()
 
-        self.assertIn("no kitchen projects", question.answer.lower())
+        # Graceful no-projects answer (wording: "...i do not see any kitchen
+        # projects... no projects yet."). Assert the semantic marker present in
+        # the actual template rather than an exact legacy phrase.
+        self.assertIn("no projects", question.answer.lower())

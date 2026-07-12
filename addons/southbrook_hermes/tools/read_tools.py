@@ -48,25 +48,34 @@ def get_order_status(env, order_id: int):
     # dict surfaces None — exactly what the spec § 4.4 ACL rule wants.
     kj = env["project.task"].search(
         [("sale_order_id", "=", order.id)], limit=1)
+    # The readiness fields live on project.task via southbrook_project_mrp,
+    # which is NOT a hermes dependency — and the names carried a wrong
+    # `southbrook_` prefix (real fields: current_bottleneck_workcenter_id,
+    # top_blocker, next_best_action, readiness_score). The unguarded ones 500'd
+    # once a kitchen job was linked. Use the correct names AND getattr-guard all,
+    # so the tool degrades to None when southbrook_project_mrp isn't installed.
+    bottleneck_wc = getattr(kj, "current_bottleneck_workcenter_id", False) if kj else False
     return {
         "stage": order.state,
         "mos": _count_mos_for_order(env, order),
-        "bottleneck": (kj.southbrook_current_bottleneck_wc.name
-                       if kj and getattr(kj, "southbrook_current_bottleneck_wc", False)
-                       else None),
-        "blocker": (kj.southbrook_top_blocker if kj else None),
-        "next_action": (kj.southbrook_next_best_action if kj else None),
+        "bottleneck": bottleneck_wc.name if bottleneck_wc else None,
+        "blocker": getattr(kj, "top_blocker", None) if kj else None,
+        "next_action": getattr(kj, "next_best_action", None) if kj else None,
         "install_due": (kj.date_deadline.isoformat()
                         if kj and kj.date_deadline else None),
-        "readiness_score": (kj.southbrook_readiness_score if kj else None),
+        "readiness_score": getattr(kj, "readiness_score", None) if kj else None,
         "version": getattr(order, "southbrook_version", 1),
     }
 
 
 def _count_mos_for_order(env, order):
+    # sale_mrp links an MO to the sale.order.line it fulfils via `sale_line_id`
+    # (singular). The old `sale_order_line_id` field does not exist on
+    # mrp.production in v19 (or anywhere in this stack) → get_order_status
+    # raised ValueError("Invalid field mrp.production.sale_order_line_id").
     line_ids = order.order_line.ids
     return env["mrp.production"].search_count(
-        [("sale_order_line_id", "in", line_ids)])
+        [("sale_line_id", "in", line_ids)])
 
 
 @hermes_tool(
@@ -118,9 +127,9 @@ def list_my_kitchen_projects(env, partner_id: int = None):
         {
             "ref": p.name,
             "stage": getattr(p, "state", None),
-            "option_count": len(p.option_ids) if hasattr(p, "option_ids") else 0,
+            "option_count": len(p.design_option_ids) if hasattr(p, "design_option_ids") else 0,
             "selected": next(
-                (o.name for o in getattr(p, "option_ids", [])
+                (o.name for o in getattr(p, "design_option_ids", [])
                  if getattr(o, "is_selected", False)), None),
         }
         for p in projects
@@ -145,7 +154,7 @@ def get_kitchen_project(env, project_id: int):
     return {
         "options": [
             {"name": o.name, "is_selected": getattr(o, "is_selected", False)}
-            for o in getattr(project, "option_ids", [])
+            for o in getattr(project, "design_option_ids", [])
         ],
         "approval_status": getattr(project, "approval_status", None),
         "drawings_url": getattr(project, "drawings_url", None),
