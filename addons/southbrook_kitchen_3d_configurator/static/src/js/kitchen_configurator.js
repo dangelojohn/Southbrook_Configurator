@@ -513,11 +513,34 @@ class SouthbrookKitchenConfigurator extends Component {
             this._recomputeLayoutFromItems();
             this._hydratedFromDesign = true;
         } catch (e) {
+            // PR2.5a (Gap 2) — fail loud, don't fall back to the
+            // generator. A TRANSIENT load_design_lines failure used to
+            // silently fall through to `_refreshLayout()` (the
+            // generator) while `designId` stayed set — the next
+            // debounced auto-save would then full-replace the saved
+            // design with a freshly generated (and completely
+            // different) fill: the exact overwrite class PR2.5 closed.
+            // Instead: surface the existing error-banner mechanism
+            // (`state.error` / `state.errorCode`, rendered at
+            // `o_sbk_error` in the template — see the
+            // `t-elif="state.error"` branch) and hard-gate every write
+            // path (`_queueAutoSave` + `_saveDesign`) behind
+            // `_hydrationFailed` until the rep reloads the page.
+            // `_hydrationFailed` is set ONLY here, in the
+            // designId-was-set + load_design_lines-threw path, so a
+            // normal session (no designId, or a successful hydrate, or
+            // the empty-lines branch above) can never trip it.
             console.warn(
-                "[SouthbrookKitchenConfigurator] load_design_lines failed, "
-                + "falling back to /layout:", e
+                "[SouthbrookKitchenConfigurator] load_design_lines failed; "
+                + "refusing to fall back to the generator (would "
+                + "silently overwrite the saved design on the next "
+                + "auto-save):", e
             );
-            await this._refreshLayout();
+            this._hydrationFailed = true;
+            this.state.error = "Couldn't load the saved design — reload "
+                + "the page. Saving is disabled to protect your design.";
+            this.state.errorCode = "HYDRATION_FAILED";
+            this.state.errorCta = null;
         }
     }
 
@@ -1236,6 +1259,18 @@ class SouthbrookKitchenConfigurator extends Component {
 
     // ─── Save ─────────────────────────────────────────────────────────────────────
     async _saveDesign() {
+        // PR2.5a (Gap 2) — same rationale as the _queueAutoSave() guard:
+        // a failed hydration means state doesn't reflect the saved
+        // design, so a manual save (button or Cmd/Ctrl+S) must also be
+        // refused rather than overwriting it.
+        if (this._hydrationFailed) {
+            this.notification.add(
+                "Saving is disabled — the saved design failed to load. "
+                + "Reload the page to try again.",
+                { type: "danger", sticky: true }
+            );
+            return;
+        }
         this.state.saving = true;
         try {
             const result = await rpc("/southbrook_kitchen/configurator/save", {
@@ -1374,6 +1409,12 @@ class SouthbrookKitchenConfigurator extends Component {
     // save against /save. Skipped when state.items is empty (nothing
     // to persist) or a manual save is in flight.
     _queueAutoSave() {
+        // PR2.5a (Gap 2) — a failed hydration must never auto-save: the
+        // in-memory state is whatever was left over (possibly the
+        // generator's fill from a prior edit path), and save_design is
+        // a full-replace writer. See the catch branch in
+        // _hydrateFromDesign() for the full rationale.
+        if (this._hydrationFailed) return;
         if (this._autoSaveTimer) {
             clearTimeout(this._autoSaveTimer);
             this._autoSaveTimer = null;
