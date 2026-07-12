@@ -25,15 +25,22 @@ class TestW054MyTimeVisibility(TransactionCase):
         super().setUpClass()
         cls.Workorder = cls.env["mrp.workorder"]
         cls.Productivity = cls.env["mrp.workcenter.productivity"]
+        # Both users need MRP-user access to read work orders; without a group
+        # a bare user can't read mrp.workorder at all, so the "my time" compute
+        # (which reads the WO) raised AccessError in the no-logs case (with
+        # logs, the productivity link granted implicit access and masked it).
+        mrp_group = cls.env.ref("mrp.group_mrp_user")
         cls.user_a = cls.env["res.users"].create({
             "name": "W054 User A",
             "login": "w054_a@test",
             "email": "w054_a@test",
+            "group_ids": [(4, mrp_group.id)],
         })
         cls.user_b = cls.env["res.users"].create({
             "name": "W054 User B",
             "login": "w054_b@test",
             "email": "w054_b@test",
+            "group_ids": [(4, mrp_group.id)],
         })
         wc = cls.env["mrp.workcenter"].search([], limit=1)
         if not wc:

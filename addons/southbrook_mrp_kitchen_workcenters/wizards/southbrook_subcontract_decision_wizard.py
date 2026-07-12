@@ -148,7 +148,11 @@ class SouthbrookSubcontractDecisionWizard(models.TransientModel):
     selected_vendor_id = fields.Many2one(
         "pg.vendor",
         string="Subcontractor",
-        required=True,
+        # NOT required= at the field level: the wizard is opened empty (the
+        # user picks the vendor after seeing the candidate list), so a NOT NULL
+        # column makes create() fail before the form even renders. The
+        # requirement is enforced where it belongs — action_confirm raises
+        # "Pick a qualified subcontractor first." if it's unset.
         ondelete="restrict",
         help="The vendor to whom the operation is diverted. Must be "
              "in the qualified-candidates list (W031 AVL).",

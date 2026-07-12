@@ -82,7 +82,8 @@ class TestW026TravelerRichness(TransactionCase):
             "product_qty": 1.0,
             "bom_id": bom.id,
         })
-        mo._onchange_move_raw()
+        # v19 removed the _onchange_move_raw onchange; action_confirm() builds
+        # the raw moves from the BoM directly, so the manual trigger is gone.
         mo.action_confirm()
         wo = mo.workorder_ids[:1]
         self.assertTrue(wo, "Expected MO confirm to spawn a workorder")
