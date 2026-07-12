@@ -117,7 +117,7 @@ reconcile cron ──► sale.order.line.wall_id = Wall A        [B6: flattened]
 | PR | Content | Leak closed |
 |---|---|---|
 | **PR2** | `wall` at the backend write boundary: `WALLS` frozen constant (new code only), item→`line_vals` carry, server-side validation (reject non-members), NULL→`back` on read. TransactionCase: save/invalid/default. | B1, W4 |
-| **PR2.5** | **Restore-from-canonical:** when `designId` is present, hydrate from `load_design_lines` instead of `/layout`; `/layout` remains the empty-room suggest path. Emit `wall` (+`run_seq`) in **both** read serializers — ideally extract one shared line-serializer used by `load_design_lines` and `_southbrook_design_payload`. | §2 (the root violation), B3, B4 |
+| **PR2.5 (P1 — data-integrity defect, VERIFIED)** | **Restore-from-canonical:** when `designId` is present, hydrate from `load_design_lines` instead of `/layout`; `/layout` remains the empty-room suggest path. Emit `wall` (+`run_seq`) in **both** read serializers — ideally extract one shared line-serializer used by `load_design_lines` and `_southbrook_design_payload`. | §2 (the root violation), B3, B4 |
 | **PR3** | Renderer coordinate-model unification. **Gate:** the Prompt-3 matrix (Component × uses X/Y/Z/rotation × contract violation) produced first, as a punch list. | coupling #3 |
 | **PR3a** | Hoot infra + tests covering PR1–PR3 contracts (as previously scoped). | — |
 | **PR4** | Wall-aware placement: delegate to the engine; retire client `packRow` for non-back items; add `wall` to `design-3d/move`. | coupling #1, B5 |
@@ -134,9 +134,17 @@ restore repair its own review, where the risk actually lives.
 ## 6. Verification ledger
 
 - **Verified (read at cited lines, this session):** every `file:line` in §§1–4.
-- **Reasoned (not executed):** that reopening a saved backend design shows regenerated
-  fill rather than saved lines (§2). High confidence from code; a one-look browser check
-  on design 81 would convert this to Verified.
+- **VERIFIED 2026-07-12 (browser + DB forensic check on design 81):** reopening a saved
+  backend design does NOT load the canonical model. Opening design 81 (DB truth: 84×24
+  room, 3 base cabinets at x=0/24/48) via its "Open 3D Configurator" button rendered a
+  **12-inch empty default room with 0 cabinets**; the network capture showed exactly
+  `products` + `user_defaults` + `layout` — **`load_design_lines` never fired**. Worse
+  than regeneration: the saved room dimensions aren't even passed. **PR2.5 is hereby a
+  P1 data-integrity defect** — the editor is not faithfully reopening its own canonical
+  model, and `save_design`'s full-replace semantics mean any post-open mutation
+  auto-saves the regenerated state over the saved design (destructive overwrite).
+  Design 81's lines were confirmed untouched after the read-only inspection
+  (5 rows, write_date unchanged).
 - **Not examined:** `southbrook_customer_portal/kitchen_canvas.js` beyond its header;
   FreeCAD-bridge geometry parity; `sample_3d_widget` internals. None are on the PR2–PR5
   path.
