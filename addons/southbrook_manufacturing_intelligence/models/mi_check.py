@@ -2,7 +2,7 @@
 import logging
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 _logger = logging.getLogger(__name__)
@@ -153,6 +153,23 @@ class SouthbrookMiCheck(models.Model):
                 and rec.category in AUTO_FIX_DISPATCH
             )
 
+    # ------------------------------------------------------------------
+    # C2 — 'ship_with_deviation' is the state that lets a cabinet ship WITH a
+    # recorded defect; warranty-trace queries key off it. It must only ever be
+    # reached through an APPROVED deviation waiver (which the waiver action sets
+    # via sudo). The QC group has ORM write on this model, so a raw
+    # write({"state": "ship_with_deviation"}) would launder a failing check
+    # straight to ship — no waiver, no engineering sign-off, no customer ack.
+    # Block the direct transition; only the sudo path (waiver approval) may set it.
+    # ------------------------------------------------------------------
+    def write(self, vals):
+        if not self.env.su and vals.get("state") == "ship_with_deviation":
+            raise AccessError(_(
+                "A check can only be moved to 'Ship with Deviation' through an "
+                "approved deviation waiver (Segregation of Duties + engineering "
+                "sign-off + customer acknowledgement), not a direct edit."))
+        return super().write(vals)
+
     def action_auto_fix(self):
         """Run the auto-fix for this check's category.
 
@@ -169,6 +186,13 @@ class SouthbrookMiCheck(models.Model):
         touched_productions = self.env["mrp.production"]
 
         for check in self:
+            # Auto-fixing one check triggers an MI recompute that may unlink
+            # sibling checks (and, if this check is an engine 'cut'/'cad'
+            # blocker, this very one) — so a later record in `self` can already
+            # be gone. Reading any field on it then raises MissingError. Skip
+            # records that no longer exist rather than crash the whole batch.
+            if not check.exists():
+                continue
             if not check.auto_fixable:
                 _logger.debug(
                     "W024 auto-fix: skip check %s — not auto_fixable",

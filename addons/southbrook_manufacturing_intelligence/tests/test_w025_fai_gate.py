@@ -25,7 +25,7 @@ class TestW025FaiGate(TransactionCase):
         cls.bom_creator = Users.create({
             "name": "Test BOM Engineer",
             "login": "test_bom_eng_w025",
-            "groups_id": [(6, 0, [
+            "group_ids": [(6, 0, [
                 cls.env.ref("mrp.group_mrp_user").id,
                 cls.env.ref("mrp.group_mrp_manager").id,
             ])],
@@ -33,7 +33,7 @@ class TestW025FaiGate(TransactionCase):
         cls.fai_inspector = Users.create({
             "name": "Test FAI Inspector",
             "login": "test_fai_qc_w025",
-            "groups_id": [(6, 0, [
+            "group_ids": [(6, 0, [
                 cls.env.ref("mrp.group_mrp_user").id,
                 cls.env.ref("mrp.group_mrp_manager").id,
             ])],

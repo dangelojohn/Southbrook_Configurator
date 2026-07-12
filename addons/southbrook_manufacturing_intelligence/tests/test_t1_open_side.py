@@ -56,6 +56,9 @@ class TestT1OpenSide(TransactionCase):
             })],
         })
         line = so.order_line[0]
+        # southbrook_mrp_pm gates MO creation for a sale-linked order behind
+        # production approval; force-release so this MI test can build the MO.
+        so.force_production_release = True
         mo = self.MO.create({
             "product_id": variant.id, "product_qty": 1.0,
             "sale_line_id": line.id, "origin": so.name,

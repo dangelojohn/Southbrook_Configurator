@@ -23,28 +23,28 @@ class TestDeviationWaiver(TransactionCase):
         cls.qc_user = Users.create({
             "name": "Test QC Inspector",
             "login": "test_qc_w012",
-            "groups_id": [
+            "group_ids": [
                 (6, 0, [cls.env.ref("mrp.group_mrp_user").id]),
             ],
         })
         cls.eng_user = Users.create({
             "name": "Test Engineering Lead",
             "login": "test_eng_w012",
-            "groups_id": [
+            "group_ids": [
                 (6, 0, [cls.env.ref("mrp.group_mrp_manager").id]),
             ],
         })
         cls.other_eng_user = Users.create({
             "name": "Test Second Engineer",
             "login": "test_eng2_w012",
-            "groups_id": [
+            "group_ids": [
                 (6, 0, [cls.env.ref("mrp.group_mrp_manager").id]),
             ],
         })
         cls.random_user = Users.create({
             "name": "Test Non-Eng User",
             "login": "test_rand_w012",
-            "groups_id": [
+            "group_ids": [
                 (6, 0, [cls.env.ref("mrp.group_mrp_user").id]),
             ],
         })
@@ -81,8 +81,9 @@ class TestDeviationWaiver(TransactionCase):
             "production_id": production.id,
         })
 
-    def _draft_waiver(self, check, customer_acked=True):
-        return self.env["southbrook.deviation.waiver"].create({
+    def _draft_waiver(self, check, customer_acked=True, user=None):
+        env = self.env(user=user) if user else self.env
+        return env["southbrook.deviation.waiver"].create({
             "mi_check_id": check.id,
             "defect_summary": "Door alignment cosmetic offset, customer aware.",
             "customer_acknowledged": customer_acked,
@@ -140,13 +141,15 @@ class TestDeviationWaiver(TransactionCase):
         dual_role = Users.create({
             "name": "Test Dual-Role Engineer",
             "login": "test_dual_w012",
-            "groups_id": [(6, 0, [
+            "group_ids": [(6, 0, [
                 self.env.ref("mrp.group_mrp_user").id,
                 self.env.ref("mrp.group_mrp_manager").id,
             ])],
         })
         check = self._make_check(production, user=dual_role)
-        waiver = self._draft_waiver(check)
+        # SoD compares the WAIVER REQUESTER (create_uid), so the dual-role user
+        # must be the one who raised the waiver — then they can't self-approve.
+        waiver = self._draft_waiver(check, user=dual_role)
         waiver.action_submit_for_eng_review()
         # Same user cannot self-approve even though they're in the eng
         # group — SoD must block.

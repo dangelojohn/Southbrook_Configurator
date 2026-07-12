@@ -181,13 +181,14 @@ class MrpProduction(models.Model):
     )
     def _compute_fai_check_id(self):
         for prod in self:
-            # Pick the first FAI-category check on this MO. Includes
-            # inactive checks (a passing check is retired to active=False
-            # by action_fai_pass but we still want to surface it as the
-            # historical sign-off record).
-            fai_check = prod.x_mi_check_ids.filtered(
-                lambda c: c.category == "fai"
-            )[:1]
+            # Pick the first FAI-category check on this MO — INCLUDING inactive
+            # ones. action_fai_pass retires the passing check to active=False;
+            # the plain One2many read applies active_test and would drop it,
+            # leaving fai_check_id empty and fai_status falling back to
+            # 'not_required' instead of 'passed' (L1). Read with active_test off
+            # so the historical sign-off record is surfaced.
+            fai_check = prod.with_context(active_test=False).x_mi_check_ids \
+                .filtered(lambda c: c.category == "fai")[:1]
             prod.fai_check_id = fai_check.id if fai_check else False
 
     @api.depends(
