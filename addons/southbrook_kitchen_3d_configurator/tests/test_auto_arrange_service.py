@@ -76,6 +76,28 @@ class TestAutoArrangeService(TransactionCase):
         d.action_auto_arrange()
         self.assertEqual(len(d.cabinet_line_ids), n1)   # 8 canonical + 1 corner
 
+    def _canonical_intrinsic(self, design):
+        """Identity + intrinsic properties of the canonical selection —
+        excludes derived arrangement state (position/rotation/active) and
+        metadata (write timestamps). This is what MUST NOT change."""
+        return sorted(
+            (l.layout_key, l.product_id.id, round(l.width_in, 3),
+             round(l.height_in, 3), round(l.depth_in, 3), l.cabinet_type,
+             l.origin, l.quantity)
+            for l in self._all_lines(design).filtered(
+                lambda l: l.layout_role == "canonical"))
+
+    def test_canonical_integrity_across_cycles(self):
+        # Compile → reset → compile … the customer's canonical selection is
+        # byte-for-byte unchanged (catches accidental mutation of the source
+        # records, distinct from output stability).
+        d = self._make_design(10)
+        original = self._canonical_intrinsic(d)
+        self.assertEqual(len(original), 10)
+        for _ in range(5):
+            d.action_auto_arrange()
+            self.assertEqual(self._canonical_intrinsic(d), original)
+
     def test_no_canonical_line_is_ever_lost(self):
         d = self._make_design(10)
         canon = lambda: len(self._all_lines(d).filtered(
