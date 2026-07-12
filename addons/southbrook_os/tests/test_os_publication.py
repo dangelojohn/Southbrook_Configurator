@@ -7,6 +7,10 @@ class TestOsPublication(TransactionCase):
     def setUp(self):
         super().setUp()
         Section = self.env["southbrook.os.section"]
+        # Isolate from the canonical sections the post_init hook loads at
+        # install — otherwise these fixed-slug creates collide (UNIQUE(slug))
+        # and the len(snapshot)==2 assertions would count canonical rows too.
+        Section.search([]).unlink()
         self.s1 = Section.create({
             "slug": "00_charter", "name": "Charter",
             "source": "canonical", "body": "v1 body",

@@ -7,7 +7,11 @@ from odoo.tests.common import TransactionCase, tagged
 class TestOsRevision(TransactionCase):
     def setUp(self):
         super().setUp()
-        self.section = self.env["southbrook.os.section"].create({
+        Section = self.env["southbrook.os.section"]
+        # The post_init hook loads canonical 04_lifecycle at install; drop it so
+        # this fixed-slug fixture create doesn't collide on UNIQUE(slug).
+        Section.search([("slug", "=", "04_lifecycle")]).unlink()
+        self.section = Section.create({
             "slug": "04_lifecycle", "name": "Lifecycle",
             "source": "canonical", "body": "v1 body",
         })

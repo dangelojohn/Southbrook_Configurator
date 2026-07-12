@@ -42,7 +42,12 @@ class OsSection(models.Model):
         required=True,
     )
     body = fields.Text(required=True)
-    body_html = fields.Html(compute="_compute_body_html", sanitize=False, store=True)
+    # Default sanitizer left ON: bodies flow in from canonical .md, generators
+    # (which interpolate live product/work-center names), and OSRO applies —
+    # markdown→HTML with sanitize=False was a latent stored-XSS sink the moment
+    # body_html gets rendered in any view. The default sanitizer keeps the
+    # markdown-safe subset (tables, code, lists, links) and strips scripts.
+    body_html = fields.Html(compute="_compute_body_html", store=True)
     version = fields.Integer(default=1, required=True)
     last_updated_at = fields.Datetime(default=fields.Datetime.now)
     last_updated_by = fields.Many2one("res.users", default=lambda self: self.env.user)

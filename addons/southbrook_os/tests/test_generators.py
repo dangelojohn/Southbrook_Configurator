@@ -46,10 +46,15 @@ class TestCutSpecGenerator(TransactionCase):
         section = self.env["southbrook.os.section"].search(
             [("slug", "=", "06_cut_spec.generated")], limit=1)
         self.assertTrue(section)
-        # Body should mention thickness or reveal terminology
-        text = section.body.lower()
-        self.assertTrue("thickness" in text or "reveal" in text)
         self.assertEqual(result["status"], "ok")
+        text = section.body.lower()
+        if self.env.get("southbrook.cut.spec") is not None:
+            # Full stack (southbrook_plm present): real spec fields are rendered.
+            self.assertTrue("thickness" in text or "reveal" in text)
+        else:
+            # southbrook_plm absent → generator emits a documented stub; the
+            # status-ok + section-exists checks are the meaningful assertions.
+            self.assertIn("cut specification", text)
 
 
 @tagged("post_install", "-at_install", "southbrook", "southbrook_os")

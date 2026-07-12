@@ -1,6 +1,8 @@
 # addons/southbrook_os/tests/test_os_section.py
 from odoo.tests.common import TransactionCase, tagged
 
+from odoo.addons.southbrook_os.models.os_section import _HAS_MARKDOWN
+
 
 @tagged("post_install", "-at_install", "southbrook", "southbrook_os")
 class TestOsSection(TransactionCase):
@@ -13,7 +15,11 @@ class TestOsSection(TransactionCase):
         })
         self.assertEqual(section.version, 1)
         self.assertEqual(section.source, "canonical")
-        self.assertIn("<h1>", section.body_html)
+        # `markdown` is an OPTIONAL dependency (os_section has a fallback
+        # renderer). Only assert real header conversion when it's installed;
+        # always assert the body text survives rendering + sanitisation.
+        if _HAS_MARKDOWN:
+            self.assertIn("<h1>", section.body_html)
         self.assertIn("Hello", section.body_html)
 
     def test_slug_is_unique(self):
