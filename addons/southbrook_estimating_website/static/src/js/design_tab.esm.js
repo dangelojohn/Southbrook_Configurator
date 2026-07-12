@@ -417,6 +417,7 @@ export class KitchenDesignTab extends Component {
         this._toastSeq = 0;
         this._toastTimers = new Set();      // audit A16 — cancel on unmount
         this._cornerFlashTimer = null;      // Task 4 — cancel on unmount
+        this._cornerFlashRaf = null;        // M2 — cancel on unmount
         this._roomSaveSeq = 0;              // audit A6 — last-write-wins guard
         this._itemsMutSeq = 0;              // audit A7 — reload/add race guard
         this._lastAdd = null;               // audit A9 — hybrid double-add guard
@@ -449,6 +450,13 @@ export class KitchenDesignTab extends Component {
             for (const t of this._toastTimers) clearTimeout(t);
             this._toastTimers.clear();
             if (this._cornerFlashTimer) clearTimeout(this._cornerFlashTimer);
+            // M2 — a rAF scheduled by _triggerCornerFlash() right before
+            // unmount must not fire after teardown (it would mutate
+            // state.cornerFlash / schedule a timer on a torn-down component).
+            if (this._cornerFlashRaf !== null) {
+                cancelAnimationFrame(this._cornerFlashRaf);
+                this._cornerFlashRaf = null;
+            }
         });
     }
 
@@ -489,7 +497,8 @@ export class KitchenDesignTab extends Component {
         }
         this.state.cornerFlash = false;
         // Restart the CSS transition even if it's already mid-flash.
-        requestAnimationFrame(() => {
+        this._cornerFlashRaf = requestAnimationFrame(() => {
+            this._cornerFlashRaf = null;
             this.state.cornerFlash = true;
             this._cornerFlashTimer = setTimeout(() => {
                 this._cornerFlashTimer = null;
