@@ -41,6 +41,36 @@ jobs:
         run: flutter test
         working-directory: flutter_app
 
+  # PR3a — southbrook_kitchen_3d_configurator regression suite. Node-native
+  # (not Hoot): the runner has no headless-Chromium binary available, so
+  # this mounts the REAL kitchen_configurator.js OWL component under
+  # jsdom + the real @odoo/owl package (pinned to the vendored 2.8.2),
+  # and exercises the real coordinate-math builders +
+  # KitchenCanvas._placeCabinetGroup against the real vendored r160
+  # Three.js (pure matrix math, no WebGL context needed). Independent of
+  # the Odoo docker stack — no compose/db/odoo bring-up required, so this
+  # finishes in seconds. See addons/southbrook_kitchen_3d_configurator/
+  # tests/node_js/README.md for the full runnability rationale and how
+  # to run it locally.
+  kitchen-3d-configurator-node-tests:
+    runs-on: linux-amd64
+    container:
+      image: node:22-slim
+    defaults:
+      run:
+        working-directory: addons/southbrook_kitchen_3d_configurator/tests/node_js
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install pinned deps (npm ci — lockfile-exact, no drift)
+        run: npm ci --no-audit --no-fund
+
+      - name: Run the regression suite (wall selection, hydration/reload, renderer coordinate math, active-wall indicator, callback contract, Design-83 golden snapshot)
+        run: npm test
+
   southbrook-tests:
     # `runs-on` labels must match what the Forgejo runner advertises.
     # The runner installed on the QNAP advertises `linux-amd64`; adjust
