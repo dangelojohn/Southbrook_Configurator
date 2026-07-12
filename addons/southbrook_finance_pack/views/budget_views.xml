@@ -69,12 +69,16 @@
         <field name="name">southbrook.finance.budget_line.pivot</field>
         <field name="model">southbrook.finance.budget_line</field>
         <field name="arch" type="xml">
-            <pivot string="Budget vs Actual">
+            <!-- actual_amount / variance are NON-STORED, search-based computes;
+                 a pivot/graph measure must be stored (read_group cannot
+                 aggregate a non-stored field) or opening this view raises.
+                 Only budget_amount (stored) is a valid measure here. Actual vs
+                 variance are shown per-line in the budget form's embedded
+                 list, which renders non-stored computes fine. -->
+            <pivot string="Budget by Account / Month">
                 <field name="account_id" type="row"/>
                 <field name="period_month" type="col"/>
                 <field name="budget_amount" type="measure"/>
-                <field name="actual_amount" type="measure"/>
-                <field name="variance" type="measure"/>
             </pivot>
         </field>
     </record>

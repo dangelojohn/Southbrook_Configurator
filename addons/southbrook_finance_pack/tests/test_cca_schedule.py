@@ -108,12 +108,20 @@ class TestCcaSchedule(TransactionCase):
         asset = self._new_asset(self.class_8, 10000.0)
         asset.action_generate_schedule(years=5)
         self.assertEqual(len(asset.schedule_ids), 5)
-        # Accumulated = sum of cca_amount.
-        expected_acc = sum(r.cca_amount for r in asset.schedule_ids)
-        self.assertAlmostEqual(asset.accumulated_depreciation, expected_acc, places=2)
+        # Accumulated depreciation counts only POSTED (taken) lines, not the
+        # whole projected schedule. Freshly generated => nothing posted =>
+        # accumulated 0.0 and net_book_value still the full acquisition cost.
+        self.assertAlmostEqual(asset.accumulated_depreciation, 0.0, places=2)
+        self.assertAlmostEqual(asset.net_book_value, 10000.0, places=2)
+        # Post the first two years and re-check: accumulated tracks the posted
+        # slice, NBV falls by exactly that much.
+        posted = asset.schedule_ids.sorted("year")[:2]
+        posted.write({"posted": True})
+        expected_acc = sum(posted.mapped("cca_amount"))
         self.assertAlmostEqual(
-            asset.net_book_value, 10000.0 - expected_acc, places=2
-        )
+            asset.accumulated_depreciation, expected_acc, places=2)
+        self.assertAlmostEqual(
+            asset.net_book_value, 10000.0 - expected_acc, places=2)
 
     def test_cannot_regenerate_if_posted(self):
         asset = self._new_asset(self.class_8, 10000.0)

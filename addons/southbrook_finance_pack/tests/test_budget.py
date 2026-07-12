@@ -15,8 +15,10 @@ class TestBudget(TransactionCase):
         # Reuse an existing expense account -- on a fresh CE install the
         # demo CoA may be empty, so create a stub account.account record.
         Account = self.env["account.account"]
+        # v19 made account.account multi-company: company_id → company_ids (M2M).
         existing = Account.search(
-            [("account_type", "=", "expense"), ("company_id", "=", self.env.company.id)],
+            [("account_type", "=", "expense"),
+             ("company_ids", "in", self.env.company.id)],
             limit=1,
         )
         if existing:
@@ -27,7 +29,7 @@ class TestBudget(TransactionCase):
                     "name": "Test Expense",
                     "code": "TST-EXP",
                     "account_type": "expense",
-                    "company_id": self.env.company.id,
+                    "company_ids": [(6, 0, [self.env.company.id])],
                 }
             )
 

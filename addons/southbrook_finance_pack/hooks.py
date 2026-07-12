@@ -32,8 +32,12 @@ def post_init_activate_l10n_ca(env):
 
         # Skip when a chart of accounts is already loaded for this company:
         # account.account is empty until a template is materialised.
+        # v19 made account.account multi-company: company_id → company_ids
+        # (M2M). The old company_id leaf raised (invalid field), and the broad
+        # except below swallowed it — so the CoA was never auto-loaded on a
+        # fresh company, defeating the whole point of this hook.
         existing = env["account.account"].search_count(
-            [("company_id", "=", company.id)]
+            [("company_ids", "in", company.id)]
         )
         if existing:
             _logger.info(
