@@ -2310,13 +2310,11 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         except AccessError:
             return {"error": "forbidden"}
         design = self._southbrook_get_or_create_design(order)
-        # Atomic: the whole re-arrange (drop corners → engine → mutate design
-        # lines → mirror) runs in a savepoint. Any failure — including an
-        # impossible layout — rolls back cleanly, never leaving half-created
-        # cabinets.
+        # Thin controller: validate (above) → call the service → return JSON.
+        # All geometry/substitution/manufacturing/persistence lives in the
+        # design.action_auto_arrange() service, which is atomic on its own.
         try:
-            with request.env.cr.savepoint():
-                arrange = self._southbrook_auto_arrange(design)
+            arrange = design.sudo().action_auto_arrange()
         except kitchen_layout_engine.LayoutCapacityExceeded as ex:
             _logger.info("[auto-arrange] ROOM_TOO_SMALL order=%s cap=%.0f "
                          "req=%.0f", order.id, ex.capacity_mm, ex.requested_mm)
@@ -2326,143 +2324,6 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                     "detail": ex.detail}
         return {"ok": True, "arrange": arrange,
                 "payload": self._southbrook_design_payload(design)}
-
-    # Corner-layer → catalog SKU. Base uses the generic lazy-susan-capable
-    # SB-CORNER; wall uses SB-WALL-CORNER. (Style variants — blind/diagonal
-    # — are a later refinement driven by run length + storage choice.)
-    _CORNER_SKU = {"base": "SB-CORNER", "wall": "SB-WALL-CORNER"}
-
-    def _southbrook_auto_arrange(self, design):
-        """Run the pure layout engine over the design's cabinets and apply
-        the result to the DESIGN lines (delete replaced, reposition
-        survivors, insert corner cabinets), then mirror to manufacturing."""
-        design = design.sudo()
-        Line = request.env["southbrook.kitchen.design.line"].sudo()
-        SaleOrder = request.env["sale.order"]
-        IN = 1.0 / 25.4
-        MM = 25.4
-        _t0 = time.time()
-        _logger.info("[auto-arrange] started design=%s", design.id)
-
-        # Fresh start — drop corner cabinets left by a prior auto-arrange
-        # so re-running is idempotent.
-        design.cabinet_line_ids.filtered(
-            lambda l: l.origin == "configurator" and l.cabinet_type == "corner"
-        ).unlink()
-
-        # Semantic cabinet list from the real cabinets (skip server-placed
-        # fillers/panels; corner cabinets were just dropped).
-        cabs = []
-        for dl in design.cabinet_line_ids:
-            if dl.origin != "configurator":
-                continue
-            if dl.cabinet_type in ("filler", "panel", "corner"):
-                continue
-            is_wall = dl.cabinet_type == "wall"
-            cabs.append({
-                "id": dl.id,
-                "width_mm": (dl.width_in or 0) * MM,
-                "height_mm": (dl.height_in or 0) * MM,
-                "depth_mm": (dl.depth_in or 0) * MM,
-                "family": "wall" if is_wall else "base",
-                "cabinet_type": dl.cabinet_type,
-                "zone": dl.zone or ("wall" if is_wall else "base_run"),
-            })
-        if not cabs:
-            return {"corners": 0, "removed": 0, "inserted": 0, "empty": True}
-
-        room = {
-            "width_mm":  (design.room_width_in or 0) * MM,
-            "depth_mm":  (design.room_depth_in or 0) * MM,
-            "height_mm": (design.room_height_in or 0) * MM,
-        }
-        r = kitchen_layout_engine.resolve_and_layout(
-            cabs, room,
-            zone_layout=SaleOrder._ZONE_LAYOUT,
-            worktop_cursor=SaleOrder._WORKTOP_CURSOR,
-            worktop_y=SaleOrder._WORKTOP_Y_FLOOR,
-        )
-        finals = {c["id"]: c for c in r["cabinets"]}
-        places = {p["id"]: p for p in r["placements"]}
-
-        # 1) delete the standard cabinets the corner replaced
-        if r["removed_ids"]:
-            design.cabinet_line_ids.filtered(
-                lambda l: l.id in set(r["removed_ids"])).unlink()
-
-        # Refresh the O2M so the survivor loop never sees a deleted record.
-        design.invalidate_recordset(["cabinet_line_ids"])
-
-        # 2) reposition the survivors
-        for dl in design.cabinet_line_ids:
-            cab = finals.get(dl.id)
-            place = places.get(dl.id)
-            if not cab or not place:
-                continue
-            dl.write({
-                "wall":          cab.get("wall", "back"),
-                "run_seq":       cab.get("run_seq", 0),
-                "x_position_in": place["x"] * IN,
-                "y_position_in": place["y"] * IN,
-                "z_position_in": place["z"] * IN,
-                "rotation_deg":  place["rotation_deg"],
-            })
-
-        # 3) insert a real corner cabinet per resolved corner
-        for node in r["inserted"]:
-            place = places[node["id"]]
-            code = self._CORNER_SKU.get(node["layer"], "SB-CORNER")
-            tmpl = request.env["product.template"].sudo().search(
-                [("default_code", "=", code)], limit=1)
-            variant = False
-            if tmpl:
-                variant = tmpl.product_variant_id or tmpl.product_variant_ids[:1]
-            if not variant:
-                _logger.warning(
-                    "[auto-arrange] corner SKU %s missing/no-variant — "
-                    "skipping corner insert (design %s)", code, design.id)
-                continue
-            Line.create({
-                "design_id":     design.id,
-                "product_id":    variant.id,
-                "quantity":      1,
-                "price_unit":    variant.list_price or tmpl.list_price,
-                "cabinet_type":  "corner",
-                "width_in":      node["width_mm"] * IN,
-                "height_in":     node["height_mm"] * IN,
-                "depth_in":      node["depth_mm"] * IN,
-                "x_position_in": place["x"] * IN,
-                "y_position_in": place["y"] * IN,
-                "z_position_in": place["z"] * IN,
-                "rotation_deg":  place["rotation_deg"],
-                "wall":          node["wall"],
-                "run_seq":       node["run_seq"],
-                "pinned":        False,
-                "layout_key":    "corner-%s-%s-%s" % (
-                    design.id, node["corner"], node["layer"]),
-                "origin":        "configurator",
-            })
-
-        # 4) mirror to the manufacturing model NOW (don't wait for the 5-min
-        #    reconcile cron) so BOM/price/cutlist reflect the corner today.
-        try:
-            request.env["southbrook.design.reconcile"].sudo()._reconcile_one(
-                design, {"created_orders": 0, "created_rooms": 0,
-                         "created_lines": 0, "mirrored": 0, "divergence": 0})
-        except Exception:
-            # Do NOT swallow — re-raise so the enclosing savepoint rolls the
-            # whole re-arrange back. Never leave the design mutated but the
-            # manufacturing mirror stale.
-            _logger.exception("[auto-arrange] reconcile failed for design %s "
-                              "— rolling back", design.id)
-            raise
-
-        _logger.info("[auto-arrange] finished design=%s corners=%d removed=%d "
-                     "inserted=%d elapsed=%dms", design.id, len(r["corners"]),
-                     len(r["removed_ids"]), len(r["inserted"]),
-                     int((time.time() - _t0) * 1000))
-        return {"corners": len(r["corners"]), "removed": len(r["removed_ids"]),
-                "inserted": len(r["inserted"])}
 
     # 2026-07-06 — portal-scoped "new design" defaults. The shared
     # southbrook.kitchen.design model's own field defaults (12in W ×
