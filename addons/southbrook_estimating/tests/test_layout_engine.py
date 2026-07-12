@@ -414,8 +414,13 @@ class TestKitchenLayoutEngine(TransactionCase):
         self.assertEqual(node_br["corner"], "back-right")
         self.assertIn(node_br["wall"], E.WALLS)
         cell_br = E._corner_cell_aabb("W", "0", room_br, cs)
-        self.assertTrue(E.footprints_overlap(
-            E.footprint_mm(node_br, place_br), cell_br))
+        fp_br = E.footprint_mm(node_br, place_br)
+        # M1: exact-cell equality (not just overlap) — the node's footprint
+        # must be PRECISELY the corner cell, same bar as back-left, so a
+        # future off-by-something pose regression can't slip through on a
+        # mere overlap check.
+        for got_edge, want_edge in zip(fp_br, cell_br):
+            self.assertAlmostEqual(got_edge, want_edge)
         self.assertNotEqual(int(round(place_br["rotation_deg"])) % 360, 0)
 
         # front-left — mirror (already correct pre-fix: the front run's LOW
@@ -426,8 +431,10 @@ class TestKitchenLayoutEngine(TransactionCase):
         self.assertEqual(node_fl["corner"], "front-left")
         self.assertIn(node_fl["wall"], E.WALLS)
         cell_fl = E._corner_cell_aabb("0", "D", ROOM, cs)
-        self.assertTrue(E.footprints_overlap(
-            E.footprint_mm(node_fl, place_fl), cell_fl))
+        fp_fl = E.footprint_mm(node_fl, place_fl)
+        # M1: exact-cell equality — see back-right comment above.
+        for got_edge, want_edge in zip(fp_fl, cell_fl):
+            self.assertAlmostEqual(got_edge, want_edge)
         self.assertNotEqual(int(round(place_fl["rotation_deg"])) % 360, 0)
 
     # ── Layer-scoped corner offset (2026-07-12, review I1) ──────────────
