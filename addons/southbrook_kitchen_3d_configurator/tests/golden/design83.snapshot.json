@@ -1,0 +1,9 @@
+{
+  "_comment": "Golden scene-snapshot regression artifact for the 3D renderer. Captured live from KitchenCanvas.__sbSceneSnapshot() (kitchen_canvas.esm.js:_sbSceneSnapshot) on Design 83 (4 base + 4 wall cabinets, all rotation_deg=0, back wall, room 96x96). Each row is [x, y, z, rotY_deg] of a decomposed cab-mesh matrixWorld in scene-feet (IN=1/12), rounded, sorted. This is the BYTE-IDENTITY baseline for PR3.1 (renderer dispatch collapse to the single _placeCabinetGroup path): before==after==hash below, verified live on deploy 2026-07-12. PR3a (Hoot) should mount a headless KitchenCanvas with this design's items and assert the snapshot equals `rows` / `hash`.",
+  "design_id": 83,
+  "captured": "2026-07-12",
+  "verified_against": "PR3.1 deploy (git main 8eb8a18); before-hash (pre-PR3.1) == after-hash (post-PR3.1)",
+  "mesh_count": 48,
+  "hash": 3591767287,
+  "rows": [[0.625,4.49,0.5,0],[0.625,5.75,0.5,0],[0.625,5.75,0.999,0],[0.625,6,1.018,0],[1,0.146,1,0],[1,0.627,1.999,0],[1,0.627,2.018,0],[1,1.377,1.999,0],[1,1.377,2.018,0],[1,1.583,1,0],[1,2.913,2.07,0],[1,2.938,1.03,0],[1.875,4.49,0.5,0],[1.875,5.75,0.5,0],[1.875,5.75,0.999,0],[1.875,6,1.018,0],[3,0.146,1,0],[3,0.627,1.999,0],[3,0.627,2.018,0],[3,1.377,1.999,0],[3,1.377,2.018,0],[3,1.583,1,0],[3,2.913,2.07,0],[3,2.938,1.03,0],[3.125,4.49,0.5,0],[3.125,5.75,0.5,0],[3.125,5.75,0.999,0],[3.125,6,1.018,0],[4.375,4.49,0.5,0],[4.375,5.75,0.5,0],[4.375,5.75,0.999,0],[4.375,6,1.018,0],[5,0.146,1,0],[5,0.627,1.999,0],[5,0.627,2.018,0],[5,1.377,1.999,0],[5,1.377,2.018,0],[5,1.583,1,0],[5,2.913,2.07,0],[5,2.938,1.03,0],[7,0.146,1,0],[7,0.627,1.999,0],[7,0.627,2.018,0],[7,1.377,1.999,0],[7,1.377,2.018,0],[7,1.583,1,0],[7,2.913,2.07,0],[7,2.938,1.03,0]]
+}
