@@ -203,6 +203,25 @@ class TestKitchenWorkspace(TransactionCase):
         with self.assertRaises(UserError):
             approval.action_reject()
 
+    def test_approval_state_not_writable_directly(self):
+        """Integrity guard: state may only change via Approve/Reject, never
+        by a direct write (which would bypass the pending-guard and let a
+        rejected approval be flipped back to approved)."""
+        project = self._new_project()
+        approval = self.Approval.create({
+            "project_id": project.id,
+            "approval_type": "eng_review",
+            "approver_type": "manager",
+        })
+        approval.action_reject()
+        # Attempt to launder the rejection into an approval via direct write.
+        with self.assertRaises(UserError):
+            approval.write({"state": "approved"})
+        self.assertEqual(approval.state, "rejected")
+        # Non-state writes still work.
+        approval.write({"notes": "reviewed offline"})
+        self.assertEqual(approval.notes, "reviewed offline")
+
     # ------------------------------------------------------------------
     # DoD — designer creates a project, attaches photos, selects options
     # ------------------------------------------------------------------

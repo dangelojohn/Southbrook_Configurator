@@ -18,7 +18,7 @@
                         <group>
                             <field name="project_id"/>
                             <field name="date_analyzed"/>
-                            <field name="confirmed_by_human" widget="boolean_toggle"/>
+                            <field name="confirmed_by_human" widget="boolean_toggle" readonly="1"/>
                             <field name="confirmed_by_user_id"/>
                             <field name="confirmed_at"/>
                         </group>

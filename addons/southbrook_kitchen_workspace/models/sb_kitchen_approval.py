@@ -46,16 +46,29 @@ class SbKitchenApproval(models.Model):
     approver_type = fields.Selection(APPROVER_TYPES, required=True)
     state = fields.Selection(
         APPROVAL_STATES, default="pending", tracking=True, required=True,
+        index=True,
     )
     notes = fields.Text()
     date_decided = fields.Datetime(readonly=True, copy=False)
+
+    def write(self, vals):
+        # Integrity gate: the approval state may ONLY change through the
+        # Approve/Reject actions below (which set the sb_approval_transition
+        # flag). A direct ORM/UI write to `state` — e.g. flipping a rejected
+        # approval back to approved, bypassing the pending-guard — is refused.
+        if "state" in vals and not self.env.context.get(
+                "sb_approval_transition"):
+            raise UserError(_(
+                "Approval state changes only through the Approve / Reject "
+                "actions, not by direct edit."))
+        return super().write(vals)
 
     def action_approve(self):
         for record in self:
             if record.state != "pending":
                 raise UserError(_(
                     "Approval already decided (state=%s).") % record.state)
-            record.write({
+            record.with_context(sb_approval_transition=True).write({
                 "state": "approved",
                 "approver_id": self.env.user.id,
                 "date_decided": fields.Datetime.now(),
@@ -66,7 +79,7 @@ class SbKitchenApproval(models.Model):
             if record.state != "pending":
                 raise UserError(_(
                     "Approval already decided (state=%s).") % record.state)
-            record.write({
+            record.with_context(sb_approval_transition=True).write({
                 "state": "rejected",
                 "approver_id": self.env.user.id,
                 "date_decided": fields.Datetime.now(),

@@ -108,7 +108,7 @@
                                     <field name="height_mm"/>
                                     <field name="depth_mm"/>
                                     <field name="requires_clearance_mm"/>
-                                    <field name="confirmed_by_human" widget="boolean_toggle"/>
+                                    <field name="confirmed_by_human" widget="boolean_toggle" readonly="1"/>
                                 </list>
                             </field>
                         </page>

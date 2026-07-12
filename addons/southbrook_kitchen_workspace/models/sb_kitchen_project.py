@@ -1,7 +1,11 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """sb.kitchen.project — the parent record for a kitchen design engagement."""
+import logging
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 PROJECT_STATES = [
@@ -53,6 +57,7 @@ class SbKitchenProject(models.Model):
     )
     state = fields.Selection(
         PROJECT_STATES, default="draft", tracking=True, required=True,
+        index=True,
     )
     theme = fields.Selection(THEME_CHOICES, tracking=True)
     date_created = fields.Date(
@@ -67,7 +72,7 @@ class SbKitchenProject(models.Model):
     opportunity_id = fields.Many2one("crm.lead", string="CRM Opportunity")
     salesperson_id = fields.Many2one(
         "res.users", string="Designer / Salesperson",
-        default=lambda self: self.env.user,
+        default=lambda self: self.env.user, index=True,
     )
 
     # Child collections.
@@ -202,11 +207,14 @@ class SbKitchenProject(models.Model):
         block — the state machine ran first and is the authoritative
         contract; email is a side-effect.
         """
-        Template = self.env["mail.template"].sudo()
         full_xml_id = f"southbrook_kitchen_workspace.{template_xml_id}"
         template = self.env.ref(full_xml_id, raise_if_not_found=False)
         if not template:
             return  # template removed / renamed — caller carries on
+        # Render/queue as sudo so a non-privileged designer can send the
+        # template (its access is otherwise restricted); the body renders only
+        # this project's own fields via auto-escaped t-out — no injection.
+        template = template.sudo()
         for project in self:
             try:
                 template.with_context(
@@ -214,8 +222,7 @@ class SbKitchenProject(models.Model):
                 ).send_mail(project.id, force_send=False)
             except Exception:
                 # The transition must not roll back on email failure.
-                import logging
-                logging.getLogger(__name__).warning(
+                _logger.warning(
                     "Lifecycle email %s failed for project %s",
                     full_xml_id, project.code, exc_info=True,
                 )
