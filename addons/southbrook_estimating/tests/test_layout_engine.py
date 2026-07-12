@@ -169,3 +169,47 @@ class TestKitchenLayoutEngine(TransactionCase):
         self.assertTrue(all(abs(p["rotation_deg"] - 90) < 1 for p in left))
         self.assertLessEqual(max(p["x"] + 300 for p in back + [cc]), 4000)
         self.assertLessEqual(max(p["z"] + 300 for p in left), 3000)
+
+    def test_resolve_generates_manufacturable_U(self):
+        # A manually-placed U: left + back + right. BOTH back corners must be
+        # reserved (back-left low/low, back-right where the back run meets the
+        # right run at its HIGH end). The load-bearing property is that NO two
+        # cabinets overlap once the corners are resolved.
+        def mk(cid, wall, seq, ct="base"):
+            return {"id": cid, "width_mm": 600,
+                    "height_mm": 876 if ct != "wall" else 720,
+                    "depth_mm": 600 if ct != "wall" else 320,
+                    "family": ct if ct == "wall" else "base",
+                    "cabinet_type": ct,
+                    "zone": "wall" if ct == "wall" else "base_run",
+                    "wall": wall, "run_seq": seq}
+        cabs = ([mk(("L", s), "left", s) for s in range(3)]
+                + [mk(("B", s), "back", s) for s in range(5)]
+                + [mk(("R", s), "right", s) for s in range(3)])
+        r = E.resolve_and_layout(cabs, ROOM, auto_assign=False)
+        corners = sorted(c["corner"] for c in r["cabinets"]
+                         if c.get("corner_cabinet"))
+        self.assertEqual(corners, ["back-left", "back-right"])
+        handed = {c["corner"]: c["handed"] for c in r["cabinets"]
+                  if c.get("corner_cabinet")}
+        self.assertEqual(handed, {"back-left": "L", "back-right": "R"})
+        # 11 in − 4 replaced (2 per corner) + 2 corners = 9
+        self.assertEqual(len(r["cabinets"]), 9)
+        pl = {p["id"]: p for p in r["placements"]}
+        # THE invariant: no cabinet overlaps another (incl. both corner cells).
+        fps = [(c["id"], E.footprint_mm(c, pl[c["id"]])) for c in r["cabinets"]]
+        for i in range(len(fps)):
+            for j in range(i + 1, len(fps)):
+                self.assertFalse(
+                    E.footprints_overlap(fps[i][1], fps[j][1]),
+                    "overlap: %s vs %s" % (fps[i][0], fps[j][0]))
+        # every cabinet stays inside the room
+        for c in r["cabinets"]:
+            self.assertTrue(E.within_room(c, pl[c["id"]], ROOM),
+                            "outside room: %s" % (c["id"],))
+        # back-right corner sits against the right wall near (W, 0)
+        br = [c for c in r["cabinets"]
+              if c.get("corner") == "back-right"][0]
+        self.assertEqual(br["wall"], "right")
+        self.assertGreater(pl[br["id"]]["x"], 3000)
+        self.assertLess(pl[br["id"]]["z"], 1000)

@@ -357,6 +357,23 @@ def auto_assign_walls(cabinets, room, wall_order=("back", "left")):
     return result
 
 
+# Corner resolution geometry, keyed by corner name:
+#   (host_wall, other_wall, other_end, handed)
+#   host_wall  — the run whose LOW end is at this corner; the corner cabinet
+#                joins it at run_seq -1 (consuming its cursor so the run
+#                flows past the reserved cell).
+#   other_wall — the adjoining run.
+#   other_end  — where the adjoining run meets the corner: "first" (its low
+#                end → also offset it by cs) or "last" (its high end simply
+#                terminates at the cell → no offset).
+#   handed     — corner handedness hint for downstream SKU selection.
+# Front corners are detected but not yet reserved (need a front wall UX).
+_CORNER_RESOLVE = {
+    "back-left":  ("back",  "left", "first", "L"),
+    "back-right": ("right", "back", "last",  "R"),
+}
+
+
 # Corner-cabinet footprint (square) + per-layer height, millimetres.
 _CORNER_FOOTPRINT_MM = 914.0            # 36"
 _CORNER_HEIGHT_MM = {"base": 876.0, "wall": 762.0}   # 34.5" / 30"
@@ -378,9 +395,10 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                         interactive flow, where the user placed each cabinet
                         on a wall) and just resolve corners in place.
 
-    v1 resolves the back-left corner (what wall_order=('back','left')
-    produces for an L). Other corners are detected + returned but not yet
-    footprint-reserved — that lands with the U-shape increment.
+    Resolves the two BACK corners (back-left + back-right) — an L
+    (back+left) or a U (left+back+right). The two FRONT corners are still
+    detected + returned but not footprint-reserved (they need a front-wall
+    UX before they're reachable).
 
     Returns {"cabinets", "placements", "corners", "inserted"}.
     """
@@ -391,28 +409,36 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     removed_ids = set()
     offsets = {}
 
-    def _run_first(cabs, wall, layer):
+    def _run_end(cabs, wall, layer, end):
         run = [c for c in cabs if (c.get("wall") or "back") == wall
                and _layer_of(c) == layer and not c.get("corner_cabinet")]
-        return min(run, key=lambda c: c.get("run_seq", 0), default=None)
+        pick = min if end == "first" else max
+        return pick(run, key=lambda c: c.get("run_seq", 0), default=None)
 
     for corner in corners:
-        if corner["corner"] != "back-left":
-            continue   # v1: only back-left is footprint-reserved
+        spec = _CORNER_RESOLVE.get(corner["corner"])
+        if spec is None:
+            continue   # front corners detected but not yet footprint-reserved
+        host_wall, other_wall, other_end, handed = spec
         layer = corner["layer"]
         # The corner cabinet REPLACES the two standard cabinets that meet at
-        # the corner (the low-end cabinet of each run) — otherwise they'd
-        # overlap the corner cell and the wall would overflow.
-        back_first = _run_first(assigned, "back", layer)
-        left_first = _run_first(assigned, "left", layer)
-        for c in (back_first, left_first):
+        # the corner — otherwise they'd overlap the corner cell / overflow.
+        # It JOINS the run whose LOW end is at this corner (host_wall) at
+        # run_seq -1: sitting first, it consumes that run's cursor so the
+        # rest of the run flows past the reserved cell automatically. The
+        # adjoining run meets the corner at `other_end`:
+        #   "first" → its low end is also at the corner, so offset it by cs;
+        #   "last"  → its high end terminates at the cell (no offset needed).
+        host_first = _run_end(assigned, host_wall, layer, "first")
+        other_cab = _run_end(assigned, other_wall, layer, other_end)
+        for c in (host_first, other_cab):
             if c is not None:
                 removed_ids.add(c["id"])
         inserted.append({
             "id": "corner-%s-%s" % (corner["corner"], layer),
             "corner_cabinet": True,
             "corner": corner["corner"],
-            "handed": "L",
+            "handed": handed,
             "layer": layer,
             "cabinet_type": "wall" if layer == "wall" else "base",
             "family": "wall" if layer == "wall" else "base",
@@ -420,15 +446,15 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
             "depth_mm": corner_size_mm,
             "height_mm": _CORNER_HEIGHT_MM[layer],
             "zone": "wall" if layer == "wall" else "base_run",
-            # Joins the BACK run at its low (x=0) end so it sits in the
-            # corner; run_seq -1 makes it first.
-            "wall": "back",
+            "wall": host_wall,
             "run_seq": -1,
-            "replaced_ids": [c["id"] for c in (back_first, left_first)
+            "replaced_ids": [c["id"] for c in (host_first, other_cab)
                              if c is not None],
         })
-        # The LEFT run must start past the corner footprint.
-        offsets["left"] = max(offsets.get("left", 0), corner_size_mm)
+        if other_end == "first":
+            # The adjoining low-end run must start past the corner footprint.
+            offsets[other_wall] = max(offsets.get(other_wall, 0),
+                                      corner_size_mm)
 
     final = [dict(c) for c in assigned if c["id"] not in removed_ids]
     final.extend(dict(n) for n in inserted)
