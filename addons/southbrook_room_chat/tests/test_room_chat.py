@@ -191,14 +191,14 @@ class TestRoomChatAgentModel(TransactionCase):
     # Mock mode — exercises the REAL tool-execution code
     # ------------------------------------------------------------------
     def test_mock_handle_turn_returns_reply_and_room(self):
-        result = self.Agent.handle_turn(self.order.id, "It's an L-shaped kitchen.")
+        result = self.Agent._handle_turn(self.order.id, "It's an L-shaped kitchen.")
         self.assertTrue(result["ok"], msg=result)
         self.assertIn("reply", result)
         self.assertTrue(result["reply"])
         self.assertIn("room", result)
 
     def test_mock_populates_draft_via_tool_loop(self):
-        result = self.Agent.handle_turn(self.order.id, "It's a straight run, 12 feet.")
+        result = self.Agent._handle_turn(self.order.id, "It's a straight run, 12 feet.")
         self.assertTrue(result["ok"], msg=result)
         room = result["room"]
         self.assertEqual(room["layout_shape"], "straight")
@@ -209,25 +209,25 @@ class TestRoomChatAgentModel(TransactionCase):
         self.assertEqual(room["walls"][0]["constraints"][0]["constraint_type"], "window")
 
     def test_mock_persists_across_turns(self):
-        self.Agent.handle_turn(self.order.id, "first message")
+        self.Agent._handle_turn(self.order.id, "first message")
         session = self.env["southbrook.room.chat.session"].get_or_create_for_order(self.order.id)
         transcript = session.get_transcript()
         self.assertEqual(len(transcript), 2)  # user + assistant
 
     def test_reset_flag_clears_session(self):
-        self.Agent.handle_turn(self.order.id, "It's a straight run.")
-        result = self.Agent.handle_turn(self.order.id, "", reset=True)
+        self.Agent._handle_turn(self.order.id, "It's a straight run.")
+        result = self.Agent._handle_turn(self.order.id, "", reset=True)
         self.assertTrue(result["ok"], msg=result)
         self.assertIsNone(result["room"]["layout_shape"])
 
     def test_empty_message_rejected(self):
-        result = self.Agent.handle_turn(self.order.id, "   ")
+        result = self.Agent._handle_turn(self.order.id, "   ")
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "invalid")
 
     def test_message_length_cap_rejected(self):
         too_long = "x" * (self.Agent._MAX_MESSAGE_CHARS + 1)
-        result = self.Agent.handle_turn(self.order.id, too_long)
+        result = self.Agent._handle_turn(self.order.id, too_long)
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "invalid")
 
@@ -366,7 +366,7 @@ class TestRoomChatAgentModel(TransactionCase):
 
     def test_no_southbrook_room_records_created(self):
         before = self.env["southbrook.room"].search_count([])
-        self.Agent.handle_turn(self.order.id, "It's an L-shaped kitchen with a window.")
+        self.Agent._handle_turn(self.order.id, "It's an L-shaped kitchen with a window.")
         after = self.env["southbrook.room"].search_count([])
         self.assertEqual(before, after)
 
@@ -395,17 +395,100 @@ class TestRoomChatAgentModel(TransactionCase):
         with patch.object(
             type(self.Agent), "_call_anthropic", side_effect=responses,
         ):
-            result = self.Agent.handle_turn(self.order.id, "One wall, 4 metres.")
+            result = self.Agent._handle_turn(self.order.id, "One wall, 4 metres.")
         self.assertTrue(result["ok"], msg=result)
         self.assertEqual(result["reply"], "Added a 4m wall.")
         self.assertEqual(result["room"]["walls"][0]["length_mm"], 4000)
+
+    def test_daily_cap_kill_switch_blocks_real_call(self):
+        """max_daily_calls=0 is a hard kill-switch — _handle_turn returns
+        rate_limited without ever invoking _call_anthropic."""
+        self._set_real_backend()
+        self.env["ir.config_parameter"].sudo().set_param(
+            "southbrook_room_chat.max_daily_calls", "0")
+        with patch.object(
+            type(self.Agent), "_call_anthropic",
+            side_effect=AssertionError("_call_anthropic must not be called"),
+        ):
+            result = self.Agent._handle_turn(self.order.id, "hello")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "rate_limited")
+
+    def test_daily_cap_reached_blocks_further_turns(self):
+        """Once today's real-call counter hits the cap, the next turn's
+        first real call is rejected with rate_limited."""
+        self._set_real_backend()
+        self.env["ir.config_parameter"].sudo().set_param(
+            "southbrook_room_chat.max_daily_calls", "1")
+        end_turn = {
+            "stop_reason": "end_turn",
+            "content": [{"type": "text", "text": "ok"}],
+        }
+        with patch.object(
+            type(self.Agent), "_call_anthropic", return_value=end_turn,
+        ):
+            first = self.Agent._handle_turn(self.order.id, "hi")
+            second = self.Agent._handle_turn(self.order.id, "hi again")
+        self.assertTrue(first["ok"], msg=first)
+        self.assertFalse(second["ok"])
+        self.assertEqual(second["error"], "rate_limited")
+
+    def test_daily_cap_counts_per_real_call_not_per_turn(self):
+        """A turn that fans out N real calls consumes N units of quota
+        (bounding the _MAX_TOOL_ITERATIONS multiplier), so a cap of 1
+        stops the loop after the first call within a single turn."""
+        self._set_real_backend()
+        self.env["ir.config_parameter"].sudo().set_param(
+            "southbrook_room_chat.max_daily_calls", "1")
+        # First call asks for a tool; the loop would normally make a 2nd
+        # real call to get the final reply — but the cap (1) is exhausted,
+        # so the turn stops gracefully with the draft built so far.
+        responses = [
+            {
+                "stop_reason": "tool_use",
+                "content": [{
+                    "type": "tool_use", "id": "c1", "name": "add_wall",
+                    "input": {"name": "Wall A", "length_mm": 4000},
+                }],
+            },
+            {  # must never be reached — cap is 1
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": "should not appear"}],
+            },
+        ]
+        with patch.object(
+            type(self.Agent), "_call_anthropic", side_effect=responses,
+        ):
+            result = self.Agent._handle_turn(self.order.id, "one wall 4m")
+        self.assertTrue(result["ok"], msg=result)
+        # The tool ran (draft has the wall) but the 2nd call was capped.
+        self.assertEqual(result["room"]["walls"][0]["length_mm"], 4000)
+        self.assertNotEqual(result["reply"], "should not appear")
+
+    def test_daily_cap_does_not_apply_to_mock(self):
+        """The mock backend is free — the cap only gates the paid real
+        call, so mock turns never consume quota."""
+        self.env["ir.config_parameter"].sudo().set_param(
+            "southbrook_room_chat.max_daily_calls", "0")
+        result = self.Agent._handle_turn(self.order.id, "It's a straight run.")
+        self.assertTrue(result["ok"], msg=result)
+
+    def test_handle_turn_is_not_rpc_dispatchable(self):
+        """H2 regression: the public `handle_turn` name must be gone (an
+        RPC-reachable entry point would bypass the controller's ownership
+        + rate-limit gates); only the private `_handle_turn` exists."""
+        self.assertFalse(
+            hasattr(type(self.Agent), "handle_turn"),
+            "handle_turn must be private (_handle_turn) — a public name is "
+            "call_kw-dispatchable and bypasses ownership/rate-limit gates.")
+        self.assertTrue(hasattr(type(self.Agent), "_handle_turn"))
 
     def test_malformed_ai_response_recovered(self):
         self._set_real_backend()
         with patch.object(
             type(self.Agent), "_call_anthropic", return_value="not a dict",
         ):
-            result = self.Agent.handle_turn(self.order.id, "hello")
+            result = self.Agent._handle_turn(self.order.id, "hello")
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "malformed_response")
 
@@ -415,7 +498,7 @@ class TestRoomChatAgentModel(TransactionCase):
             type(self.Agent), "_call_anthropic",
             side_effect=RuntimeError("Anthropic HTTP 503"),
         ):
-            result = self.Agent.handle_turn(self.order.id, "hello")
+            result = self.Agent._handle_turn(self.order.id, "hello")
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "upstream_error")
 
@@ -425,7 +508,7 @@ class TestRoomChatAgentModel(TransactionCase):
             type(self.Agent), "_call_anthropic",
             return_value={"content": [], "stop_reason": "refusal"},
         ):
-            result = self.Agent.handle_turn(self.order.id, "hello")
+            result = self.Agent._handle_turn(self.order.id, "hello")
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "refused")
 
@@ -433,7 +516,7 @@ class TestRoomChatAgentModel(TransactionCase):
         ICP = self.env["ir.config_parameter"].sudo()
         ICP.set_param("southbrook_room_chat.use_mock", "False")
         ICP.set_param("southbrook_room_capture.anthropic_api_key", "")
-        result = self.Agent.handle_turn(self.order.id, "hello")
+        result = self.Agent._handle_turn(self.order.id, "hello")
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "not_configured")
 
