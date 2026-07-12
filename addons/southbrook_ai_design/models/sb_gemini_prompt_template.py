@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """sb.gemini.prompt.template — versioned prompts stored as records."""
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class SbGeminiPromptTemplate(models.Model):
@@ -36,10 +37,12 @@ class SbGeminiPromptTemplate(models.Model):
             ("code", "=", code), ("active", "=", True),
         ], limit=1)
         if not template:
-            raise ValueError(
-                f"No active prompt template with code={code!r}. "
-                f"Insert one or activate an existing record."
-            )
+            # UserError (not ValueError) so a missing/inactive template surfaces
+            # as a clean message on the analyze() path, not an opaque 500.
+            raise UserError(_(
+                "No active Gemini prompt template with code '%s'. Insert one "
+                "or activate an existing record."
+            ) % code)
         return template
 
     def to_generation_config(self) -> dict:

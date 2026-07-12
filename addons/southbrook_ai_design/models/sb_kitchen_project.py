@@ -55,6 +55,14 @@ class SbKitchenProject(models.Model):
         if not isinstance(payload, dict):
             raise UserError(_("Gemini payload must be a JSON object."))
 
+        # Re-validate here: this is a public ORM method callable directly,
+        # bypassing analyze()'s _validate — a caller could otherwise land
+        # unclamped/hallucinated dimensions (which, though gated by
+        # confirmed_by_human downstream, shouldn't enter the DB unchecked).
+        # _validate clamps ranges + coerces enums and is idempotent, so the
+        # normal analyze() path (already validated) is unaffected. (Audit M3.)
+        payload = self.env["southbrook.gemini.client"]._validate(payload)
+
         image_hash = payload.get("image_hash") or ""
         if not image_hash:
             raise UserError(_(
