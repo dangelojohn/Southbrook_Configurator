@@ -29,6 +29,7 @@ the bridge is not registered, so no callback can fire in production.
 The controller body is here so the test suite can exercise it without
 the server action.
 """
+import hmac
 import json
 import logging
 
@@ -60,9 +61,19 @@ class FreecadBridgeController(http.Controller):
                 headers=[("Content-Type", "application/json")],
             )
         provided = request.httprequest.headers.get("X-Bridge-Secret", "")
-        if provided != configured:
+        # Constant-time compare so an attacker can't recover the shared secret
+        # byte-by-byte via response timing (a plain `!=` short-circuits on the
+        # first differing byte). compare_digest needs equal-length str/bytes.
+        if not hmac.compare_digest(str(provided), str(configured)):
             _logger.warning("cad_callback rejected: bad X-Bridge-Secret header")
-            raise AccessError("Invalid bridge secret")
+            # Return the documented JSON 401 (not a raised AccessError, which
+            # v19 renders as a 403 HTML page — inconsistent with every other
+            # branch of this machine-to-machine handler).
+            return request.make_response(
+                json.dumps({"error": "bad_secret"}),
+                status=401,
+                headers=[("Content-Type", "application/json")],
+            )
 
         # ---- Body parse ----
         try:
@@ -85,8 +96,22 @@ class FreecadBridgeController(http.Controller):
                 headers=[("Content-Type", "application/json")],
             )
 
+        # MEDIUM-3: validate coercions defensively so a malformed bridge payload
+        # returns a clean 400, not an uncaught 500; cap the attachment list.
+        try:
+            production_id = int(production_id)
+            if not isinstance(attachment_ids, list):
+                raise ValueError("attachment_ids must be a list")
+            attachment_ids = [int(a) for a in attachment_ids][:200]
+        except (TypeError, ValueError):
+            return request.make_response(
+                json.dumps({"error": "bad_field_types"}),
+                status=400,
+                headers=[("Content-Type", "application/json")],
+            )
+
         Production = request.env["mrp.production"].sudo()
-        mo = Production.browse(int(production_id)).exists()
+        mo = Production.browse(production_id).exists()
         if not mo:
             return request.make_response(
                 json.dumps({"error": "unknown_production"}),
@@ -94,9 +119,30 @@ class FreecadBridgeController(http.Controller):
                 headers=[("Content-Type", "application/json")],
             )
 
+        # MEDIUM-1: only accept a callback for an MO actually awaiting a render
+        # (pending/rendering), OR an idempotent replay of the same terminal
+        # status (the endpoint advertises idempotent repeat calls). This blocks
+        # a forged/replayed call from *regressing* MOs across the factory (e.g.
+        # flipping a 'done' MO to 'error', or attaching to an MO that never
+        # entered the render pipeline) while preserving safe retries.
+        if (mo.x_cad_status not in ("pending", "rendering")
+                and status != mo.x_cad_status):
+            return request.make_response(
+                json.dumps({"error": "not_awaiting_render",
+                            "x_cad_status": mo.x_cad_status}),
+                status=409,
+                headers=[("Content-Type", "application/json")],
+            )
+
         values = {"x_cad_status": status}
         if attachment_ids:
-            values["x_cad_attachment_ids"] = [(6, 0, [int(a) for a in attachment_ids])]
+            # HIGH-2 (partial): ADD (4,id), never (6,0) REPLACE — a forged or
+            # replayed call must not be able to WIPE the legitimately-linked CAD
+            # artifacts. Restricting these ids to attachments already bound to
+            # THIS MO (res_model/res_id) is a further hardening left to the owner
+            # (needs the bridge's upload/bind flow confirmed so the filter
+            # doesn't drop legit unbound uploads) — see the code review.
+            values["x_cad_attachment_ids"] = [(4, a) for a in attachment_ids]
         mo.write(values)
 
         _logger.info(

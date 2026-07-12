@@ -159,7 +159,7 @@ class MrpProduction(models.Model):
                 self.message_post(
                     body=_("CAD render job posted to bridge (HTTP %s).")
                     % resp.status_code,
-                    subtype_xmlid="mail.mt_log_note",
+                    subtype_xmlid="mail.mt_note",
                 )
                 return True
             _logger.warning(
@@ -179,7 +179,7 @@ class MrpProduction(models.Model):
         self.write({"x_cad_status": "error"})
         self.message_post(
             body=_("CAD render request failed: %s") % msg,
-            subtype_xmlid="mail.mt_log_note",
+            subtype_xmlid="mail.mt_note",
         )
 
     # ──────────────────────────────────────────────────────────────────
@@ -214,7 +214,7 @@ class MrpProduction(models.Model):
                 body=_(
                     "CAD status reset from %s → pending by %s."
                 ) % (old, rec.env.user.name),
-                subtype_xmlid="mail.mt_log_note",
+                subtype_xmlid="mail.mt_note",
             )
         return True
 
