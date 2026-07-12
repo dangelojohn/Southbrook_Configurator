@@ -260,6 +260,15 @@ class ProjectTask(models.Model):
         "mrp.workcenter",
         string="Current Bottleneck Work Center",
         compute="_compute_phase1_operational_context",
+        # store=True is REQUIRED, not cosmetic: the "Bottleneck Contention"
+        # action (views: action_southbrook_bottleneck_contention) both filters
+        # `[('current_bottleneck_workcenter_id','!=',False)]` and group_by's on
+        # this field. A non-stored computed field with no _search method raises
+        # at search/read_group time — the whole W029 menu threw. The compute's
+        # @api.depends already covers production_ids.workorder_ids.workcenter_id
+        # + .duration_expected (the derivation's inputs), so storing is
+        # deterministic and never stale.
+        store=True,
         readonly=True,
     )
     cabinet_family_summary = fields.Char(
@@ -370,8 +379,10 @@ class ProjectTask(models.Model):
         ],
         string="Production Release",
         compute="_compute_southbrook_production_release",
+        # store=True → searchable via the indexed column; the custom search=
+        # did a full-table search([]).filtered() and is removed (see the note
+        # on manufacturing_readiness_state).
         store=True,
-        search="_search_southbrook_production_release_state",
         readonly=True,
     )
     southbrook_production_release_reason = fields.Char(
@@ -485,8 +496,10 @@ class ProjectTask(models.Model):
         ],
         string="Install Readiness",
         compute="_compute_southbrook_install_readiness",
+        # store=True → searchable via the indexed column; the custom search=
+        # did a full-table search([]).filtered() and is removed (see the note
+        # on manufacturing_readiness_state).
         store=True,
-        search="_search_southbrook_install_readiness_state",
         readonly=True,
     )
     southbrook_install_readiness_reason = fields.Char(
@@ -610,8 +623,11 @@ class ProjectTask(models.Model):
         [("ready", "Ready"), ("review", "Review"), ("blocked", "Blocked")],
         string="Readiness Decision",
         compute="_compute_manufacturing_readiness",
-        store=True,
-        search="_search_manufacturing_readiness_state")
+        # store=True makes the column directly searchable; a custom search=
+        # here forced search([]).filtered() over the whole task table on every
+        # filter click (the most-used filter in the module), discarding the
+        # index. Removed — the stored column handles all operators natively.
+        store=True)
     manufacturing_waterfall_summary = fields.Text(
         string="Waterfall Readiness",
         compute="_compute_manufacturing_readiness")
@@ -2176,16 +2192,27 @@ class ProjectTask(models.Model):
 
     @api.depends("production_ids.workorder_ids.workcenter_id")
     def _compute_equipment_readiness(self):
-        Request = self.env["maintenance.request"]
+        # Odoo 19 removed mrp.workcenter.equipment_ids (the reverse of
+        # maintenance.equipment.workcenter_id). This compute still read the
+        # removed field (`wc.equipment_ids`), raising AttributeError on every
+        # access — the v19 port fixed the sibling spot in
+        # mrp_workorder._southbrook_start_blocker but missed this one. Walk
+        # the forward path via maintenance.request.equipment_id.workcenter_id
+        # instead, and filter to open requests in the domain (stage not done).
+        Request = self.env["maintenance.request"].sudo()
+        has_equipment_link = bool(Request._fields.get("equipment_id"))
         for task in self:
             workcenters = task.production_ids.mapped(
                 "workorder_ids.workcenter_id")
-            requests = Request
+            requests = Request.browse()
             lines = []
             for wc in workcenters.sorted("name"):
-                equipment = wc.equipment_ids
-                wc_requests = equipment.mapped("maintenance_ids").filtered(
-                    lambda req: not req.stage_id.done)
+                wc_requests = Request.browse()
+                if has_equipment_link:
+                    wc_requests = Request.search([
+                        ("equipment_id.workcenter_id", "=", wc.id),
+                        ("stage_id.done", "=", False),
+                    ])
                 requests |= wc_requests
                 if wc_requests:
                     lines.append("%s: BLOCKED - %d open maintenance request(s)" %
