@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      A regular user may READ only their OWN API keys in the backend (the
+      ACL grants group_user read-only; issuance/verification/revocation all
+      run via sudo methods, so no user needs create/write). This record rule
+      scopes that read so one user cannot enumerate another user's keys, and
+      — with create/write removed from the ACL — closes the privilege-
+      escalation where any employee could forge a southbrook.api.key row
+      pointing at an admin user_id and authenticate as admin over /api/v1/*.
+    -->
+    <record id="rule_api_key_own" model="ir.rule">
+        <field name="name">API key: own keys only</field>
+        <field name="model_id" ref="model_southbrook_api_key"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+</odoo>

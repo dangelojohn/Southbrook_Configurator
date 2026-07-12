@@ -8,7 +8,8 @@ Two endpoints:
 Both gated on X-Api-Key. The envelope is the same dict
 sb.cutlist.to_nesting_envelope() returns; the nesting-result endpoint
 forwards a JSON payload to sb.cutlist.from_nesting_result(), which
-validates schema = southbrook.nesting.v1 and advances state to 'nested'.
+validates the schema (v1 or v2 both accepted) and advances state to
+'nested'.
 """
 import json
 
@@ -16,7 +17,9 @@ from odoo.tests.common import HttpCase, tagged
 
 
 SCHEMA = "southbrook.flutter.api.v1"
-NESTING_SCHEMA = "southbrook.nesting.v1"
+# sb.cutlist.to_nesting_envelope() emits v2 (the current envelope schema);
+# from_nesting_result() still accepts both v1 and v2 on input.
+NESTING_SCHEMA = "southbrook.nesting.v2"
 
 
 @tagged("post_install", "-at_install", "southbrook", "api", "cutlist_nesting")

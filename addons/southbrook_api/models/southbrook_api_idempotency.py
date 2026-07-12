@@ -11,6 +11,7 @@ import logging
 from datetime import timedelta
 
 from odoo import api, fields, models
+from odoo.tools import config
 
 _logger = logging.getLogger(__name__)
 
@@ -77,12 +78,47 @@ class SouthbrookApiIdempotency(models.Model):
         if not (api_key_hash and idempotency_key):
             return
         try:
-            self.sudo().create({
-                "api_key_hash": api_key_hash,
-                "route_scope": route_scope or "",
-                "idempotency_key": idempotency_key,
-                "status_code": status_code,
-                "response_body": response_body,
-            })
+            # SAVEPOINT is essential: two concurrent requests with the same
+            # Idempotency-Key both miss the cache and both reach here; the
+            # second create violates UNIQUE(api_key_hash, route_scope,
+            # idempotency_key). Catching that IntegrityError WITHOUT a
+            # savepoint leaves the PG transaction aborted ("poisoned cursor"),
+            # so the request's final COMMIT fails — the client gets a 500 and
+            # the handler's real work is rolled back, the opposite of
+            # idempotent. The savepoint confines the rollback to this create.
+            with self.env.cr.savepoint():
+                self.sudo().create({
+                    "api_key_hash": api_key_hash,
+                    "route_scope": route_scope or "",
+                    "idempotency_key": idempotency_key,
+                    "status_code": status_code,
+                    "response_body": response_body,
+                })
         except Exception:
             _logger.debug("Idempotency stash race (benign)", exc_info=True)
+
+    @api.model
+    def _gc_expired(self):
+        """Cron: delete idempotency records past the TTL. The lazy unlink in
+        get_cached only removes rows that happen to be replayed — rows never
+        replayed would otherwise accumulate forever (one per POST with an
+        Idempotency-Key). Batched + committed to bound memory/lock size."""
+        cutoff = fields.Datetime.now() - timedelta(hours=self._ttl_hours())
+        batch = 1000
+        total = 0
+        while True:
+            old = self.sudo().search(
+                [("create_date", "<", cutoff)], limit=batch)
+            if not old:
+                break
+            n = len(old)
+            old.unlink()
+            total += n
+            if not config["test_enable"]:
+                self.env.cr.commit()
+            if n < batch:
+                break
+        if total:
+            _logger.info(
+                "Idempotency GC: purged %d expired records", total)
+        return total
