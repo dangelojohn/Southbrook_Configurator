@@ -131,6 +131,59 @@ class TestKitchenLayoutEngine(TransactionCase):
         br = [c for c in got if c["corner"] == "back-right"][0]
         self.assertEqual(br["position_mm"], {"x": 4000.0, "z": 0.0})
 
+    # ── Geometric corner detection (2026-07-12, corner-cell footprint) ──
+    # The "vanishing cabinet" bug: detect_corners used to activate a corner
+    # the instant BOTH walls carried ANY cabinet of a layer — so adding the
+    # very FIRST cabinet to a second wall could immediately fire a corner
+    # resolution and silently consume it, even though the two runs were
+    # nowhere near each other. Passing `placements` makes detection require
+    # each wall's cabinet to GEOMETRICALLY reach the corner's footprint
+    # cell, not merely exist on that wall.
+    def test_corner_detected_only_when_footprints_reach_corner_cell(self):
+        back = {"id": "B", "width_mm": 600, "depth_mm": 600,
+                "wall": "back", "cabinet_type": "base"}
+        left = {"id": "L", "width_mm": 600, "depth_mm": 600,
+                "wall": "left", "cabinet_type": "base"}
+        # Both cabinets actually occupy the back-left cell (914mm square at
+        # the origin) → corner detected.
+        placements = [
+            {"id": "B", "x": 300, "y": 0, "z": 0, "rotation_deg": 0},
+            {"id": "L", "x": 0, "y": 0, "z": 300, "rotation_deg": 90},
+        ]
+        got = E.detect_corners([back, left], ROOM, placements=placements)
+        self.assertEqual(self._names(got), [("back-left", "base")])
+
+        # Same back cabinet, but the left cabinet is placed FAR down the
+        # left wall (near the front of the room) — its footprint never
+        # reaches the corner cell, so no corner should be detected even
+        # though the left wall nominally "has a cabinet".
+        left_far = {"id": "L2", "width_mm": 600, "depth_mm": 600,
+                    "wall": "left", "cabinet_type": "base"}
+        placements_far = [
+            {"id": "B", "x": 300, "y": 0, "z": 0, "rotation_deg": 0},
+            {"id": "L2", "x": 0, "y": 0, "z": 2700, "rotation_deg": 90},
+        ]
+        got_far = E.detect_corners(
+            [back, left_far], ROOM, placements=placements_far)
+        self.assertEqual(got_far, [])
+
+    def test_back_only_kitchen_detects_no_corner(self):
+        """Parity guard: a straight back-only kitchen never detects a
+        corner — geometric detection must not regress the common case."""
+        cabs = [
+            {"id": 1, "width_mm": 600, "height_mm": 762, "depth_mm": 600,
+             "family": "base", "zone": "base_run", "wall": "back",
+             "cabinet_type": "base"},
+            {"id": 2, "width_mm": 900, "height_mm": 762, "depth_mm": 600,
+             "family": "base", "zone": "base_run", "wall": "back",
+             "cabinet_type": "base"},
+            {"id": 3, "width_mm": 600, "height_mm": 720, "depth_mm": 300,
+             "family": "wall", "zone": "wall", "wall": "back",
+             "cabinet_type": "wall"},
+        ]
+        placements = E.layout(copy.deepcopy(cabs), ROOM, ZL, WC, WY)
+        self.assertEqual(E.detect_corners(cabs, ROOM, placements=placements), [])
+
     # ── Auto-distribution + corner resolution (P1) ──────────────────────
     def test_auto_assign_wraps_to_side_wall(self):
         # 10x 600mm on a 4000-wide back wall → 6 fit, 4 wrap to left.
@@ -175,6 +228,14 @@ class TestKitchenLayoutEngine(TransactionCase):
         # reserved (back-left low/low, back-right where the back run meets the
         # right run at its HIGH end). The load-bearing property is that NO two
         # cabinets overlap once the corners are resolved.
+        #
+        # Geometric detection (2026-07-12) requires the back run to actually
+        # REACH the back-right corner cell to be detected there — a real U,
+        # not just "some cabinet exists on each wall". 6 back cabinets (not
+        # 5) span far enough into a slightly wider room (4300mm, not 4000mm)
+        # to reach the cell while the single-cabinet corner-side trim still
+        # leaves no residual overlap.
+        room = {"width_mm": 4300, "depth_mm": 3000, "height_mm": 2400}
         def mk(cid, wall, seq, ct="base"):
             return {"id": cid, "width_mm": 600,
                     "height_mm": 876 if ct != "wall" else 720,
@@ -184,17 +245,17 @@ class TestKitchenLayoutEngine(TransactionCase):
                     "zone": "wall" if ct == "wall" else "base_run",
                     "wall": wall, "run_seq": seq}
         cabs = ([mk(("L", s), "left", s) for s in range(3)]
-                + [mk(("B", s), "back", s) for s in range(5)]
+                + [mk(("B", s), "back", s) for s in range(6)]
                 + [mk(("R", s), "right", s) for s in range(3)])
-        r = E.resolve_and_layout(cabs, ROOM, auto_assign=False)
+        r = E.resolve_and_layout(cabs, room, auto_assign=False)
         corners = sorted(c["corner"] for c in r["cabinets"]
                          if c.get("corner_cabinet"))
         self.assertEqual(corners, ["back-left", "back-right"])
         handed = {c["corner"]: c["handed"] for c in r["cabinets"]
                   if c.get("corner_cabinet")}
         self.assertEqual(handed, {"back-left": "L", "back-right": "R"})
-        # 11 in − 4 replaced (2 per corner) + 2 corners = 9
-        self.assertEqual(len(r["cabinets"]), 9)
+        # 12 in − 4 replaced (2 per corner) + 2 corners = 10
+        self.assertEqual(len(r["cabinets"]), 10)
         pl = {p["id"]: p for p in r["placements"]}
         # THE invariant: no cabinet overlaps another (incl. both corner cells).
         fps = [(c["id"], E.footprint_mm(c, pl[c["id"]])) for c in r["cabinets"]]
@@ -205,7 +266,7 @@ class TestKitchenLayoutEngine(TransactionCase):
                     "overlap: %s vs %s" % (fps[i][0], fps[j][0]))
         # every cabinet stays inside the room
         for c in r["cabinets"]:
-            self.assertTrue(E.within_room(c, pl[c["id"]], ROOM),
+            self.assertTrue(E.within_room(c, pl[c["id"]], room),
                             "outside room: %s" % (c["id"],))
         # back-right corner sits against the right wall near (W, 0)
         br = [c for c in r["cabinets"]
@@ -241,8 +302,12 @@ class TestKitchenLayoutEngine(TransactionCase):
     def test_resolve_front_left_corner(self):
         # front-left has a low-end host (front run's origin), same model as
         # back-right — corner joins the front run at run_seq -1.
+        #
+        # Geometric detection (2026-07-12) requires the left run to actually
+        # REACH the front-left corner cell (near the front wall) to be
+        # detected there — 4 left cabinets (not 3) span far enough.
         cabs = ([self._mkw(("F", s), "front", s) for s in range(4)]
-                + [self._mkw(("L", s), "left", s) for s in range(3)])
+                + [self._mkw(("L", s), "left", s) for s in range(4)])
         r = E.resolve_and_layout(cabs, ROOM, auto_assign=False)
         fl = [c for c in r["cabinets"] if c.get("corner") == "front-left"]
         self.assertEqual(len(fl), 1)
@@ -276,10 +341,18 @@ class TestKitchenLayoutEngine(TransactionCase):
     def test_resolve_full_g_shape_four_corners(self):
         # All four walls occupied → all four corners reserved, nothing
         # overlaps, each corner in its own quadrant.
-        big = {"width_mm": 6000, "depth_mm": 5000, "height_mm": 2400}
+        #
+        # Geometric detection (2026-07-12) requires each run to actually
+        # REACH both of its corner cells — a real G-shape, not just "some
+        # cabinet on each wall". back/front need 9 cabinets (long walls,
+        # 6200mm) and left/right need 7 (5000mm) to reach into the FAR
+        # corner cell from each run's low end while the single-cabinet
+        # corner-side trim still leaves no residual overlap.
+        big = {"width_mm": 6200, "depth_mm": 5000, "height_mm": 2400}
+        wall_counts = {"back": 9, "front": 9, "left": 7, "right": 7}
         cabs = []
-        for wall in ("back", "left", "right", "front"):
-            cabs += [self._mkw((wall, s), wall, s) for s in range(5)]
+        for wall, n in wall_counts.items():
+            cabs += [self._mkw((wall, s), wall, s) for s in range(n)]
         r = E.resolve_and_layout(cabs, big, auto_assign=False)
         corners = sorted(c["corner"] for c in r["cabinets"]
                          if c.get("corner_cabinet"))

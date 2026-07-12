@@ -291,14 +291,47 @@ def _layer_of(cab):
     return "base"
 
 
-def detect_corners(cabinets, room):
+# Corner-cabinet footprint (square) + per-layer height, millimetres. Defined
+# here (ahead of detect_corners) so it can serve as that function's default
+# `corner_size_mm`; resolve_and_layout below re-exports/reuses the same
+# constant.
+_CORNER_FOOTPRINT_MM = 914.0            # 36"
+_CORNER_HEIGHT_MM = {"base": 876.0, "wall": 762.0}   # 34.5" / 30"
+
+
+def _corner_cell_aabb(xk, zk, room, corner_size_mm):
+    """World-space AABB of a corner's `corner_size_mm` square cell, anchored
+    at the room corner named by (xk, zk) and extending toward the room
+    interior."""
+    room_w = room.get("width_mm", 0)
+    room_d = room.get("depth_mm", 0)
+    if xk == "0":
+        x0, x1 = 0.0, corner_size_mm
+    else:   # "W"
+        x0, x1 = room_w - corner_size_mm, room_w
+    if zk == "0":
+        z0, z1 = 0.0, corner_size_mm
+    else:   # "D"
+        z0, z1 = room_d - corner_size_mm, room_d
+    return (x0, x1, z0, z1)
+
+
+def detect_corners(cabinets, room, placements=None,
+                    corner_size_mm=_CORNER_FOOTPRINT_MM):
     """Find every inside 90° corner that needs a corner cabinet.
 
-    Pure + deterministic. A corner is "active" for a layer when BOTH of
-    its two walls carry at least one cabinet in that layer. Detection only
-    — resolution (footprint reservation, standard-cabinet removal, corner
-    SKU selection, run re-flow, manufacturing write-back) is layered on top
-    in the Odoo integration, which owns product identity.
+    Pure + deterministic. Detection only — resolution (footprint
+    reservation, standard-cabinet removal, corner SKU selection, run
+    re-flow, manufacturing write-back) is layered on top in the Odoo
+    integration, which owns product identity.
+
+    When `placements` is given (the placed x/y/z/rotation_deg for each
+    cabinet, as returned by `layout()`), a corner is "active" for a layer
+    only when BOTH of its two walls have a cabinet in that layer whose
+    PLACED footprint actually overlaps the corner's `corner_size_mm` cell
+    (geometric occupancy) — merely having *some* cabinet on each wall is
+    not enough; it must reach the corner. When `placements` is None (legacy
+    callers), falls back to the old wall-occupancy test.
 
     Returns a list (stable order) of:
       {"corner": "back-left"|..., "layer": "base"|"wall",
@@ -313,10 +346,30 @@ def detect_corners(cabinets, room):
     for cab in cabinets:
         walls_with[_layer_of(cab)].add(cab.get("wall") or "back")
 
+    placed_by_id = {p["id"]: p for p in placements} if placements is not None else None
+
+    def _wall_reaches_cell(wall, layer, cell):
+        for cab in cabinets:
+            if (cab.get("wall") or "back") != wall or _layer_of(cab) != layer:
+                continue
+            place = placed_by_id.get(cab.get("id"))
+            if place is None:
+                continue
+            if footprints_overlap(footprint_mm(cab, place), cell):
+                return True
+        return False
+
     out = []
     for name, (wa, wb), (xk, zk) in _CORNER_SPECS:
+        cell = (_corner_cell_aabb(xk, zk, room, corner_size_mm)
+                if placed_by_id is not None else None)
         for layer in ("base", "wall"):
-            if wa in walls_with[layer] and wb in walls_with[layer]:
+            if placed_by_id is None:
+                active = wa in walls_with[layer] and wb in walls_with[layer]
+            else:
+                active = (_wall_reaches_cell(wa, layer, cell)
+                          and _wall_reaches_cell(wb, layer, cell))
+            if active:
                 out.append({
                     "corner": name,
                     "layer": layer,
@@ -396,11 +449,6 @@ _CORNER_STANDALONE = {
 }
 
 
-# Corner-cabinet footprint (square) + per-layer height, millimetres.
-_CORNER_FOOTPRINT_MM = 914.0            # 36"
-_CORNER_HEIGHT_MM = {"base": 876.0, "wall": 762.0}   # 34.5" / 30"
-
-
 def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                        wall_order=("back", "left"), auto_assign=True,
                        **layout_kwargs):
@@ -427,7 +475,13 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     """
     assigned = (auto_assign_walls(cabinets, room, wall_order) if auto_assign
                 else [dict(c) for c in cabinets])
-    corners = detect_corners(assigned, room)
+    # Detect corners against REAL placed footprints (geometric occupancy),
+    # not mere wall occupancy — a provisional layout of the as-assigned
+    # cabinets (before any corner insertion/removal) is enough to tell
+    # whether each run's cabinets actually reach the shared corner cell.
+    provisional_placements = layout(assigned, room, **layout_kwargs)
+    corners = detect_corners(assigned, room, placements=provisional_placements,
+                              corner_size_mm=corner_size_mm)
     inserted = []
     removed_ids = set()
     offsets = {}
