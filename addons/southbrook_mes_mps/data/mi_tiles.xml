@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Seed a single MES/MPS Snapshot record so the "MES Snapshot" menu (and the
+      MI dashboard that reads southbrook.mes_mps.mi_tiles) render on install.
+      The tile fields are computed on read from live OEE / bottleneck / MPS
+      data, so this one record is the whole snapshot. Without a seed the menu
+      opened empty until a user manually clicked New. noupdate so a rename
+      survives upgrades.
+    -->
+    <data noupdate="1">
+        <record id="mi_tiles_default" model="southbrook.mes_mps.mi_tiles">
+            <field name="label">MES/MPS Snapshot</field>
+        </record>
+    </data>
+</odoo>

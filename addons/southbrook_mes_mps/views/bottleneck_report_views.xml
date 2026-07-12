@@ -17,7 +17,7 @@
           <group>
             <field name="as_of_date"/>
             <field name="top_bottleneck_workcenter_id" readonly="1"/>
-            <field name="top_bottleneck_load_pct" widget="percentage" readonly="1"/>
+            <field name="top_bottleneck_load_pct" readonly="1"/>
           </group>
           <notebook>
             <page string="Lines">
@@ -25,7 +25,7 @@
                 <list decoration-danger="load_pct &gt; 110"
                       decoration-warning="load_pct &gt; 90 and load_pct &lt;= 110">
                   <field name="workcenter_id"/>
-                  <field name="load_pct" widget="percentage"/>
+                  <field name="load_pct"/>
                   <field name="bottleneck_score"/>
                   <field name="recommended_action"/>
                 </list>
@@ -46,7 +46,7 @@
         <field name="name"/>
         <field name="as_of_date"/>
         <field name="top_bottleneck_workcenter_id"/>
-        <field name="top_bottleneck_load_pct" widget="percentage"/>
+        <field name="top_bottleneck_load_pct"/>
       </list>
     </field>
   </record>
