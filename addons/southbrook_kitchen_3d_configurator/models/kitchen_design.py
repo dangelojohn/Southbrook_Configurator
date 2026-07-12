@@ -574,7 +574,12 @@ class SouthbrookKitchenDesign(models.Model):
                     "z_position_in": place["z"] * IN,
                     "rotation_deg":  place["rotation_deg"],
                     "wall":          node["wall"],
-                    "run_seq":       node["run_seq"],
+                    # I2: a front-right standalone corner (both-high, no
+                    # host run to join) omits run_seq from the engine's
+                    # inserted node entirely — .get() with a sentinel default
+                    # avoids a KeyError/500 on action_auto_arrange for that
+                    # corner. No behaviour change for nodes that DO set it.
+                    "run_seq":       node.get("run_seq", -1),
                     "pinned":        False,
                     "layout_key":    "corner-%s-%s-%s" % (
                         design.id, node["corner"], node["layer"]),
