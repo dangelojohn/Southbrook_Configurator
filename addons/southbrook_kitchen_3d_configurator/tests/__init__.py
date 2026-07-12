@@ -24,3 +24,9 @@ from . import test_coordinate_contract
 # PR2 (2026-07-12) — `wall` becomes part of the canonical persistence
 # path: save_design write + validation, load_design_lines read emission.
 from . import test_wall_persistence
+
+# 2026-07-12 — Save -> Load is identity: save_design(items) ->
+# load_design_lines() -> save_design(loaded items) must reproduce the
+# exact same canonical model. Permanent regression pin for the
+# controller-layer persistence round-trip.
+from . import test_save_load_identity

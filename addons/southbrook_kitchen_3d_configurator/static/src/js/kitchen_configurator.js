@@ -42,6 +42,23 @@ class SouthbrookKitchenConfigurator extends Component {
         this.notification = useService("notification");
         this.action       = useService("action");
 
+        // PR2.5 — Odoo 19 client-action components receive `props.action`
+        // (the full ir.actions.client record); `_getActionInfo` in the
+        // core action service (web/static/src/webclient/actions/
+        // action_service.js, `_executeClientAction`) builds component
+        // props as `{...clientAction.extractProps?.(action), action,
+        // actionId}` — it does NOT spread `action.params` onto the flat
+        // props. This component registers with `actionRegistry.add(...)`
+        // and defines no `extractProps`, so every `this.props.design_id`
+        // (etc.) read below was always `undefined`. That's the root
+        // cause of the "reopens as a blank 12in room" defect: room
+        // dims/design_id/partner_id/filler_strategy/etc. never arrived.
+        // Read from `props.action.params` first; keep the flat
+        // `this.props` as a fallback so a caller that ever passes props
+        // directly (tests, a future doAction shape) still works.
+        const params = (this.props.action && this.props.action.params) || this.props || {};
+        this._actionParams = params;
+
         // ── Reactive state ────────────────────────────────────────────────────
         this.state = useState({
             loading:  true,
@@ -50,9 +67,9 @@ class SouthbrookKitchenConfigurator extends Component {
             errorCode: "",
             errorCta:  null,
             room: {
-                width_in:  this.props.room_width_in  || 12,
-                depth_in:  this.props.room_depth_in  || 24,
-                height_in: this.props.room_height_in || 96,
+                width_in:  params.room_width_in  || 12,
+                depth_in:  params.room_depth_in  || 24,
+                height_in: params.room_height_in || 96,
             },
             products:  [],
             items:     [],
@@ -65,8 +82,8 @@ class SouthbrookKitchenConfigurator extends Component {
             // (that arrives in PR2/PR3/PR4).
             activeWall: null,
             summary:   { base_count: 0, wall_count: 0, total: 0, price: 0, remainder_in: 0 },
-            designId:  this.props.design_id || null,
-            designName: this.props.design_name || "",
+            designId:  params.design_id || null,
+            designName: params.design_name || "",
             // D1 — multi-view camera system. 'iso' default; switchable
             // among iso/top/front/left/right/persp. Hotkeys 1-6 + R reset.
             view:      "iso",
@@ -75,7 +92,7 @@ class SouthbrookKitchenConfigurator extends Component {
             // or stays null (configurator opened standalone). channel
             // meta is populated by the first /products + /layout RPC
             // response and drives the topbar badge.
-            partnerId: this.props.partner_id || null,
+            partnerId: params.partner_id || null,
             channel:   {
                 partner_name:    "",
                 channel:         "retail",
@@ -91,12 +108,12 @@ class SouthbrookKitchenConfigurator extends Component {
             // D7 — filler placement strategy. Drives /layout on each
             // refresh; default matches the controller default ("split"
             // — half-width fillers at both ends, most common spec).
-            fillerStrategy:  this.props.filler_strategy || "split",
+            fillerStrategy:  params.filler_strategy || "split",
             // D8 — wall-cab Z alignment + soffit height. Defaults match
             // the model defaults so an unsaved design still computes
             // sensible wall-cab positions.
-            wallCabTopAlignment: this.props.wall_cab_top_alignment || "fixed_gap",
-            soffitHeightIn:      this.props.soffit_height_in       || 84.0,
+            wallCabTopAlignment: params.wall_cab_top_alignment || "fixed_gap",
+            soffitHeightIn:      params.soffit_height_in       || 84.0,
             warnings:            [],
             // D13 — searchable inventory + drag-and-drop add.
             inventorySearch: "",
@@ -121,7 +138,7 @@ class SouthbrookKitchenConfigurator extends Component {
             //   picker* control the dropdown lifecycle (open, loading,
             //     result list). Results fetched lazily on focus so the
             //     initial paint isn't gated by the RPC.
-            partnerName:       this.props.partner_name || "",
+            partnerName:       params.partner_name || "",
             portalUser:        false,
             pickerOpen:        false,
             pickerLoading:     false,
@@ -165,7 +182,17 @@ class SouthbrookKitchenConfigurator extends Component {
                 this._loadProducts(),
                 this._loadUserDefaults(),
             ]);
-            await this._refreshLayout();
+            // PR2.5 — a design_id means there's a canonical saved layout
+            // to reopen; hydrate from it instead of running the /layout
+            // generator (which would silently replace the saved
+            // cabinets with a freshly computed fill — the destructive-
+            // reopen bug). No design_id (brand-new/standalone session)
+            // keeps the original generate-on-open behavior.
+            if (this.state.designId) {
+                await this._hydrateFromDesign();
+            } else {
+                await this._refreshLayout();
+            }
             this.state.loading = false;
         });
 
@@ -199,10 +226,11 @@ class SouthbrookKitchenConfigurator extends Component {
                 save: false,
             });
             this._userDefaults = d;
-            const hasExplicitProps = !!(this.props.room_width_in
-                                    || this.props.room_depth_in
-                                    || this.props.room_height_in
-                                    || this.props.design_id);
+            const params = this._actionParams || {};
+            const hasExplicitProps = !!(params.room_width_in
+                                    || params.room_depth_in
+                                    || params.room_height_in
+                                    || params.design_id);
             if (!hasExplicitProps && d) {
                 if (d.width  > 0) this.state.room.width_in  = d.width;
                 if (d.depth  > 0) this.state.room.depth_in  = d.depth;
@@ -346,7 +374,90 @@ class SouthbrookKitchenConfigurator extends Component {
         ).length;
     }
 
+    // PR2.5 — Reopen an existing design from its canonical saved lines
+    // instead of running the /layout generator. /layout always computes
+    // a *fresh* cabinet fill for the current room width; calling it on
+    // open would immediately discard whatever was saved (design 81:
+    // 84×24 room / 3 base cabinets → rendered as an empty 12in default
+    // room), and because save_design is a full-replace writer, the very
+    // next auto-save would persist that regenerated/empty state over
+    // the original — data loss. /load_design_lines is the read-side
+    // counterpart PR2 already wired to emit `wall`; this is its first
+    // caller from the boot path.
+    //
+    // Sets `this._hydratedFromDesign = true` on success so
+    // `_refreshLayout()` (called by every later room/filler/alignment
+    // edit) knows to stop regenerating for the rest of this session —
+    // see the guard at the top of `_refreshLayout`.
+    async _hydrateFromDesign() {
+        try {
+            const resp = await rpc(
+                "/southbrook_kitchen/configurator/load_design_lines",
+                { design_id: this.state.designId },
+            );
+            const lines = (resp && resp.lines) || [];
+            if (!lines.length) {
+                // Design record exists but has no saved configurator-
+                // origin lines yet (e.g. freshly created from a template
+                // preset with generate_layout=False, or from the "open
+                // configurator" action on a design nobody has ever
+                // saved cabinets into). Nothing to protect — fall back
+                // to the generator exactly like the no-design_id path
+                // so the rep still sees a starter fill, and leave
+                // _hydratedFromDesign unset so normal generate-on-edit
+                // behavior continues until the first real save.
+                await this._refreshLayout();
+                return;
+            }
+            // `name` mirrors `product_name` — every other item-producing
+            // path (/layout, _addCabinetFromProduct) sets `name` and a
+            // few UI spots (the detail-panel header, "Moved X to Y‴"
+            // toasts) read `state.selected.name` directly rather than
+            // falling back to `product_name`. /load_design_lines only
+            // emits `product_name`; alias it here so a hydrated
+            // session's selected-cabinet panel isn't blank.
+            this.state.items = lines.map(line => ({
+                ...line,
+                name: line.product_name,
+            }));
+            if (this.state.items.length) {
+                this.state.selected = this.state.items[0];
+            }
+            this._recomputeLayoutFromItems();
+            this._hydratedFromDesign = true;
+        } catch (e) {
+            console.warn(
+                "[SouthbrookKitchenConfigurator] load_design_lines failed, "
+                + "falling back to /layout:", e
+            );
+            await this._refreshLayout();
+        }
+    }
+
     async _refreshLayout() {
+        // PR2.5 — once hydrated from a saved design's canonical lines,
+        // /layout must never run again for the life of this session:
+        // it's a pure generator that reflows a brand-new cabinet fill
+        // for the current room width with no knowledge of what was
+        // loaded, and would silently replace the saved layout (losing
+        // pinned positions + layout_keys — the exact defect this PR
+        // fixes, since the next auto-save would then persist the
+        // regenerated state over the original design). Room / filler /
+        // alignment / soffit edits made after reopening still update
+        // their piece of `state` and re-run the local packer
+        // (`_recomputeLayoutFromItems`) so the summary/price reflect
+        // the edit — they just don't trigger a server-side regenerate.
+        //
+        // Documented trade-off (accepted, out of scope for this P1 data
+        // -integrity fix): the server's filler/remainder-width recompute
+        // and channel-pricelist repricing for the /layout-only fields
+        // don't refresh after hydration. Re-running the generator
+        // post-hydration is a placement/packing concern, explicitly out
+        // of scope per the PR2.5 brief ("no placement/packing changes").
+        if (this._hydratedFromDesign) {
+            this._recomputeLayoutFromItems();
+            return;
+        }
         try {
             const result = await rpc("/southbrook_kitchen/configurator/layout", {
                 room_width_in:           this.state.room.width_in,
