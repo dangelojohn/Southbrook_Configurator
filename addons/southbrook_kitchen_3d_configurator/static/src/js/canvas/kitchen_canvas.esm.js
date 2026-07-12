@@ -150,6 +150,13 @@ export class KitchenCanvas extends Component {
 
             this._buildScene(this.props);
 
+            // Golden-scene harness — expose a serialisable snapshot of every
+            // cabinet leaf-mesh world transform, for visual-regression
+            // baselines (straight vs L). Inspection-only; no rendering effect.
+            // Capture in the browser console via:
+            //   document.querySelector('.o_sbk_canvas3d').__sbSceneSnapshot()
+            mount.__sbSceneSnapshot = () => this._sbSceneSnapshot();
+
             if (this.props.onReady) {
                 this.props.onReady({
                     setView: (key) => this._setView(key),
@@ -353,6 +360,35 @@ export class KitchenCanvas extends Component {
             this._ndcFromEvent(ev),
             (this.props.room && this.props.room.width_in) || 0,
         );
+    }
+
+    // Golden-scene harness. Returns a sorted, order-independent list of every
+    // cabinet leaf-mesh world transform [x, y, z, rotY°] (mm/deg, rounded).
+    // Traversing to leaf meshes keeps the snapshot stable across the coming
+    // THREE.Group refactor: a straight kitchen must produce an IDENTICAL
+    // snapshot before and after each builder migration (compatibility gate).
+    _sbSceneSnapshot() {
+        const THREE = this.T.THREE, scene = this.T.scene;
+        if (!THREE || !scene) return [];
+        scene.updateMatrixWorld(true);
+        const out = [];
+        const p = new THREE.Vector3(), q = new THREE.Quaternion(),
+              s = new THREE.Vector3(), e = new THREE.Euler();
+        const collect = (obj) => {
+            if (!obj || !obj.isMesh) return;
+            obj.matrixWorld.decompose(p, q, s);
+            e.setFromQuaternion(q, "YXZ");
+            out.push([
+                +p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3),
+                +((e.y * 180) / Math.PI).toFixed(1),
+            ]);
+        };
+        for (const obj of this.T.cabObjs) {
+            if (obj && obj.traverse) obj.traverse(collect);
+            else collect(obj);
+        }
+        out.sort();
+        return out;
     }
 
     _onMouseDown(e) {
