@@ -459,17 +459,24 @@ class SouthbrookKitchenDesign(models.Model):
         _logger.info("[auto-arrange] started design=%s", design.id)
 
         with self.env.cr.savepoint():
-            # Fresh start — drop corner cabinets from a prior run so
-            # re-running is idempotent.
-            design.cabinet_line_ids.filtered(
-                lambda l: l.origin == "configurator"
-                and l.cabinet_type == "corner").unlink()
+            # RESET TO CANONICAL — every run is a pure transformation of the
+            # customer's canonical selection, never of the previous arranged
+            # state. (1) delete all ephemeral DERIVED artifacts; (2) restore
+            # (reactivate) any superseded canonical cabinets. This prevents
+            # lineage chains (A+B→C, then C+D→E) and guarantees idempotence:
+            # running N times yields identical state.
+            all_lines = design.with_context(active_test=False).cabinet_line_ids
+            all_lines.filtered(lambda l: l.layout_role == "derived").unlink()
+            all_lines.filtered(lambda l: not l.active).write({"active": True})
+            design.invalidate_recordset(["cabinet_line_ids"])
 
-            # Semantic cabinet list from the real cabinets (skip server-placed
-            # fillers/panels; corner cabinets were just dropped).
+            # Semantic cabinet list from the CANONICAL cabinets (now all
+            # active/restored; skip server-placed fillers/panels).
             cabs = []
             for dl in design.cabinet_line_ids:
                 if dl.origin != "configurator":
+                    continue
+                if dl.layout_role == "derived":
                     continue
                 if dl.cabinet_type in ("filler", "panel", "corner"):
                     continue
@@ -500,11 +507,15 @@ class SouthbrookKitchenDesign(models.Model):
             finals = {c["id"]: c for c in r["cabinets"]}
             places = {p["id"]: p for p in r["placements"]}
 
-            # 1) delete the standard cabinets the corner replaced
+            # 1) SUPERSEDE (archive — never delete) the canonical cabinets the
+            #    corner replaced. They stay part of the customer's canonical
+            #    selection and are restored on the next run; archiving hides
+            #    them from the scene + manufacturing mirror in the meantime.
             if r["removed_ids"]:
                 design.cabinet_line_ids.filtered(
-                    lambda l: l.id in set(r["removed_ids"])).unlink()
-            # refresh the O2M so the survivor loop never sees a deleted record
+                    lambda l: l.id in set(r["removed_ids"])).write(
+                    {"active": False})
+            # refresh the O2M so the survivor loop never sees an archived record
             design.invalidate_recordset(["cabinet_line_ids"])
 
             # 2) reposition the survivors
@@ -555,6 +566,8 @@ class SouthbrookKitchenDesign(models.Model):
                     "layout_key":    "corner-%s-%s-%s" % (
                         design.id, node["corner"], node["layer"]),
                     "origin":        "configurator",
+                    # DERIVED artifact — deleted + regenerated every run.
+                    "layout_role":   "derived",
                 })
 
             # 4) mirror to the manufacturing model NOW (don't wait for the
@@ -1699,6 +1712,45 @@ class SouthbrookKitchenDesignLine(models.Model):
         copy=True,
         help="Order of this cabinet within its wall's run (lower = nearer "
              "the run's origin corner).",
+    )
+
+    # ── Arrangement lifecycle (2026-07-12) ──────────────────────────────
+    # Auto-arrange is a pure transformation of the customer's CANONICAL
+    # selection into a derived arranged layout. These two fields make that
+    # explicit and keep the transformation from mutating its own input.
+    #
+    #   layout_role = canonical → part of the customer's selection; NEVER
+    #                             deleted by arrangement (only hidden).
+    #   layout_role = derived   → an artifact the arrangement created (e.g.
+    #                             a corner cabinet). Ephemeral: every run
+    #                             deletes all derived lines and re-derives.
+    #
+    #   active = False          → a CANONICAL line temporarily superseded
+    #                             by a derived artifact (hidden from the
+    #                             scene + manufacturing mirror via Odoo's
+    #                             automatic active-record filtering). Reset
+    #                             to canonical reactivates it.
+    #
+    # Deliberately NOT named after "corner" — future substitutions (blind
+    # corners, fillers, appliance panels, U-shape transitions) reuse this
+    # same generic lifecycle.
+    layout_role = fields.Selection(
+        [("canonical", "Canonical"), ("derived", "Derived")],
+        string="Layout Role",
+        default="canonical",
+        required=True,
+        copy=True,
+        help="Canonical = the customer's own selection (preserved across "
+             "re-arranges). Derived = an artifact created by auto-arrange "
+             "(deleted and regenerated on every run).",
+    )
+    active = fields.Boolean(
+        string="Active",
+        default=True,
+        help="Superseded canonical cabinets are archived (active=False) so "
+             "they are hidden from the scene and manufacturing mirror while "
+             "a derived artifact stands in for them; a re-arrange restores "
+             "them. Never a permanent delete.",
     )
 
     # ── Recommendation D · Sprint 1 bridge field ────────────────────────

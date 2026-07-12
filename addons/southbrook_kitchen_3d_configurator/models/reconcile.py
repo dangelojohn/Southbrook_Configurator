@@ -229,11 +229,22 @@ class SouthbrookDesignReconcile(models.AbstractModel):
                 "zone":                  dline.zone or False,
             }
             if not sol:
+                # A design line regenerated with the same layout_key (e.g. a
+                # DERIVED corner cabinet rebuilt on every auto-arrange run)
+                # already has a mirrored SO line — reuse it so the mirror is
+                # idempotent and never duplicates corner lines.
+                sol = Line.sudo().search([
+                    ("order_id",         "=", design.sale_order_id.id),
+                    ("sb_layout_origin", "=", "configurator"),
+                    ("sb_layout_key",    "=", line_vals["sb_layout_key"]),
+                ], limit=1)
+            if not sol:
                 sol = Line.sudo().create(line_vals)
                 dline.sudo().sale_order_line_id = sol.id
                 stats["created_lines"] += 1
             else:
                 sol.sudo().write(line_vals)
+                dline.sudo().sale_order_line_id = sol.id
 
         # 5) Unlink SO lines whose design.line disappeared. Only touches
         #    configurator-origin SO lines to protect manually-added ones.

@@ -13,3 +13,7 @@ from . import test_track_b_end_to_end
 # 2026-07-06 — M1 (design totals ignore order-added cabinet lines) and
 # M2 (reconcile cron can create a duplicate room) regression pins.
 from . import test_m1_m2_reconcile_fixes
+
+# 2026-07-12 — auto-arrange lifecycle: idempotence, no canonical loss, no
+# derived accumulation, atomic rollback, mirror-reflects-visible.
+from . import test_auto_arrange_service
