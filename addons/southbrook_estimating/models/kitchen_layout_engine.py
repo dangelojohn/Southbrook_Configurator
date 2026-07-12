@@ -448,6 +448,56 @@ _CORNER_STANDALONE = {
     "front-right": ("W", "D"),
 }
 
+# `(x_key, z_key)` of each _CORNER_RESOLVE corner's OWN cell (not the "far"
+# corner used by _CORNER_STANDALONE) — reuses the same keys as _CORNER_SPECS,
+# indexed by corner name for the pose math below.
+_CORNER_XZ_KEYS = {name: (xk, zk) for name, _walls, (xk, zk) in _CORNER_SPECS}
+
+# How each _CORNER_RESOLVE corner PRESENTS: (wall tag persisted to
+# kitchen.design.line, rotation_deg). `host_wall` (in _CORNER_RESOLVE above)
+# stays solely the adjoining-run cursor bookkeeping key — it must NOT be
+# assumed to be the emitted `wall`/orientation, because for back-left that
+# coupling IS the "vanishing cabinet" bug: host_wall="back" has rotation 0
+# (_WALL_SPEC["back"]["rot"]), which is visually IDENTICAL to an ordinary
+# back-wall cabinet, so the corner rendered flat on the back wall instead of
+# turning into the corner.
+#   back-left  -> "left" / 90 (left wall's rotation). Re-tagging + rotating
+#                 to the LEFT wall's convention makes the corner read as the
+#                 turn into the left run — the fix for the reported bug, and
+#                 it also happens to be the wall this whole plan is about
+#                 keeping visible.
+#   back-right -> "right" / 270 (right wall's rotation). host_wall="right"
+#                 already gives a non-zero, distinct rotation — unchanged;
+#                 this is the regression guard the plan calls out as
+#                 "already correct".
+#   front-left -> "front" / 180 (front wall's rotation). host_wall="front"
+#                 likewise already gives a non-zero, distinct rotation —
+#                 unchanged, second regression guard.
+_CORNER_RESOLVE_PRESENTATION = {
+    "back-left":   ("left",  90),
+    "back-right":  ("right", 270),
+    "front-left":  ("front", 180),
+}
+
+
+def _corner_node_pose(xk, zk, room, corner_size_mm, rotation_deg, y_floor):
+    """Explicit (x, y, z, rotation_deg) pose whose footprint AABB (per
+    `footprint_mm`'s own placement convention) is EXACTLY the corner's
+    `corner_size_mm` cell, for any of the four `ALLOWED_ROTATIONS`. Used so
+    the inserted corner node's `__pose` lands in the corner cell regardless
+    of which run's cursor (`host_wall`) it was bookkept against."""
+    x0, x1, z0, z1 = _corner_cell_aabb(xk, zk, room, corner_size_mm)
+    rot = int(round(rotation_deg)) % 360
+    if rot == 0:
+        x, z = (x0 + x1) / 2.0, z0
+    elif rot == 180:
+        x, z = (x0 + x1) / 2.0, z1
+    elif rot == 90:
+        x, z = x0, (z0 + z1) / 2.0
+    else:   # 270
+        x, z = x1, (z0 + z1) / 2.0
+    return {"x": x, "y": y_floor, "z": z, "rotation_deg": rot}
+
 
 def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                        wall_order=("back", "left"), auto_assign=True,
@@ -532,17 +582,24 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         host_wall, other_wall, other_end, handed = spec
         # The corner cabinet REPLACES the two standard cabinets that meet at
         # the corner — otherwise they'd overlap the corner cell / overflow.
-        # It JOINS the run whose LOW end is at this corner (host_wall) at
-        # run_seq -1: sitting first, it consumes that run's cursor so the
-        # rest of the run flows past the reserved cell automatically. The
-        # adjoining run meets the corner at `other_end`:
-        #   "first" → its low end is also at the corner, so offset it by cs;
-        #   "last"  → its high end terminates at the cell (no offset needed).
+        # `host_wall` identifies the run whose LOW end is at this corner —
+        # used ONLY to find which two standard cabinets to remove and to
+        # reserve that run's cursor space (via `offsets[host_wall]` below).
+        # It is deliberately NOT used to derive the emitted `wall`/rotation
+        # (see `_CORNER_RESOLVE_PRESENTATION`) — the corner gets an explicit
+        # `__pose` centred in ITS OWN corner cell, so it renders in the
+        # corner regardless of which run's cursor it was bookkept against.
         host_first = _run_end(assigned, host_wall, layer, "first")
         other_cab = _run_end(assigned, other_wall, layer, other_end)
         for c in (host_first, other_cab):
             if c is not None:
                 removed_ids.add(c["id"])
+        wall_tag, rotation_deg = _CORNER_RESOLVE_PRESENTATION[corner["corner"]]
+        xk, zk = _CORNER_XZ_KEYS[corner["corner"]]
+        y_floor = zl.get("wall" if layer == "wall" else "base_run",
+                         ("ground", 0, 0))[1]
+        pose = _corner_node_pose(xk, zk, room, corner_size_mm, rotation_deg,
+                                 y_floor)
         inserted.append({
             "id": "corner-%s-%s" % (corner["corner"], layer),
             "corner_cabinet": True,
@@ -555,11 +612,18 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
             "depth_mm": corner_size_mm,
             "height_mm": _CORNER_HEIGHT_MM[layer],
             "zone": "wall" if layer == "wall" else "base_run",
-            "wall": host_wall,
+            "wall": wall_tag,
             "run_seq": -1,
+            "__pose": pose,
             "replaced_ids": [c["id"] for c in (host_first, other_cab)
                              if c is not None],
         })
+        # The corner no longer consumes host_wall's run cursor by joining it
+        # (it carries an explicit __pose instead), so host_wall's own
+        # surviving cabinets need the SAME explicit start-offset the
+        # adjoining run gets below — host_wall's low end is always at this
+        # corner by construction (that's what makes it "host").
+        offsets[host_wall] = max(offsets.get(host_wall, 0), corner_size_mm)
         if other_end == "first":
             # The adjoining low-end run must start past the corner footprint.
             offsets[other_wall] = max(offsets.get(other_wall, 0),

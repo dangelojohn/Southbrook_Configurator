@@ -211,12 +211,19 @@ class TestKitchenLayoutEngine(TransactionCase):
         self.assertEqual(len(r["cabinets"]), 9)   # 10 - 2 + 1
         pl = {p["id"]: p for p in r["placements"]}
         cc = pl["corner-back-left-base"]
-        self.assertAlmostEqual(cc["z"], 0)
-        self.assertAlmostEqual(cc["rotation_deg"], 0)
+        cc_node = next(c for c in r["cabinets"] if c["id"] == "corner-back-left-base")
+        # 2026-07-12 (Task 2): the corner node renders IN the corner — tagged
+        # "left" (not the misrepresentative "back" of the pre-fix bug) with
+        # the left wall's rotation, its footprint exactly the back-left cell.
+        self.assertEqual(cc_node["wall"], "left")
+        self.assertAlmostEqual(cc["x"], 0)
+        self.assertAlmostEqual(cc["z"], E._CORNER_FOOTPRINT_MM / 2.0)
+        self.assertAlmostEqual(cc["rotation_deg"], 90)
         # nothing overlaps the corner cell; runs stay within wall lengths
         back = [pl[c["id"]] for c in r["cabinets"]
                 if c.get("wall") == "back" and not c.get("corner_cabinet")]
-        left = [pl[c["id"]] for c in r["cabinets"] if c.get("wall") == "left"]
+        left = [pl[c["id"]] for c in r["cabinets"]
+                if c.get("wall") == "left" and not c.get("corner_cabinet")]
         self.assertGreaterEqual(min(p["x"] - 300 for p in back), 914 - 1)
         self.assertGreaterEqual(min(p["z"] - 300 for p in left), 914 - 1)
         self.assertTrue(all(abs(p["rotation_deg"] - 90) < 1 for p in left))
@@ -365,3 +372,60 @@ class TestKitchenLayoutEngine(TransactionCase):
         self.assertTrue(q["back-right"]["x"] > 3000 and q["back-right"]["z"] < 2500)
         self.assertTrue(q["front-left"]["x"] < 3000 and q["front-left"]["z"] > 2500)
         self.assertTrue(q["front-right"]["x"] > 3000 and q["front-right"]["z"] > 2500)
+
+    # ── Corner node wall + orientation (2026-07-12, Task 2) ─────────────
+    # The "flat on the back wall" bug: the inserted back-left corner node
+    # used to be tagged wall="back" with rotation_deg=0 — geometrically
+    # inside the corner cell, but visually INDISTINGUISHABLE from an
+    # ordinary back-wall cabinet (same wall tag, same rotation), which is
+    # why the corner "vanished" into the back run instead of reading as a
+    # corner transition into the left wall. Every corner node must render
+    # IN its own corner cell with a wall tag that doesn't misrepresent it.
+    def test_corner_node_tagged_and_oriented_for_its_corner(self):
+        cs = E._CORNER_FOOTPRINT_MM
+
+        def _single_corner_node(cabs, room):
+            r = E.resolve_and_layout(cabs, room, auto_assign=False)
+            nodes = [c for c in r["cabinets"] if c.get("corner_cabinet")]
+            self.assertEqual(len(nodes), 1, "expected exactly one corner")
+            pl = {p["id"]: p for p in r["placements"]}
+            return nodes[0], pl[nodes[0]["id"]]
+
+        # back-left — the bug. Both runs' LOW ends meet at the origin.
+        cabs_bl = ([self._mkw(("B", s), "back", s) for s in range(2)]
+                   + [self._mkw(("L", s), "left", s) for s in range(2)])
+        node_bl, place_bl = _single_corner_node(cabs_bl, ROOM)
+        self.assertEqual(node_bl["corner"], "back-left")
+        self.assertIn(node_bl["wall"], E.WALLS)          # valid Selection value
+        self.assertNotEqual(node_bl["wall"], "back")     # no longer misrepresented
+        cell_bl = E._corner_cell_aabb("0", "0", ROOM, cs)
+        self.assertTrue(E.footprints_overlap(
+            E.footprint_mm(node_bl, place_bl), cell_bl))
+        self.assertIn(int(round(place_bl["rotation_deg"])) % 360,
+                      E.ALLOWED_ROTATIONS)
+        self.assertNotEqual(int(round(place_bl["rotation_deg"])) % 360, 0)
+
+        # back-right — regression guard (already correct pre-fix: the back
+        # run's HIGH end meets the right run's LOW end at (W, 0)).
+        room_br = {"width_mm": 4300, "depth_mm": 3000, "height_mm": 2400}
+        cabs_br = ([self._mkw(("B2", s), "back", s) for s in range(6)]
+                   + [self._mkw(("R2", s), "right", s) for s in range(3)])
+        node_br, place_br = _single_corner_node(cabs_br, room_br)
+        self.assertEqual(node_br["corner"], "back-right")
+        self.assertIn(node_br["wall"], E.WALLS)
+        cell_br = E._corner_cell_aabb("W", "0", room_br, cs)
+        self.assertTrue(E.footprints_overlap(
+            E.footprint_mm(node_br, place_br), cell_br))
+        self.assertNotEqual(int(round(place_br["rotation_deg"])) % 360, 0)
+
+        # front-left — mirror (already correct pre-fix: the front run's LOW
+        # end meets the left run's HIGH end at (0, D)).
+        cabs_fl = ([self._mkw(("F3", s), "front", s) for s in range(4)]
+                   + [self._mkw(("L3", s), "left", s) for s in range(4)])
+        node_fl, place_fl = _single_corner_node(cabs_fl, ROOM)
+        self.assertEqual(node_fl["corner"], "front-left")
+        self.assertIn(node_fl["wall"], E.WALLS)
+        cell_fl = E._corner_cell_aabb("0", "D", ROOM, cs)
+        self.assertTrue(E.footprints_overlap(
+            E.footprint_mm(node_fl, place_fl), cell_fl))
+        self.assertNotEqual(int(round(place_fl["rotation_deg"])) % 360, 0)
