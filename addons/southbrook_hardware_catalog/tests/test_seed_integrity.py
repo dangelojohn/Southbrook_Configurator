@@ -8,13 +8,17 @@ from odoo.tests.common import TransactionCase, tagged
 class TestSeedIntegrity(TransactionCase):
 
     def test_all_36_brands_present(self):
-        """Module ships 36 brand records — original 19 + DTC/King Slide
+        """Module ships >= 36 brand records — original 19 + DTC/King Slide
         (Tier 1) + 15 Marathon-homepage brands (Tier 2.2). Locks the
-        floor; growth is fine, silent drops are not."""
+        floor; growth is fine, silent drops are not — so this asserts a
+        floor (assertGreaterEqual), matching the docstring and the sibling
+        SKU-count test. (Was a brittle assertEqual(36) that broke when the
+        seed legitimately grew to 39.)"""
         Brand = self.env["southbrook.hardware.brand"]
-        self.assertEqual(
-            Brand.search_count([]), 36,
-            "Expected 36 brand records, got a different count",
+        n = Brand.search_count([])
+        self.assertGreaterEqual(
+            n, 36,
+            f"Expected at least 36 brand records, got {n} — a brand was dropped",
         )
 
     def test_marathon_aligned_additions_present(self):
