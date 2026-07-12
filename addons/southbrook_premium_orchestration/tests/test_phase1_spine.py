@@ -38,6 +38,13 @@ class TestPhase1Spine(TransactionCase):
             "southbrook_premium.default_kitchen_project_id",
             str(cls.project.id),
         )
+        # These spine/backlink tests don't stage component stock, so disable
+        # this module's MO component-availability gate (it fires when the
+        # approval flow confirms the created MOs). The gate is product behavior,
+        # not what these tests exercise.
+        cls.env["ir.config_parameter"].sudo().set_param(
+            "southbrook.mo_availability_gate.enabled", "0",
+        )
 
         # Two stages so we can assert the spine lands in Design & Quote
         # specifically (not just "the first stage").
@@ -161,6 +168,12 @@ class TestPhase1Spine(TransactionCase):
         # observe the backlink wiring.
         self._task_for(so).unlink()
 
+        # This MO carries origin=so.name, so southbrook_mrp_pm's production-
+        # approval gate fires on create. This test is about orphan-MO backlink
+        # wiring, not the approval gate — take the documented force-release
+        # bypass on the source order.
+        if "force_production_release" in so._fields:
+            so.force_production_release = True
         orphan_mo = self.env["mrp.production"].create({
             "product_id": self.kitchen_product.id,
             "product_qty": 1.0,

@@ -29,6 +29,9 @@ class TestP1AutoEmitCutlist(TransactionCase):
             "southbrook_premium.default_kitchen_project_id",
             str(cls.project.id),
         )
+        cls.env["ir.config_parameter"].sudo().set_param(
+            "southbrook.mo_availability_gate.enabled", "0",
+        )
         cls.kitchen_product = cls.env["product.product"].create({
             "name": "Base Cabinet, 3-Drawer, Shaker Maple, 24W",
             "type": "consu",
@@ -52,6 +55,10 @@ class TestP1AutoEmitCutlist(TransactionCase):
             })],
         })
         line = so.order_line[0]
+        # SO-origin MO trips southbrook_mrp_pm's approval gate — take the
+        # documented force-release bypass (this test is about cutlist emit).
+        if "force_production_release" in so._fields:
+            so.force_production_release = True
         # Manual MO link so build_from_order_line resolves cleanly without
         # a full BoM setup (BoM-bound MOs are a different code path tested
         # in test_full_flow.py).

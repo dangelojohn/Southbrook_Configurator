@@ -20,7 +20,7 @@ import logging
 import requests
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -103,9 +103,17 @@ class SouthbrookFreecadActivator(models.Model):
         for rec in self:
             rec.url = url
 
+    def _check_admin(self):
+        # These methods are RPC-reachable and sudo() system config internally
+        # (base.group_user has read on this model). Repointing freecad_bridge.url
+        # is an SSRF vector; enabling/rendering triggers sudo work. Restrict all
+        # mutation to admins.
+        if not self.env.is_system():
+            raise AccessError(_(
+                "Only administrators may configure the FreeCAD activator."))
+
     def _inverse_url(self):
-        # .sudo() needed because freecad_bridge.url is system-scoped config;
-        # admin write check happens at wizard ACL.
+        self._check_admin()
         param = self.env["ir.config_parameter"].sudo()
         for rec in self:
             param.set_param(
@@ -122,6 +130,7 @@ class SouthbrookFreecadActivator(models.Model):
 
     def _inverse_enabled(self):
         param = self.env["ir.config_parameter"].sudo()
+        self._check_admin()
         for rec in self:
             param.set_param(
                 "freecad_bridge.enabled",
@@ -153,6 +162,7 @@ class SouthbrookFreecadActivator(models.Model):
     def action_health_check(self):
         """GET {url}/health with a short timeout. Any HTTP 200 = up."""
         rec = self._get_singleton()
+        self._check_admin()
         param = self.env["ir.config_parameter"].sudo()
         url = (param.get_param("freecad_bridge.url", DEFAULT_BRIDGE_URL) or "").strip()
         now = fields.Datetime.now()
@@ -202,6 +212,7 @@ class SouthbrookFreecadActivator(models.Model):
     def action_enable(self):
         """Flip ``freecad_bridge.enabled`` to True — gated on URL + last health OK."""
         self.ensure_one()
+        self._check_admin()
         param = self.env["ir.config_parameter"].sudo()
         url = (param.get_param("freecad_bridge.url", "") or "").strip()
         if not url:
@@ -223,6 +234,7 @@ class SouthbrookFreecadActivator(models.Model):
         return True
 
     def action_render_first_mo(self):
+        self._check_admin()
         """Acceptance test: render the oldest pending MO end-to-end.
 
         Picks the oldest mrp.production where x_cad_status='pending' and

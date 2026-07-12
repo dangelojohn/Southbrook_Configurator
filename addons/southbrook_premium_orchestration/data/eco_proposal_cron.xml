@@ -4,6 +4,7 @@
         <record id="cron_propose_eco_for_high_freq_overrides" model="ir.cron">
             <field name="name">Southbrook: Propose ECOs for High-Frequency Cut-Spec Overrides</field>
             <field name="model_id" ref="model_southbrook_cut_spec_override"/>
+            <field name="user_id" ref="base.user_root"/>
             <field name="state">code</field>
             <field name="code">model._cron_propose_eco_for_high_frequency_overrides()</field>
             <field name="interval_number">1</field>
