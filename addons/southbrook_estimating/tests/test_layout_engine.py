@@ -429,3 +429,50 @@ class TestKitchenLayoutEngine(TransactionCase):
         self.assertTrue(E.footprints_overlap(
             E.footprint_mm(node_fl, place_fl), cell_fl))
         self.assertNotEqual(int(round(place_fl["rotation_deg"])) % 360, 0)
+
+    # ── Layer-scoped corner offset (2026-07-12, review I1) ──────────────
+    # A base-only corner used to offset the WHOLE host wall via
+    # `wall_start_offsets[wall]`, and `layout()` applied that offset to
+    # EVERY run on that wall — including the wall (upper) layer's run,
+    # which has nothing to do with the base-layer corner. Uppers can
+    # legitimately run all the way to the corner above a short base corner
+    # cabinet; they must not be shoved 914mm right just because the base
+    # layer resolved a corner on the same wall.
+    def test_base_corner_does_not_shift_host_upper_run(self):
+        # Base layer: back + left, enough to reach the back-left cell → one
+        # base-only corner resolves (same shape as cabs_bl above).
+        base_cabs = ([self._mkw(("B", s), "back", s) for s in range(2)]
+                     + [self._mkw(("L", s), "left", s) for s in range(2)])
+        # Wall (upper) layer: ONLY on the back wall — no left-wall uppers at
+        # all, so no wall-layer corner is ever detected here.
+        upper_cabs = [self._mkw(("BW", s), "back", s, ct="wall")
+                      for s in range(2)]
+        cabs = base_cabs + upper_cabs
+
+        r = E.resolve_and_layout(cabs, ROOM, auto_assign=False)
+        corner_nodes = [c for c in r["cabinets"] if c.get("corner_cabinet")]
+        self.assertEqual(len(corner_nodes), 1)
+        self.assertEqual(corner_nodes[0]["layer"], "base")
+
+        pl = {p["id"]: p for p in r["placements"]}
+
+        # The back wall's UPPER run is untouched by the base corner — its
+        # cabinets keep their pre-corner x (cursor starts at 0 on "back").
+        upper_back = [c for c in r["cabinets"]
+                      if c.get("wall") == "back"
+                      and c.get("cabinet_type") == "wall"]
+        self.assertEqual(len(upper_back), 2)
+        upper_x = sorted(pl[c["id"]]["x"] for c in upper_back)
+        self.assertAlmostEqual(upper_x[0], 300)
+        self.assertAlmostEqual(upper_x[1], 900)
+
+        # The base run on "back" (the corner's host wall) IS still offset,
+        # exactly as before — this is the existing, single-layer behaviour
+        # that must remain byte-identical.
+        base_back = [c for c in r["cabinets"]
+                     if c.get("wall") == "back"
+                     and c.get("cabinet_type") == "base"
+                     and not c.get("corner_cabinet")]
+        self.assertEqual(len(base_back), 1)
+        self.assertAlmostEqual(
+            pl[base_back[0]["id"]]["x"] - 300, E._CORNER_FOOTPRINT_MM)

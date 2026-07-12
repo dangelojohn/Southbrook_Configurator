@@ -257,7 +257,12 @@ def layout(cabinets, room,
     for wall, run in runs.items():
         for cab in run:
             run_key = _cabinet_run_key(cab, zone_layout, worktop_cursor)
-            along = cursors.get(run_key, wall_start_offsets.get(wall, 0))
+            # wall_start_offsets is keyed by (wall, layer) — a corner
+            # resolved for ONE layer (base or wall) on a wall must not
+            # shove the OTHER layer's run on that same wall (I1: a
+            # base-only corner shouldn't shift the wall/upper run).
+            along = cursors.get(
+                run_key, wall_start_offsets.get((wall, _layer_of(cab)), 0))
             y_floor, cross_offset = _cabinet_zone_offsets(
                 cab, zone_layout, worktop_y)
             pose = _place_on_wall(
@@ -623,11 +628,18 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         # surviving cabinets need the SAME explicit start-offset the
         # adjoining run gets below — host_wall's low end is always at this
         # corner by construction (that's what makes it "host").
-        offsets[host_wall] = max(offsets.get(host_wall, 0), corner_size_mm)
+        #
+        # I1: keyed by (wall, layer) — NOT just wall — so a base-layer
+        # corner's offset never bleeds into that same wall's wall (upper)
+        # run, and vice versa. Each detected corner is already scoped to
+        # exactly one layer (`corner["layer"]`); the offset must stay
+        # scoped to it too.
+        offsets[(host_wall, layer)] = max(
+            offsets.get((host_wall, layer), 0), corner_size_mm)
         if other_end == "first":
             # The adjoining low-end run must start past the corner footprint.
-            offsets[other_wall] = max(offsets.get(other_wall, 0),
-                                      corner_size_mm)
+            offsets[(other_wall, layer)] = max(
+                offsets.get((other_wall, layer), 0), corner_size_mm)
 
     final = [dict(c) for c in assigned if c["id"] not in removed_ids]
     final.extend(dict(n) for n in inserted)
