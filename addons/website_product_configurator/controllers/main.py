@@ -3,7 +3,6 @@ import logging
 from odoo import http, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request, route
-from odoo.tools.safe_eval import safe_eval
 
 from odoo.addons.website_sale.controllers.main import WebsiteSale
 
@@ -417,8 +416,19 @@ class ProductConfigWebsiteSale(WebsiteSale):
 
             if attr_line.custom and custom_field_value:
                 custom_field_value = custom_field_value[0]
-                if attr_line.attribute_id.custom_type in ["int", "float"]:
-                    custom_field_value = safe_eval(custom_field_value)
+                # Strict numeric parse — NOT safe_eval: this is unauthenticated
+                # POST text on a public route, and safe_eval evaluates arbitrary
+                # Python expressions (e.g. "9**9**9" → CPU/memory exhaustion).
+                if attr_line.attribute_id.custom_type == "int":
+                    try:
+                        custom_field_value = int(custom_field_value)
+                    except (TypeError, ValueError):
+                        custom_field_value = 0
+                elif attr_line.attribute_id.custom_type == "float":
+                    try:
+                        custom_field_value = float(custom_field_value)
+                    except (TypeError, ValueError):
+                        custom_field_value = 0.0
 
             if attr_line.multi:
                 field_value = [[6, False, field_value]]
