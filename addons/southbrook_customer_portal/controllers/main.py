@@ -2,7 +2,7 @@
 """Customer-facing /my/kitchen-projects portal."""
 import logging
 
-from odoo import _, http
+from odoo import _, fields, http
 from odoo.exceptions import AccessError, MissingError, UserError
 from odoo.http import request
 
@@ -98,6 +98,16 @@ class KitchenPortal(http.Controller):
     )
     def kitchen_project_select_option(self, project_id, option_id, **kw):
         project = self._fetch_project_for_user(project_id)
+        # Server-side state gate (the template only HIDES the button — a customer
+        # legitimately holds a CSRF token from their own pages and can POST
+        # directly). Without this, after the project is approved/in production a
+        # customer could re-point selected_design_option_id to a different
+        # concept than the one approved, desyncing the quote/MO/spec-sheet from
+        # the portal with no re-approval or audit. Mirror the approve gate.
+        if project.state not in ("designing", "awaiting_customer"):
+            raise UserError(_(
+                "Project state is %s; design options can no longer be changed."
+            ) % project.state)
         option = project.design_option_ids.filtered(lambda o: o.id == option_id)
         if not option:
             raise MissingError(_("Design option does not belong to this project."))
@@ -128,7 +138,10 @@ class KitchenPortal(http.Controller):
             "approver_id": request.env.user.id,
             "approver_type": "customer",
             "state": "approved",
-            "date_decided": http.fields.Datetime.now() if hasattr(http, "fields") else None,
+            # was `http.fields.Datetime.now()` — odoo.http has no `fields`
+            # attribute, so the guard always evaluated to None and the decision
+            # timestamp was never recorded.
+            "date_decided": fields.Datetime.now(),
         })
         project.sudo().action_customer_approves()
         return request.redirect(f"/my/kitchen-project/{project_id}")
