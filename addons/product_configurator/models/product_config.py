@@ -133,10 +133,12 @@ class ProductConfigDomainLine(models.Model):
         comodel_name="product.attribute",
         string="Attribute",
         required=True,
+        index=True,
         domain=lambda self: self._compute_attribute_id_domain(),
     )
     domain_id = fields.Many2one(
-        comodel_name="product.config.domain", required=True, string="Rule"
+        comodel_name="product.config.domain", required=True, string="Rule",
+        index=True,
     )
     condition = fields.Selection(selection=_get_domain_conditions, required=True)
     value_ids = fields.Many2many(
@@ -197,6 +199,9 @@ class ProductConfigLine(models.Model):
         string="Product Template",
         ondelete="cascade",
         required=True,
+        # Inverse of product.template.config_line_ids — accessed constantly by
+        # the rule engine; Postgres does not auto-index FK columns.
+        index=True,
     )
     attribute_line_id = fields.Many2one(
         comodel_name="product.template.attribute.line",
@@ -263,6 +268,7 @@ class ProductConfigImage(models.Model):
         string="Product",
         ondelete="cascade",
         required=True,
+        index=True,
     )
     sequence = fields.Integer(default=10)
     value_ids = fields.Many2many(
@@ -324,6 +330,7 @@ class ProductConfigStepLine(models.Model):
         string="Product Template",
         ondelete="cascade",
         required=True,
+        index=True,
     )
     sequence = fields.Integer(default=10)
 
@@ -513,6 +520,7 @@ class ProductConfigSession(models.Model):
                 custom_vals[val.attribute_id.id] = val.value
         return custom_vals
 
+    @api.depends("config_step")
     def _compute_config_step_name(self):
         """Get the config.step.line name using the string stored in config_step
         field of the session"""
@@ -588,6 +596,7 @@ class ProductConfigSession(models.Model):
         for cfg_session in self:
             cfg_session.weight = cfg_session.get_cfg_weight()
 
+    @api.depends("product_tmpl_id", "product_tmpl_id.company_id.currency_id")
     def _compute_currency_id(self):
         main_company = self.env["res.company"]._get_main_company()
         for session in self:
@@ -611,6 +620,10 @@ class ProductConfigSession(models.Model):
         domain=[("config_ok", "=", True)],
         string="Configurable Template",
         required=True,
+        # Part of the (product_tmpl_id, user_id, state) lookup key hit on every
+        # wizard open (get_session_search_domain) on a table documented to grow
+        # 100k+ rows/month; index it.
+        index=True,
     )
     value_ids = fields.Many2many(
         comodel_name="product.attribute.value",
@@ -618,7 +631,9 @@ class ProductConfigSession(models.Model):
         column1="cfg_session_id",
         column2="attr_val_id",
     )
-    user_id = fields.Many2one(comodel_name="res.users", required=True, string="User")
+    user_id = fields.Many2one(
+        comodel_name="res.users", required=True, string="User", index=True,
+    )
     custom_value_ids = fields.One2many(
         comodel_name="product.config.session.custom.value",
         inverse_name="cfg_session_id",
@@ -638,6 +653,7 @@ class ProductConfigSession(models.Model):
         required=True,
         selection=[("draft", "Draft"), ("done", "Done")],
         default="draft",
+        index=True,
     )
     weight = fields.Float(compute="_compute_cfg_weight", digits="Stock Weight")
     # Product preset
