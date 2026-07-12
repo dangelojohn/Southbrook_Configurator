@@ -525,7 +525,26 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 # matching the model field's own default.
                 "wall":           line.wall or "back",
             })
-        return {"lines": out}
+        # PR2.5a (Gap 1) — additive: a direct-URL reload of the
+        # configurator restores the client action's `design_id` (via the
+        # actionStack fallback in kitchen_configurator.js) but NOT the
+        # room dims / design name that normally arrive via
+        # action_open_configurator's `params` (models/kitchen_design.py
+        # action_open_configurator). Echo them here, read-side only, so
+        # _hydrateFromDesign() can backfill state.room / state.designName
+        # when a URL restore skipped params entirely. The no-design /
+        # no-access branches above are unchanged (still bare
+        # {"lines": []}) — this key is only ever added when a design was
+        # actually found and readable.
+        return {
+            "lines": out,
+            "room": {
+                "width_in":  design.room_width_in,
+                "depth_in":  design.room_depth_in,
+                "height_in": design.room_height_in,
+            },
+            "design_name": design.display_name,
+        }
 
     @http.route(
         "/southbrook_kitchen/configurator/save_position",

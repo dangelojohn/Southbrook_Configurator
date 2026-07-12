@@ -168,6 +168,41 @@ class TestWallPersistence(TransactionCase):
         self.assertEqual(len(result["lines"]), 1)
         self.assertEqual(result["lines"][0]["wall"], "right")
 
+    def test_load_design_lines_emits_room_and_design_name(self):
+        """PR2.5a (Gap 1) — load_design_lines must additively echo the
+        design's room dims + display name alongside `lines`, so the
+        client can backfill state on a direct-URL reload (where
+        action.params never carries room_width_in/depth_in/height_in or
+        design_name — only the 3D configurator's boot params do, and a
+        URL restore skips params entirely)."""
+        _, lines = self._save([{
+            "product_id":    self.product.id,
+            "layout_key":    "wall-test-room-echo",
+            "x_position_in": 0,
+            "wall":          "back",
+        }])
+        self.assertEqual(len(lines), 1)
+        controller = self._controller()
+        with stubbed_request(self.env):
+            result = controller.load_design_lines(design_id=self.design.id)
+        self.assertIn("room", result)
+        self.assertEqual(result["room"]["width_in"], self.design.room_width_in)
+        self.assertEqual(result["room"]["depth_in"], self.design.room_depth_in)
+        self.assertEqual(result["room"]["height_in"], self.design.room_height_in)
+        self.assertIn("design_name", result)
+        self.assertEqual(result["design_name"], self.design.display_name)
+        # `lines` + `wall` still present alongside the new keys.
+        self.assertEqual(len(result["lines"]), 1)
+        self.assertEqual(result["lines"][0]["wall"], "back")
+
+    def test_load_design_lines_no_design_stays_bare(self):
+        """The no-design / no-access short-circuit paths must remain
+        byte-identical: bare {"lines": []}, no room/design_name keys."""
+        controller = self._controller()
+        with stubbed_request(self.env):
+            result = controller.load_design_lines(design_id=999999999)
+        self.assertEqual(result, {"lines": []})
+
     def test_null_wall_reads_as_back(self):
         """Pre-PR2 rows with a NULL wall column (no migration) must read
         back as 'back' for backward compatibility."""

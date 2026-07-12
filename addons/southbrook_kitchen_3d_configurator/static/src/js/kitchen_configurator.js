@@ -59,6 +59,68 @@ class SouthbrookKitchenConfigurator extends Component {
         const params = (this.props.action && this.props.action.params) || this.props || {};
         this._actionParams = params;
 
+        // PR2.5a (Gap 1) — a direct-URL reload (browser refresh /
+        // bookmark) restores the client action WITHOUT `params.design_id`:
+        // Odoo 19's router rebuilds the action purely from the URL path,
+        // never replaying the `params` dict action_open_configurator()
+        // originally sent. Verified against the vendored source inside
+        // the local `sami-odoo` container:
+        //   - web/static/src/core/browser/router.js `urlToState`
+        //     (~lines 186-232) parses a path segment like
+        //     `/odoo/southbrook.kitchen.design/81/
+        //     southbrook_kitchen_configurator` into
+        //     actionStack = [{model:"southbrook.kitchen.design", resId:81},
+        //                    {action:"southbrook_kitchen_configurator",
+        //                     active_id:81}]
+        //     and merges the LAST entry's keys onto the top-level state
+        //     (so state.active_id = 81, state.action = the tag).
+        //   - web/static/src/webclient/actions/action_service.js
+        //     `_getActionParams` (~lines 505-536), reached ONLY from
+        //     `loadState()` (i.e. only on a URL-driven load, never on a
+        //     live doAction() button dispatch), builds
+        //     `actionRequest = { context, params: state, tag, type:
+        //     "ir.actions.client" }` for a registered client-action tag —
+        //     so `action.params.actionStack` (and `.active_id`) exist
+        //     ONLY when Odoo reconstructed the action from the URL.
+        // We recover the design id from the actionStack frame that
+        // precedes our own action, but ONLY when that frame's `model` is
+        // genuinely "southbrook.kitchen.design" — this is what tells a
+        // reload of "an opened design's configurator" (safe: active_id
+        // really is the design) apart from a reload of one of the
+        // "bare" entry points with no design_id at all (a room with no
+        // bridged design — southbrook_room.py action_open_kitchen_3d —
+        // or an SO with neither a design nor a room —
+        // sale_order.py action_open_in_kitchen_3d — whose preceding
+        // record is a southbrook.room / sale.order, not a design;
+        // treating THAT active_id as a design id would silently hydrate
+        // an unrelated record). Live button-click opens never populate
+        // `params.actionStack` at all (see above), so this fallback can
+        // only ever fire on a URL restore — it never runs on a normal
+        // open, even the "bare" ones.
+        const restoredStack = params.actionStack;
+        const restoredDesignFrame = Array.isArray(restoredStack)
+            ? restoredStack.find(
+                  // router.js `urlToState` can also produce resId:"new"
+                  // (an unsaved record's form) — explicitly require a
+                  // real numeric id here, never treat "new" as a
+                  // design id.
+                  (s) => s && s.model === "southbrook.kitchen.design"
+                      && typeof s.resId === "number"
+              )
+            : null;
+        const restoredDesignId = restoredDesignFrame ? restoredDesignFrame.resId : null;
+        // Room dims / design name are never part of `params` on a URL
+        // restore (only the id survives) — _hydrateFromDesign() backfills
+        // them additively from the /load_design_lines response (server
+        // extended in PR2.5a). Track whether `params` explicitly supplied
+        // them so that path knows it's safe to overwrite state.room /
+        // state.designName only when params did NOT — params, when
+        // present, keep precedence.
+        this._hasExplicitRoomParams = !!(
+            params.room_width_in || params.room_depth_in || params.room_height_in
+        );
+        this._hasExplicitDesignName = !!params.design_name;
+
         // ── Reactive state ────────────────────────────────────────────────────
         this.state = useState({
             loading:  true,
@@ -82,7 +144,10 @@ class SouthbrookKitchenConfigurator extends Component {
             // (that arrives in PR2/PR3/PR4).
             activeWall: null,
             summary:   { base_count: 0, wall_count: 0, total: 0, price: 0, remainder_in: 0 },
-            designId:  params.design_id || null,
+            // PR2.5a (Gap 1) — falls back to the URL-restore-only
+            // actionStack signal (see setup() comment above) when
+            // params.design_id is absent (a direct-URL reload).
+            designId:  params.design_id || restoredDesignId || null,
             designName: params.design_name || "",
             // D1 — multi-view camera system. 'iso' default; switchable
             // among iso/top/front/left/right/persp. Hotkeys 1-6 + R reset.
@@ -395,6 +460,27 @@ class SouthbrookKitchenConfigurator extends Component {
                 "/southbrook_kitchen/configurator/load_design_lines",
                 { design_id: this.state.designId },
             );
+            // PR2.5a (Gap 1) — backfill room dims / design name from the
+            // server's additive echo (controllers/main.py
+            // load_design_lines) when `params` didn't already supply
+            // them explicitly. A live button-click open always does —
+            // action_open_configurator forwards the same design's
+            // room_width_in/depth_in/height_in + design_name — so this
+            // is a no-op there; only a direct-URL reload skips `params`
+            // entirely, and that's the case this backfills. Params, when
+            // present, keep precedence (see the `_hasExplicit*` flags
+            // set in setup()) since they're always sourced from the same
+            // design row anyway — no real conflict is possible.
+            if (resp && resp.room && !this._hasExplicitRoomParams) {
+                this.state.room = {
+                    width_in:  resp.room.width_in  || this.state.room.width_in,
+                    depth_in:  resp.room.depth_in  || this.state.room.depth_in,
+                    height_in: resp.room.height_in || this.state.room.height_in,
+                };
+            }
+            if (resp && resp.design_name && !this._hasExplicitDesignName) {
+                this.state.designName = resp.design_name;
+            }
             const lines = (resp && resp.lines) || [];
             if (!lines.length) {
                 // Design record exists but has no saved configurator-
@@ -405,7 +491,8 @@ class SouthbrookKitchenConfigurator extends Component {
                 // to the generator exactly like the no-design_id path
                 // so the rep still sees a starter fill, and leave
                 // _hydratedFromDesign unset so normal generate-on-edit
-                // behavior continues until the first real save.
+                // behavior continues until the first real save. Safe:
+                // the next save is a full-replace of nothing.
                 await this._refreshLayout();
                 return;
             }
