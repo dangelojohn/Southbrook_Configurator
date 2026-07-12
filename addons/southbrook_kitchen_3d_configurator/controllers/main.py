@@ -165,8 +165,16 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         items = []
         for i in range(n):
             x = i * module_w
-            items.append(self._layout_item(base, i, x, 0.0, 0.0,    pricelist, partner))
-            items.append(self._layout_item(wall, i, x, 0.0, wall_z, pricelist, partner))
+            # PR3.0 — y/z field-semantics migration: y_position_in is the
+            # canonical mount-height/elevation field, z_position_in is the
+            # depth axis per COORDINATE_CONTRACT.md. Base cabinets are
+            # floor-flush (y=0, z=0, unchanged). Wall cabinets carry their
+            # D8-computed mount height (`wall_z`) in y now, not z; z stays
+            # 0 (flush to the back wall) — this was the "z-as-height"
+            # convention flagged as the riskiest finding in the PR3
+            # coordinate-contract matrix.
+            items.append(self._layout_item(base, i, x, 0.0,    0.0, pricelist, partner))
+            items.append(self._layout_item(wall, i, x, wall_z, 0.0, pricelist, partner))
 
         # D7 — Smart filler placement. Honors the chosen filler_strategy:
         #  split: half-width filler at each end (default; pushes bases by half)

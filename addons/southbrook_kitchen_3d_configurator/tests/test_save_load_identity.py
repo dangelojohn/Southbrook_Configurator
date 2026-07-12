@@ -231,3 +231,47 @@ class TestSaveLoadIdentity(TransactionCase):
         self.assertNotIn("error", result3, f"unexpected error: {result3}")
         self.assertEqual(self._snapshot(lines3), snapshot1)
         self.assertEqual(set(lines3.ids), ids1)
+
+    # ------------------------------------------------------------------
+    # PR3.0 — y/z field-semantics migration. Save/load identity is a
+    # field-preserving contract regardless of which field a value lives
+    # in, but this pins it explicitly for the CANONICAL post-migration
+    # shape: a wall-type upper carrying its mount height in
+    # y_position_in (nonzero) with z_position_in flush at 0 — the
+    # opposite of the pre-PR3.0 fixture above (which used the legacy
+    # z-as-height shape, itself still a valid round-trip case since
+    # save/load never interprets these fields, only persists them).
+    def test_save_load_save_is_identity_with_canonical_wall_mount_height(self):
+        items = [
+            {
+                "product_id":    self.product_wall.id,
+                "layout_key":    "identity-wall-canonical-1",
+                "wall":          "back",
+                "x_position_in": 12,
+                "y_position_in": 66,   # canonical: mount height lives in y
+                "z_position_in": 0,    # canonical: flush to the back wall
+                "rotation_deg":  0,
+                "pinned":        False,
+                "width_in":      18.0,
+                "height_in":     30.0,
+                "depth_in":      12.0,
+                "price":         350.0,
+            },
+        ]
+        result1, lines1 = self._save(items)
+        self.assertNotIn("error", result1, f"unexpected error: {result1}")
+        self.assertEqual(len(lines1), 1)
+        self.assertEqual(lines1[0].y_position_in, 66)
+        self.assertEqual(lines1[0].z_position_in, 0)
+        snapshot1 = self._snapshot(lines1)
+        ids1 = set(lines1.ids)
+
+        loaded = self._load()
+        self.assertEqual(len(loaded["lines"]), 1)
+        self.assertEqual(loaded["lines"][0]["y_position_in"], 66)
+        self.assertEqual(loaded["lines"][0]["z_position_in"], 0)
+
+        result2, lines2 = self._save(loaded["lines"])
+        self.assertNotIn("error", result2, f"unexpected error: {result2}")
+        self.assertEqual(self._snapshot(lines2), snapshot1)
+        self.assertEqual(set(lines2.ids), ids1)
