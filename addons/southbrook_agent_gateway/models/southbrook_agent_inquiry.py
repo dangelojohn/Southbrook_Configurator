@@ -26,6 +26,7 @@ import hmac
 import logging
 import re
 import secrets
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.tools import email_normalize, plaintext2html
@@ -371,7 +372,13 @@ class SouthbrookAgentInquiry(models.Model):
             "southbrook_agent_gateway.partner_category_ai_agent_lead",
             raise_if_not_found=False)
         agent_label = cleaned.get("agent_name") or _("an AI agent")
-        return Partner.create(dict(
+        # BUGFIX (2026-07-11): this branch returned a bare recordset while the
+        # method contract (and the existing-partner branch above) is
+        # (partner, is_new). submit() unpacks two values, so creating a NEW
+        # partner — the common case for any new customer — raised
+        # "not enough values to unpack" and the public /quote-request endpoint
+        # 500'd for every new email. Return the (partner, True) tuple.
+        new_partner = Partner.create(dict(
             {
                 "name": cleaned["customer_name"],
                 "email": cleaned["email"],
@@ -388,6 +395,7 @@ class SouthbrookAgentInquiry(models.Model):
             },
             **self._partner_address_vals(cleaned),
         ))
+        return new_partner, True
 
     def _partner_address_vals(self, cleaned):
         """Best-effort address fields for a NEW partner. Country/state
@@ -545,8 +553,60 @@ class SouthbrookAgentInquiry(models.Model):
             vals.update(self._partner_address_vals(cleaned))
         return self.env["crm.lead"].create(vals)
 
+    def _gateway_verify_email_allowed(self):
+        """Abuse guard for the ANONYMOUS verification-email path (security C1).
+
+        The public POST endpoint sends a Southbrook-branded verify email to a
+        caller-chosen address, so without limits it is a reflected-phishing /
+        email-bomb amplifier. Two ops-tunable brakes (ir.config_parameter):
+          * `southbrook_agent_gateway.max_daily_verify_emails` (default 200;
+            set to 0 as an instant KILL-SWITCH) — a global daily ceiling.
+          * `southbrook_agent_gateway.verify_email_cooldown_hours` (default 24)
+            — do not re-email the SAME address within the window (stops
+            bombing one victim).
+        These bound the blast radius; the deeper fixes (API key / CAPTCHA /
+        defer CRM to post-verify / CF-only ingress) are documented owner/infra
+        decisions.
+        """
+        Param = self.env["ir.config_parameter"].sudo()
+        try:
+            daily_cap = int(Param.get_param(
+                "southbrook_agent_gateway.max_daily_verify_emails", "200"))
+        except (TypeError, ValueError):
+            daily_cap = 200
+        if daily_cap <= 0:
+            _logger.warning(
+                "gateway verify-email suppressed for %s: daily cap is 0 "
+                "(kill-switch engaged).", self.reference)
+            return False
+        now = fields.Datetime.now()
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if self.sudo().search_count([("create_date", ">=", day_start)]) > daily_cap:
+            _logger.warning(
+                "gateway verify-email suppressed for %s: daily cap %d reached.",
+                self.reference, daily_cap)
+            return False
+        try:
+            cooldown_h = int(Param.get_param(
+                "southbrook_agent_gateway.verify_email_cooldown_hours", "24"))
+        except (TypeError, ValueError):
+            cooldown_h = 24
+        if self.email and cooldown_h > 0:
+            since = now - timedelta(hours=cooldown_h)
+            if self.sudo().search_count([
+                    ("email", "=", self.email), ("id", "!=", self.id),
+                    ("create_date", ">=", since)]):
+                _logger.warning(
+                    "gateway verify-email suppressed: %s already emailed "
+                    "within %dh (per-recipient cooldown).",
+                    self.email, cooldown_h)
+                return False
+        return True
+
     def _send_verification_email(self):
         self.ensure_one()
+        if not self._gateway_verify_email_allowed():
+            return
         template = self.env.ref(
             "southbrook_agent_gateway.mail_template_verify_inquiry",
             raise_if_not_found=False)
