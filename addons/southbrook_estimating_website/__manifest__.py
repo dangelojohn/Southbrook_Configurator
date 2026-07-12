@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.31.3.0",
+    "version": "19.0.31.4.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -20,6 +20,10 @@
         "southbrook_estimating",
         "website_product_configurator",   # OCA — public-facing wizard base
         "portal",                          # /my/... portal layout + auth
+        # views/auth_template.xml inherits auth_passkey.auth_passkey_login_oauth;
+        # it is auto_install upstream, but declare it so the inherit is explicit
+        # (avoids an install-order ParseError if auto_install ever changes).
+        "auth_passkey",
         # 2026-07-03 T1 — the new "3D Design" tab reuses the standalone
         # Configurator's KitchenCanvas OWL engine + persists cabinet
         # positions to the existing southbrook.kitchen.design(.line)

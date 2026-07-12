@@ -94,6 +94,25 @@ class TestSendToManufacturing(TransactionCase):
             ("origin", "=", self.order.name),
         ]))
 
+    def test_portal_user_cannot_send_to_manufacturing(self):
+        """HIGH-1 regression: a share=True (portal customer / dealer) caller
+        must be refused, even for an order _southbrook_resolve_order grants
+        them via the partner chain. Releasing to the shop floor is staff-only."""
+        self.order.action_confirm()
+        portal_user = self.env["res.users"].create({
+            "name": "Portal Mfg Tester",
+            "login": "portal_mfg_test@southbrook.test",
+            "partner_id": self.partner.id,
+            "group_ids": [(6, 0, [self.env.ref("base.group_portal").id])],
+        })
+        self.assertTrue(portal_user.share)
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._southbrook_resolve_order = lambda _id: self.order
+        with stubbed_request(self.env, user=portal_user):
+            result = controller.southbrook_api_order_action(
+                self.order.id, action_code="send_to_manufacturing")
+        self.assertEqual(result.get("error"), "forbidden")
+
     # ------------------------------------------------------------------
     # Happy path
     # ------------------------------------------------------------------
