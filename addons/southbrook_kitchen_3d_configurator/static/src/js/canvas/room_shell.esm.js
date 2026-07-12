@@ -4,9 +4,10 @@
  *
  * Rec D · Sprint 2d · Step 11 · closure-body extraction.
  *
- * Builds the fixed room geometry: floor plane, back + left walls,
- * wainscoting rail on the back wall, and the floor grid. Extracted
- * from kitchen_configurator.js:1303-1322 verbatim.
+ * Builds the fixed room geometry: floor plane, back + left walls (full
+ * height), right + front wall selection strips (low), wainscoting rail on
+ * the back wall, and the floor grid. Extracted from
+ * kitchen_configurator.js:1303-1322 (back/left verbatim).
  *
  * The caller passes:
  *   - THREE (vendored module) — needed for PlaneGeometry/BoxGeometry/
@@ -41,8 +42,13 @@ export function buildRoomShell(THREE, scene, mk, palette, rw, rh, rd) {
         { rs: true, rough: 0.95, metal: 0.0 },
     );
     // Room walls carry a `wall` tag so the canvas can raycast + select them
-    // (Phase 1 interactive walls). Only back + left are rendered today (open
-    // cutaway); right + front arrive with U-shape + dynamic wall visibility.
+    // (interactive walls). Back + left are the FAR walls of the open cutaway,
+    // rendered full height. Right + front are the NEAR (open) side — rendering
+    // them full height would enclose the room and block the iso view, so they
+    // are drawn as low floor strips at the room boundary: always visible +
+    // clickable + glow-highlightable exactly like the tall walls, but too low
+    // to occlude. The toolbar wall-picker is the guaranteed way to select any
+    // wall; these strips add the click-to-select affordance in 3D.
     const bwall = mk(
         new THREE.PlaneGeometry(rw, rh), palette.wall1,
         [rw/2, rh/2, 0], null,
@@ -54,6 +60,19 @@ export function buildRoomShell(THREE, scene, mk, palette, rw, rh, rd) {
         [0, rh/2, rd/2], [0, Math.PI/2, 0],
         { rs: true, rough: 0.9, metal: 0.0,
           ud: { isRoomWall: true, wall: "left" } },
+    );
+    const stripH = 12 * IN;   // low "kick wall" — marks the wall without blocking
+    const rwall = mk(
+        new THREE.BoxGeometry(0.03, stripH, rd), palette.wall2,
+        [rw, stripH/2, rd/2], null,
+        { rs: true, rough: 0.9, metal: 0.0,
+          ud: { isRoomWall: true, wall: "right" } },
+    );
+    const fwall = mk(
+        new THREE.BoxGeometry(rw, stripH, 0.03), palette.wall1,
+        [rw/2, stripH/2, rd], null,
+        { rs: true, rough: 0.9, metal: 0.0,
+          ud: { isRoomWall: true, wall: "front" } },
     );
 
     // Wainscoting rail on back wall — semi-gloss wood trim
@@ -72,6 +91,6 @@ export function buildRoomShell(THREE, scene, mk, palette, rw, rh, rd) {
     grid.material.opacity     = 0.18;
     scene.add(grid);
 
-    return { objects: [floor, bwall, lwall, rail, grid], grid,
-             walls: { back: bwall, left: lwall } };
+    return { objects: [floor, bwall, lwall, rwall, fwall, rail, grid], grid,
+             walls: { back: bwall, left: lwall, right: rwall, front: fwall } };
 }

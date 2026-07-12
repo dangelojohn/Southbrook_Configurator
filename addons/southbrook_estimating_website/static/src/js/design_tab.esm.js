@@ -160,6 +160,16 @@ export class KitchenDesignTab extends Component {
                                t-on-change="(ev) => this._changeRoom('height_in', ev.target.value)"/>
                     </label>
                 </div>
+                <div class="o_owl_design3d_wallpick" role="group" aria-label="Active wall">
+                    <span class="o_owl_design3d_wallpick_lbl">Wall</span>
+                    <button t-foreach="['back', 'left', 'right', 'front']" t-as="w" t-key="w"
+                            type="button"
+                            class="btn btn-sm o_owl_design3d_wallbtn"
+                            t-att-class="state.activeWall === w ? 'btn-primary' : 'btn-outline-secondary'"
+                            t-att-title="'Place the next cabinets on the ' + _wallLabel(w) + ' wall'"
+                            t-on-click="() => this._pickWall(w)"
+                            t-esc="_wallLabel(w)"/>
+                </div>
                 <button type="button"
                         class="btn btn-sm btn-primary o_owl_design3d_autoarrange"
                         t-att-disabled="state.loading || state.saving || !state.items.length"
@@ -598,10 +608,17 @@ export class KitchenDesignTab extends Component {
         this.state.view = key;
     }
 
-    // Phase 1 interactive walls — the canvas reports which wall was clicked;
-    // it becomes the active wall (where the next cabinets will be added).
+    // Interactive walls — the canvas reports which wall was clicked; it
+    // becomes the active wall (where the next cabinets will be added).
     _onWallSelect(wall) {
         this.state.activeWall = wall;
+    }
+
+    // Toolbar wall-picker — the guaranteed way to select any wall, including
+    // right + front (the open cutaway side, awkward to click in 3D). Clicking
+    // the already-active wall clears the selection (back to no active wall).
+    _pickWall(wall) {
+        this.state.activeWall = this.state.activeWall === wall ? null : wall;
     }
 
     _wallLabel(wall) {
