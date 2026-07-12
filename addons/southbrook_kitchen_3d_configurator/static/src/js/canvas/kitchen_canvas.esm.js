@@ -276,7 +276,10 @@ export class KitchenCanvas extends Component {
             this.T.cabObjs.push(...objects);
             if (clickable) this.T.clickable.push(...clickable);
         };
-        items.filter(it => it.cabinet_type === "base").forEach(it => push(buildBaseCabinet(THREE, mk, P, it)));
+        items.filter(it => it.cabinet_type === "base").forEach(it =>
+            this._needsTransform(it)
+                ? this._placeCabinetGroup(it, buildBaseCabinet)
+                : push(buildBaseCabinet(THREE, mk, P, it)));
         items.filter(it => it.cabinet_type === "wall").forEach(it => push(buildWallCabinet(THREE, mk, P, it)));
         items.filter(it => !knownTypes.has(it.cabinet_type)).forEach(it => push(buildOtherCabinet(THREE, mk, P, it)));
         items.filter(it => it.cabinet_type === "filler").forEach(it => {
@@ -420,6 +423,37 @@ export class KitchenCanvas extends Component {
         }
         out.sort();
         return out;
+    }
+
+    // Phase 2 renderer — place a cabinet as a THREE.Group carrying its world
+    // transform (x/y/z_position_in + rotation_deg per COORDINATE_CONTRACT).
+    // The builder builds in a LOCAL frame (x_position_in forced to 0); the
+    // group applies the world position + Y-rotation. Teardown already handles
+    // groups (traverse); raycasting still hits the real body mesh (its
+    // matrixWorld includes the group transform).
+    _placeCabinetGroup(it, builder) {
+        const THREE = this.T.THREE, scene = this.T.scene;
+        const grp = new THREE.Group();
+        const mkG = (geo, color, pos, rotE, opts) =>
+            makeMesh(THREE, grp, geo, color, pos, rotE, opts);
+        const res = builder(THREE, mkG, P, { ...it, x_position_in: 0 });
+        grp.position.set(
+            (it.x_position_in || 0) * IN,
+            (it.y_position_in || 0) * IN,
+            (it.z_position_in || 0) * IN,
+        );
+        grp.rotation.y = ((it.rotation_deg || 0) * Math.PI) / 180;
+        scene.add(grp);
+        this.T.cabObjs.push(grp);
+        if (res && res.clickable) this.T.clickable.push(...res.clickable);
+    }
+
+    // A cabinet needs the group transform only when it isn't a plain
+    // back-wall unit. Back-wall cabinets (rotation 0, z 0 — all current
+    // production data) take the ORIGINAL absolute path and render exactly as
+    // before, so straight kitchens are byte-identical by construction.
+    _needsTransform(it) {
+        return (it.rotation_deg || 0) !== 0 || (it.z_position_in || 0) !== 0;
     }
 
     _onMouseDown(e) {
