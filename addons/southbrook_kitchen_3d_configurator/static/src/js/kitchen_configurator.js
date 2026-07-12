@@ -797,15 +797,20 @@ class SouthbrookKitchenConfigurator extends Component {
     // "where in the run order does this go". `null` = append at end.
     _addCabinetFromProduct(product, targetX = null) {
         const type = product.cabinet_type || "base";
-        // Default Z: walls track the configured wall Z; everything
-        // else sits on the floor.
-        let z = 0;
+        // PR3.0 — y/z field-semantics migration: y_position_in is the
+        // canonical mount-height/elevation field, z_position_in is the
+        // depth axis per COORDINATE_CONTRACT.md. Default mount height:
+        // walls track the configured wall Y; everything else sits on
+        // the floor (y=0). z stays 0 for every new item (flush to the
+        // back wall) — this was the "z-as-height" convention flagged as
+        // the riskiest finding in the PR3 coordinate-contract matrix.
+        let mountY = 0;
         if (type === "wall") {
-            // Use the most recent z_position_in we saw from the server
+            // Use the most recent y_position_in we saw from the server
             // so the wall cab tracks D8's alignment mode without
             // re-running /layout.
             const walls = (this.state.items || []).filter(it => it.cabinet_type === "wall");
-            z = (walls.length && walls[0].z_position_in) || (34.5 + 1.5 + 18.0);
+            mountY = (walls.length && walls[0].y_position_in) || (34.5 + 1.5 + 18.0);
         }
         // Unique layout_key (timestamp + random tail = collision-free).
         const layoutKey = `${type}-add-${Date.now()}-${Math.floor((performance.now() % 1) * 10000)}`;
@@ -835,15 +840,15 @@ class SouthbrookKitchenConfigurator extends Component {
             } else {
                 sortX = 0;   // no host cabinet yet — start at left origin
             }
-            // Base end caps sit on the floor; wall end caps track wall Z.
-            // Product data drives z via product.z_position_in when set.
+            // Base end caps sit on the floor; wall end caps track wall
+            // mount height (y), not depth (z).
         }
         const newItem = {
             ...product,
             layout_key:    layoutKey,
             x_position_in: sortX,
-            y_position_in: 0,
-            z_position_in: z,
+            y_position_in: mountY,
+            z_position_in: 0,
             width_in:      product.width_in || 24,
             height_in:     product.height_in || (type === "wall" ? 30 : 34.5),
             depth_in:      product.depth_in  || (type === "wall" ? 12 : 24),

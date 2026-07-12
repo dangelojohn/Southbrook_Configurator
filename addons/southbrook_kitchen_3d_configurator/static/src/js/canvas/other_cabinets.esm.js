@@ -19,7 +19,18 @@
  *     panel: full-height, full-depth of the host cabinet, panel-
  *     width thick (default 3/4"). x_position_in is authoritative.
  *
- * Zero behaviour change from the pre-2d inline blocks.
+ * PR3.0 (2026-07-12) — y/z field-semantics migration. buildOtherCabinet
+ * and buildEndCapPanel now read item.y_position_in (canonical mount-
+ * height/elevation per COORDINATE_CONTRACT.md) instead of misreading
+ * the depth field as height — the same fix applied to wall_cabinet.esm.js's
+ * wbY, for the same reason (PR3 coordinate-contract matrix's riskiest
+ * finding). No live data currently has a 'panel'/'tall'/'corner' row in
+ * the legacy depth-as-height shape (verified read-only against prod,
+ * 2026-07-12), so this is a forward-looking, zero-behaviour-change-today
+ * fix that keeps these builders consistent with wall_cabinet ahead of
+ * any future non-back-wall panel/tall/corner placement. buildFillerPanel
+ * is untouched (it never read either placement field — a separate,
+ * already-flagged gap, out of PR3.0 scope).
  */
 
 import { IN, BH } from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
@@ -36,9 +47,10 @@ export function buildOtherCabinet(THREE, mk, palette, item) {
     const w  = (item.width_in  || 24) * IN;
     const h  = (item.height_in || 34.5) * IN;
     const d  = (item.depth_in  || 24) * IN;
-    // Local-frame build (side-wall group render): z comes from the enclosing
-    // group, so build at local z=0; otherwise use the item's own Z offset.
-    const z0 = item.__localFrame ? 0 : (item.z_position_in || 0) * IN;
+    // Local-frame build (side-wall group render): y comes from the enclosing
+    // group, so build at local y=0; otherwise use the item's own Y (mount-
+    // height/elevation) offset.
+    const y0 = item.__localFrame ? 0 : (item.y_position_in || 0) * IN;
 
     const objects = [];
     const clickable = [];
@@ -48,12 +60,12 @@ export function buildOtherCabinet(THREE, mk, palette, item) {
     if (item.cabinet_type === "tall" || item.cabinet_type === "corner") {
         objects.push(mk(
             new THREE.BoxGeometry(w - 0.01, 3.5 * IN, d - 0.01), palette.toekick,
-            [x + w/2, z0 + 3.5*IN/2, d/2], null,
+            [x + w/2, y0 + 3.5*IN/2, d/2], null,
             { cs: true, rough: 0.95, metal: 0.0 },
         ));
         const body = mk(
             new THREE.BoxGeometry(w - 0.02, h - 3.5*IN, d - 0.02), palette.cab,
-            [x + w/2, z0 + 3.5*IN + (h - 3.5*IN)/2, d/2], null,
+            [x + w/2, y0 + 3.5*IN + (h - 3.5*IN)/2, d/2], null,
             { cs: true, rs: true, rough: 0.55, metal: 0.0,
               ud: { cab: true, cabType: item.cabinet_type, item } },
         );
@@ -63,7 +75,7 @@ export function buildOtherCabinet(THREE, mk, palette, item) {
         // Panel / corner-without-toekick / anything else.
         const body = mk(
             new THREE.BoxGeometry(w - 0.02, h, d - 0.02), palette.cab,
-            [x + w/2, z0 + h/2, d/2], null,
+            [x + w/2, y0 + h/2, d/2], null,
             { cs: true, rs: true, rough: 0.55, metal: 0.0,
               ud: { cab: true, cabType: item.cabinet_type, item } },
         );
@@ -78,7 +90,7 @@ export function buildOtherCabinet(THREE, mk, palette, item) {
             || item.cabinet_type === "corner")) {
         objects.push(mk(
             new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
-            [x + w - 0.10, z0 + h + 0.16, d - 0.10], null,
+            [x + w - 0.10, y0 + h + 0.16, d - 0.10], null,
             { rough: 0.3, metal: 0.5 },
         ));
     }
@@ -123,13 +135,14 @@ export function buildEndCapPanel(THREE, mk, palette, item) {
     const w  = (item.width_in  || 0.75) * IN;
     const h  = (item.height_in || 34.5) * IN;
     const d  = (item.depth_in  || 24)   * IN;
-    // Local-frame build (side-wall group render): z comes from the enclosing
-    // group, so build at local z=0; otherwise use the item's own Z offset.
-    const z0 = item.__localFrame ? 0 : (item.z_position_in || 0) * IN;
+    // Local-frame build (side-wall group render): y comes from the enclosing
+    // group, so build at local y=0; otherwise use the item's own Y (mount-
+    // height/elevation) offset.
+    const y0 = item.__localFrame ? 0 : (item.y_position_in || 0) * IN;
 
     const body = mk(
         new THREE.BoxGeometry(w - 0.01, h, d - 0.01), palette.cab,
-        [x + w/2, z0 + h/2, d/2], null,
+        [x + w/2, y0 + h/2, d/2], null,
         { cs: true, rs: true, rough: 0.45, metal: 0.0,
           ud: { cab: true, cabType: "panel", item } },
     );

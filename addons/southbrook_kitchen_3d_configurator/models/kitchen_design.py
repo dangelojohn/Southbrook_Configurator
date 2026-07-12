@@ -836,32 +836,47 @@ class SouthbrookKitchenDesign(models.Model):
                         ),
                     })
 
-        # 8) Z-axis collision — wall-cab vertical extent inside a tall's
-        #    vertical extent. Bases don't clash with walls in z (they
-        #    live on different run rows).
+        # 8) Vertical (mount-height) collision — wall-cab vertical extent
+        #    inside a tall's vertical extent. Bases don't clash with
+        #    walls vertically (they live on different run rows).
+        #
+        #    PR3.0 (2026-07-12) — y/z field-semantics migration: mount-
+        #    height/elevation now lives in y_position_in (was
+        #    z_position_in pre-PR3.0). This check previously read
+        #    z_position_in for exactly that reason (it predates the
+        #    canonical COORDINATE_CONTRACT.md model) — an independent
+        #    finding beyond the PR3 coordinate-contract matrix's
+        #    renderer-only review scope. Left unfixed, migrating the
+        #    persisted data without updating this reader would have
+        #    collapsed both wall.z_position_in and tall.z_position_in to
+        #    0 (walls no longer carry height there; talls never did —
+        #    floor-standing), making every x-overlapping wall+tall pair
+        #    falsely appear to collide vertically. Reading
+        #    y_position_in instead restores (and keeps correct) the
+        #    original vertical-extent comparison.
         for tall in by_type.get("tall", []):
             tx0 = tall.x_position_in
             tx1 = tx0 + (tall.width_in or 0)
-            tz0 = tall.z_position_in or 0.0
-            tz1 = tz0 + (tall.height_in or 0)
+            ty0 = tall.y_position_in or 0.0
+            ty1 = ty0 + (tall.height_in or 0)
             for wall in by_type.get("wall", []):
                 wx0 = wall.x_position_in
                 wx1 = wx0 + (wall.width_in or 0)
                 if wx1 <= tx0 + 0.01 or wx0 >= tx1 - 0.01:
                     continue
-                wz0 = wall.z_position_in or 0.0
-                wz1 = wz0 + (wall.height_in or 0)
-                if wz1 <= tz0 + 0.01 or wz0 >= tz1 - 0.01:
+                wy0 = wall.y_position_in or 0.0
+                wy1 = wy0 + (wall.height_in or 0)
+                if wy1 <= ty0 + 0.01 or wy0 >= ty1 - 0.01:
                     continue
                 issues.append({
-                    "code":     "Z_AXIS_COLLISION",
+                    "code":     "VERTICAL_COLLISION",
                     "severity": "blocking",
                     "message":  (
                         "Wall %s (bottom %.1f\") intrudes into tall "
                         "%s (top %.1f\") at x=%.1f\""
                     ) % (
-                        wall.product_id.display_name, wz0,
-                        tall.product_id.display_name, tz1,
+                        wall.product_id.display_name, wy0,
+                        tall.product_id.display_name, ty1,
                         tall.x_position_in,
                     ),
                 })
@@ -1052,10 +1067,11 @@ class SouthbrookKitchenDesign(models.Model):
                 ("southbrook_estimating.drawer_bank","base", 72.0,  0.0, 0.0, 20),
                 ("southbrook_estimating.base_1dr",   "base", 96.0,  0.0, 0.0, 30),
                 ("southbrook_estimating.corner",     "base", 120.0, 0.0, 0.0, 40),
-                # Wall cabinets over primary wall (z=54")
-                ("southbrook_estimating.wall_2dr",   "wall", 24.0,  0.0, 54.0, 50),
-                ("southbrook_estimating.wall_2dr",   "wall", 72.0,  0.0, 54.0, 60),
-                ("southbrook_estimating.wall_1dr",   "wall", 96.0,  0.0, 54.0, 70),
+                # Wall cabinets over primary wall (mount height 54" —
+                # PR3.0: lives in y_position_in, not z; z stays 0/flush).
+                ("southbrook_estimating.wall_2dr",   "wall", 24.0,  54.0, 0.0, 50),
+                ("southbrook_estimating.wall_2dr",   "wall", 72.0,  54.0, 0.0, 60),
+                ("southbrook_estimating.wall_1dr",   "wall", 96.0,  54.0, 0.0, 70),
                 # Short return leg (x=0, y offset)
                 ("southbrook_estimating.tall_pantry","tall", 0.0,   30.0, 0.0, 80),
             ],
@@ -1077,10 +1093,11 @@ class SouthbrookKitchenDesign(models.Model):
                 ("southbrook_estimating.drawer_bank","base", 72.0,  0.0, 0.0, 30),
                 ("southbrook_estimating.base_2dr",   "base", 96.0,  0.0, 0.0, 40),
                 ("southbrook_estimating.base_1dr",   "base", 120.0, 0.0, 0.0, 50),
-                # Wall cabinets over back wall
-                ("southbrook_estimating.wall_2dr",   "wall", 0.0,   0.0, 54.0, 60),
-                ("southbrook_estimating.wall_2dr",   "wall", 48.0,  0.0, 54.0, 70),
-                ("southbrook_estimating.wall_2dr",   "wall", 96.0,  0.0, 54.0, 80),
+                # Wall cabinets over back wall (mount height 54" — PR3.0:
+                # lives in y_position_in, not z; z stays 0/flush).
+                ("southbrook_estimating.wall_2dr",   "wall", 0.0,   54.0, 0.0, 60),
+                ("southbrook_estimating.wall_2dr",   "wall", 48.0,  54.0, 0.0, 70),
+                ("southbrook_estimating.wall_2dr",   "wall", 96.0,  54.0, 0.0, 80),
                 # Left return leg
                 ("southbrook_estimating.tall_pantry","tall", 0.0,   30.0, 0.0, 90),
                 # Right return leg
@@ -1104,9 +1121,11 @@ class SouthbrookKitchenDesign(models.Model):
                 ("southbrook_estimating.base_2dr",   "base", 72.0,  0.0, 0.0, 30),
                 ("southbrook_estimating.base_1dr",   "base", 96.0,  0.0, 0.0, 40),
                 ("southbrook_estimating.base_1dr",   "base", 120.0, 0.0, 0.0, 50),
-                ("southbrook_estimating.wall_2dr",   "wall", 0.0,   0.0, 54.0, 60),
-                ("southbrook_estimating.wall_2dr",   "wall", 48.0,  0.0, 54.0, 70),
-                ("southbrook_estimating.wall_2dr",   "wall", 96.0,  0.0, 54.0, 80),
+                # Wall cabinets (mount height 54" — PR3.0: lives in
+                # y_position_in, not z; z stays 0/flush).
+                ("southbrook_estimating.wall_2dr",   "wall", 0.0,   54.0, 0.0, 60),
+                ("southbrook_estimating.wall_2dr",   "wall", 48.0,  54.0, 0.0, 70),
+                ("southbrook_estimating.wall_2dr",   "wall", 96.0,  54.0, 0.0, 80),
                 # Front run (parallel, y offset — 12" gap for the aisle)
                 ("southbrook_estimating.base_2dr",   "base", 24.0,  72.0, 0.0, 90),
                 ("southbrook_estimating.base_2dr",   "base", 72.0,  72.0, 0.0, 100),
@@ -1537,8 +1556,11 @@ class SouthbrookKitchenDesign(models.Model):
         seq = 10
         for i in range(n):
             x = i * module_w
-            self._create_line(base_product, seq,      x, 0.0, 0.0)
-            self._create_line(wall_product, seq + 5,  x, 0.0, 54.0)
+            self._create_line(base_product, seq,      x, 0.0,  0.0)
+            # PR3.0 — y/z field-semantics migration: mount height (54")
+            # lives in y_position_in, not z; z stays 0 (flush to the
+            # back wall).
+            self._create_line(wall_product, seq + 5,  x, 54.0, 0.0)
             seq += 10
 
         # Filler panel for remainder

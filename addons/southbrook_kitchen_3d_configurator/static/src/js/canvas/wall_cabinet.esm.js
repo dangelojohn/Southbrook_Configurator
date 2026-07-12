@@ -9,12 +9,26 @@
  * carcass, shaker door, wall handle, bottom rail, and the pin
  * indicator sphere (when item.pinned).
  *
- * D8 follow-up — respects the per-item z_position_in the controller
+ * D8 follow-up — respects the per-item y_position_in the controller
  * computed (varies by wall_cab_top_alignment: fixed_gap /
  * to_ceiling / to_soffit). Falls back to WBY for items that pre-
  * date D8.
  *
- * Zero behaviour change from the pre-2d inline block.
+ * PR3.0 (2026-07-12) — y/z field-semantics migration. wbY now reads
+ * item.y_position_in (the canonical mount-height/elevation field per
+ * COORDINATE_CONTRACT.md) instead of the depth field. Previously this
+ * builder misread the depth field as vertical height — the
+ * "depth-field-as-height" convention the PR3 coordinate-contract
+ * matrix flags as its riskiest finding. Persisted data was migrated
+ * in lockstep (migrations/19.0.5.18.0/post-migrate.py) and both
+ * writers (controllers/main.py::_layout_item, kitchen_configurator.js::
+ * _addCabinetFromProduct) now emit the mount height into y with the
+ * depth field at 0, so this is a same-value read from a different
+ * (now correct) field — no visual change for any straight, unrotated
+ * kitchen. (This builder still does not itself apply a rotation — see
+ * test_coordinate_contract.py's known-debt ledger, unaffected by this
+ * change and out of PR3.0 scope — PR3.1 collapses this into the
+ * central group transform that already handles it.)
  */
 
 import { IN, WBY } from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
@@ -37,8 +51,8 @@ export function buildWallCabinet(THREE, mk, palette, item) {
     // back-wall path) keep the D8 mount height (to_ceiling / to_soffit),
     // falling back to WBY.
     const wbY = item.__localFrame ? 0
-        : ((item.z_position_in != null && item.z_position_in !== 0)
-            ? item.z_position_in * IN
+        : ((item.y_position_in != null && item.y_position_in !== 0)
+            ? item.y_position_in * IN
             : WBY);
 
     const objects = [];
