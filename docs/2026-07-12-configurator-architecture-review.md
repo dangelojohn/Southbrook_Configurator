@@ -183,3 +183,29 @@ this whenever a client action "mysteriously uses defaults."
 - **Not examined:** `southbrook_customer_portal/kitchen_canvas.js` beyond its header;
   FreeCAD-bridge geometry parity; `sample_3d_widget` internals. None are on the PR2–PR5
   path.
+
+---
+
+## Bug-class log — divergent save pipelines (PR4 → PR4.1)
+
+**Symptom:** a cabinet dropped on the Left wall persisted correctly (`wall=left`,
+engine pose) but stayed drawn on the back wall until reload.
+
+**Root cause:** two client save pipelines diverged. The explicit **Save** button
+(`_saveDesign`) applied the server's engine-computed `placed` poses; the **debounced
+auto-save** (`_autoSave`, which a drag-add actually triggers) did **not**. Server state
+was canonical; the client failed to consume the returned canonical pose on the path users
+actually hit.
+
+**Fix (PR4.1):** extracted a single shared consumer `_applyServerPlacements(placed)` and
+call it from **both** `_saveDesign` and `_autoSave`. **Do not re-split it** — two separate
+implementations are exactly how this class of bug returns. Locked by the Node contract
+`tests/node_js/contracts/08_immediate_refresh.test.mjs`.
+
+**General lesson:** when the same server response must be consumed on more than one client
+path, consume it through ONE shared method. Duplicated consumers silently drift.
+
+**Note on the live golden reference:** the deterministic renderer-regression reference is
+the *committed* artifact `.../tests/golden/design83.snapshot.json` + the Node golden test
+(reconstructed items, CI-run) — NOT the live DB row for design 83, which is subject to
+crons/sessions and drifts. Manual live snapshots are a convenience, not the source of truth.
