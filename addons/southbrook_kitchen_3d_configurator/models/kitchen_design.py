@@ -84,8 +84,8 @@ class SouthbrookKitchenDesign(models.Model):
     )
 
     # ── Room dimensions ─────────────────────────────────────────────────────────
-    room_width_in  = fields.Float(string="Room Width (in)",  default=12.0,  required=True)
-    room_depth_in  = fields.Float(string="Room Depth (in)",  default=24.0,  required=True)
+    room_width_in  = fields.Float(string="Room Width (in)",  default=96.0,  required=True)
+    room_depth_in  = fields.Float(string="Room Depth (in)",  default=96.0,  required=True)
     room_height_in = fields.Float(string="Room Height (in)", default=96.0,  required=True)
 
     # ── Layout lines ────────────────────────────────────────────────────────────

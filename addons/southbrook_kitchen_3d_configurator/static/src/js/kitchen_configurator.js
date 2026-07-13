@@ -129,8 +129,8 @@ class SouthbrookKitchenConfigurator extends Component {
             errorCode: "",
             errorCta:  null,
             room: {
-                width_in:  params.room_width_in  || 12,
-                depth_in:  params.room_depth_in  || 24,
+                width_in:  params.room_width_in  || 96,
+                depth_in:  params.room_depth_in  || 96,
                 height_in: params.room_height_in || 96,
             },
             products:  [],
