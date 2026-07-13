@@ -35,3 +35,9 @@ from . import test_save_load_identity
 # (migrations/19.0.5.18.0/post-migrate.py): design-line + sale-order-
 # line-mirror transform + idempotency.
 from . import test_yz_semantics_migration
+
+# PR4 (2026-07-12) — backend save_design routes non-back-wall
+# configurator lines through the shared engine-placement helper
+# (southbrook.kitchen.design._place_lines_on_wall); back-wall lines are
+# left exactly as the client sent them.
+from . import test_wall_placement_engine

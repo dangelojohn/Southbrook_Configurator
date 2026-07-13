@@ -1014,9 +1014,24 @@ class SouthbrookKitchenConfigurator extends Component {
         // canvas/pack_row.esm.js as a pure exported function; the
         // three call sites keep the same signature so scene-diff
         // rebuild timings are unchanged.
-        packRow(bases);
-        packRow(walls);
-        packRow(tailItems);
+        //
+        // PR4 (2026-07-12) — packRow is a legacy SINGLE-AXIS (X)
+        // packer; it is only valid for the back wall, where "along
+        // the run" is X. A non-back-wall cabinet's pose is decided
+        // server-side by the pure kitchen_layout_engine (its along-
+        // wall axis is Z for left/right — see
+        // docs/2026-07-12-pr3-coordinate-contract-matrix.md §4) and
+        // returned via save_design's `placed` list (applied in
+        // _saveDesign below), or hydrated verbatim from a saved
+        // design. The client must never repack that geometry back
+        // onto the X axis (Renderer Contract: the client does not
+        // decide wall-item geometry) — so only the back-wall subset
+        // of each bucket is ever handed to packRow. Counts/price
+        // above still see every item regardless of wall.
+        const isBackWall = (it) => (it.wall || "back") === "back";
+        packRow(bases.filter(isBackWall));
+        packRow(walls.filter(isBackWall));
+        packRow(tailItems.filter(isBackWall));
         // NOTE: filler items get X from server /layout; end-cap panels get X
         //       relative to their host cabinet (set by _addCabinetFromProduct
         //       or downstream). Both are left untouched here on purpose.
@@ -1289,6 +1304,34 @@ class SouthbrookKitchenConfigurator extends Component {
             this.state.designId       = result.id;
             this.state.designName     = result.name;
             this.state.lastAutoSaveAt = Date.now();
+            // PR4 (2026-07-12) — the server may have re-placed any
+            // non-back-wall cabinets via the pure kitchen_layout_engine
+            // (southbrook.kitchen.design._place_lines_on_wall),
+            // overwriting the client's back-wall-only x/y/z/rotation
+            // guess with the engine's real wall pose. Apply those
+            // poses onto the matching state.items (by layout_key) so
+            // the cabinet visibly jumps onto its wall immediately —
+            // no reload needed. This ONLY copies fields the server
+            // already computed; per the Renderer Contract, the client
+            // never derives a wall-item coordinate itself.
+            // _recomputeLayoutFromItems() refreshes price/summary and
+            // forces a new items array reference for <KitchenCanvas>'s
+            // prop-change detection; its packRow guard (above) leaves
+            // the just-applied non-back-wall poses untouched.
+            if (Array.isArray(result.placed) && result.placed.length) {
+                const placedByKey = new Map(
+                    result.placed.map(p => [p.layout_key, p])
+                );
+                for (const it of this.state.items) {
+                    const p = placedByKey.get(it.layout_key);
+                    if (!p) continue;
+                    it.x_position_in = p.x_position_in;
+                    it.y_position_in = p.y_position_in;
+                    it.z_position_in = p.z_position_in;
+                    it.rotation_deg  = p.rotation_deg;
+                }
+                this._recomputeLayoutFromItems();
+            }
             // Task #48 — quiet, non-sticky toast on the happy path.
             // Previous format ("Saved: ${name}") leaked implementation
             // detail into the message; the rep already sees the design

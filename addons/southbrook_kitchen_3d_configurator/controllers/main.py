@@ -395,6 +395,10 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         # (check_access at :420 / :459 / :492).
         Product = request.env["product.product"]
         incoming_keys = set()
+        # PR4 — track every line this save actually created/wrote (by
+        # layout_key) so the non-back-wall engine-placement pass below
+        # can find them without a second search.
+        saved_lines_by_key = {}
         for seq, item in enumerate(items, start=1):
             try:
                 pid = int(item["product_id"])
@@ -455,9 +459,11 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "wall":           item.get("wall") or "back",
             }
             if layout_key in existing_by_key:
-                existing_by_key[layout_key].write(line_vals)
+                line = existing_by_key[layout_key]
+                line.write(line_vals)
             else:
-                Line.create({"design_id": design.id, **line_vals})
+                line = Line.create({"design_id": design.id, **line_vals})
+            saved_lines_by_key[layout_key] = line
 
         # Unlink configurator-origin lines that the user removed in the
         # 3D pane. Manual-origin lines are excluded from existing_by_key
@@ -469,9 +475,43 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 stale |= existing_by_key[k]
             stale.unlink()
 
+        # PR4 (2026-07-12) — a cabinet added/moved onto a non-back wall
+        # (state.activeWall in the client) was, until now, persisted at
+        # the raw CLIENT-computed x/y/z/rotation — `_addCabinetFromProduct`
+        # only ever computes that correctly for the BACK wall (see
+        # docs/2026-07-12-renderer-contract.md). Route every non-back-wall
+        # configurator line through the SAME engine-delegation path the
+        # website's 3D tab already uses (`_place_lines_on_wall`, shared on
+        # the southbrook.kitchen.design model), overwriting the client's
+        # guess with the pure kitchen_layout_engine's pose. Back-wall
+        # lines are LEFT ALONE — the client's own back-wall packing is
+        # correct today and must not change (backward compat).
+        wall_lines = Line.browse([])
+        for line in saved_lines_by_key.values():
+            if (line.wall or "back") != "back":
+                wall_lines |= line
+        placed = []
+        if wall_lines:
+            poses = design._place_lines_on_wall(wall_lines)
+            for line in wall_lines:
+                pose = poses.get(line.id)
+                if not pose:
+                    continue
+                placed.append({
+                    "layout_key":     line.layout_key,
+                    "x_position_in":  pose["x_position_in"],
+                    "y_position_in":  pose["y_position_in"],
+                    "z_position_in":  pose["z_position_in"],
+                    "rotation_deg":   pose["rotation_deg"],
+                })
+
         return {
-            "id":   design.id,
-            "name": design.display_name,
+            "id":     design.id,
+            "name":   design.display_name,
+            # PR4 — engine-updated poses for the wall lines this save
+            # moved, so the client can apply them onto state.items and
+            # re-render immediately without a reload.
+            "placed": placed,
         }
 
     # ── v19.0.4.20.0 · Smart-pinning RPC surface ─────────────────────────────────
