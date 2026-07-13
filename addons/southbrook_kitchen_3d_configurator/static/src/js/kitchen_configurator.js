@@ -1278,6 +1278,35 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // ─── Save ─────────────────────────────────────────────────────────────────────
+
+    // PR4.1 (2026-07-12) — shared by both save paths (_saveDesign and
+    // _autoSave). Applies the server's `placed` array (engine-computed
+    // poses for non-back-wall cabinets, from
+    // southbrook.kitchen.design._place_lines_on_wall) onto the matching
+    // state.items by layout_key, then forces a new items array
+    // reference via _recomputeLayoutFromItems() so <KitchenCanvas>'s
+    // prop-change detection re-renders. This ONLY copies fields the
+    // server already computed; per the Renderer Contract, the client
+    // never derives a wall-item coordinate itself. Originally inlined
+    // in _saveDesign only (PR4) — a drag-add goes through the debounced
+    // _queueAutoSave() -> _autoSave() path instead, which never applied
+    // `placed`, so a cabinet dropped on a non-back wall stayed drawn on
+    // the back wall until reload. Extracted here so both save paths
+    // share one implementation and can't drift again (PR4.1).
+    _applyServerPlacements(placed) {
+        if (!Array.isArray(placed) || !placed.length) return;
+        const placedByKey = new Map(placed.map(p => [p.layout_key, p]));
+        for (const it of this.state.items) {
+            const p = placedByKey.get(it.layout_key);
+            if (!p) continue;
+            it.x_position_in = p.x_position_in;
+            it.y_position_in = p.y_position_in;
+            it.z_position_in = p.z_position_in;
+            it.rotation_deg  = p.rotation_deg;
+        }
+        this._recomputeLayoutFromItems();
+    }
+
     async _saveDesign() {
         // PR2.5a (Gap 2) — same rationale as the _queueAutoSave() guard:
         // a failed hydration means state doesn't reflect the saved
@@ -1309,29 +1338,11 @@ class SouthbrookKitchenConfigurator extends Component {
             // (southbrook.kitchen.design._place_lines_on_wall),
             // overwriting the client's back-wall-only x/y/z/rotation
             // guess with the engine's real wall pose. Apply those
-            // poses onto the matching state.items (by layout_key) so
-            // the cabinet visibly jumps onto its wall immediately —
-            // no reload needed. This ONLY copies fields the server
-            // already computed; per the Renderer Contract, the client
-            // never derives a wall-item coordinate itself.
-            // _recomputeLayoutFromItems() refreshes price/summary and
-            // forces a new items array reference for <KitchenCanvas>'s
-            // prop-change detection; its packRow guard (above) leaves
-            // the just-applied non-back-wall poses untouched.
-            if (Array.isArray(result.placed) && result.placed.length) {
-                const placedByKey = new Map(
-                    result.placed.map(p => [p.layout_key, p])
-                );
-                for (const it of this.state.items) {
-                    const p = placedByKey.get(it.layout_key);
-                    if (!p) continue;
-                    it.x_position_in = p.x_position_in;
-                    it.y_position_in = p.y_position_in;
-                    it.z_position_in = p.z_position_in;
-                    it.rotation_deg  = p.rotation_deg;
-                }
-                this._recomputeLayoutFromItems();
-            }
+            // poses onto the matching state.items so the cabinet
+            // visibly jumps onto its wall immediately — no reload
+            // needed. See _applyServerPlacements() for the shared
+            // logic (also used by _autoSave() — PR4.1).
+            this._applyServerPlacements(result.placed);
             // Task #48 — quiet, non-sticky toast on the happy path.
             // Previous format ("Saved: ${name}") leaked implementation
             // detail into the message; the rep already sees the design
@@ -1489,6 +1500,12 @@ class SouthbrookKitchenConfigurator extends Component {
             this.state.designId       = result.id;
             this.state.designName     = result.name;
             this.state.lastAutoSaveAt = Date.now();
+            // PR4.1 (2026-07-12) — see _applyServerPlacements() doc
+            // comment. This is the fix: a drag-add on a non-back wall
+            // routes through _queueAutoSave() -> here, not
+            // _saveDesign(), and previously never got the engine's
+            // wall pose applied client-side.
+            this._applyServerPlacements(result.placed);
         } catch (e) {
             // Silent on auto-save: manual save will surface errors. Log
             // for diagnostics only.
