@@ -774,7 +774,13 @@ class SouthbrookKitchenConfigurator extends Component {
         // end of the run). Falls back to end-of-run if the ray misses
         // the floor (e.g. dropping in empty sky area of perspective view).
         const dropX = this._computeDropX(ev);
-        this._addCabinetFromProduct(product, dropX);
+        // PR4b — which wall did the pointer drop onto? Determined by the
+        // canvas raycast (userData.wall on the room-wall meshes), NOT by
+        // any client-side math here. null when the drop missed every wall
+        // (open floor / sky) — then _addCabinetFromProduct falls back to
+        // the previously-picked activeWall, exactly as before PR4b.
+        const dropWall = this._computeDropWall(ev);
+        this._addCabinetFromProduct(product, dropX, dropWall);
     }
 
     // D14 — Cast a ray from the active camera through the drop point
@@ -790,12 +796,20 @@ class SouthbrookKitchenConfigurator extends Component {
         return this._canvasApi?.computeDropX(ev) ?? null;
     }
 
+    // PR4b — delegates to <KitchenCanvas>'s imperative API (which owns
+    // the camera + raycaster + tagged wall meshes). Returns the wall the
+    // HTML5 drop landed on, or null when the ray misses (or the api
+    // isn't attached yet). Sibling to _computeDropX; adds no wall math.
+    _computeDropWall(ev) {
+        return this._canvasApi?.computeDropWall(ev) ?? null;
+    }
+
     // Generic add — used by drop AND by a future "click to add" button.
     // D14 — `targetX` (inches) sets the new item's sort-key so it
     // slots in at the dropped position. _recomputeLayoutFromItems
     // then sorts-by-x and re-packs contiguously: visual semantic is
     // "where in the run order does this go". `null` = append at end.
-    _addCabinetFromProduct(product, targetX = null) {
+    _addCabinetFromProduct(product, targetX = null, wallOverride = null) {
         const type = product.cabinet_type || "base";
         // PR3.0 — y/z field-semantics migration: y_position_in is the
         // canonical mount-height/elevation field, z_position_in is the
@@ -852,12 +866,17 @@ class SouthbrookKitchenConfigurator extends Component {
             width_in:      product.width_in || 24,
             height_in:     product.height_in || (type === "wall" ? 30 : 34.5),
             depth_in:      product.depth_in  || (type === "wall" ? 12 : 24),
-            // PR2 — persistence only. Placement/packing/rendering
-            // intentionally ignore `wall` until PR3/PR4, so the
-            // cabinet still appears on the back wall even when
-            // wall="left". Written here so it round-trips through
-            // save_design / load_design_lines from day one.
-            wall:          this.state.activeWall || WALLS.BACK,
+            // The wall this cabinet belongs to. Persisted (save_design /
+            // load_design_lines) and — since PR4 — routed through the
+            // pure kitchen_layout_engine server-side (_place_lines_on_wall)
+            // so a non-back wall gets its canonical engine pose applied
+            // back onto state.items immediately (_applyServerPlacements).
+            // Precedence (PR4b): an explicit drop-onto-wall override wins;
+            // otherwise the wall the user click/hover-selected; else BACK.
+            // The drop path (_onCanvasDrop) and the select-then-add path
+            // therefore converge on the SAME persisted record — locked by
+            // tests/node_js/contracts/09_drag_to_wall_convergence.test.mjs.
+            wall:          wallOverride || this.state.activeWall || WALLS.BACK,
         };
         this.state.items = [...(this.state.items || []), newItem];
         this.state.selected = newItem;

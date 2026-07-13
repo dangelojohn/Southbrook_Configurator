@@ -168,6 +168,9 @@ export class KitchenCanvas extends Component {
                     setView: (key) => this._setView(key),
                     zoomBy:  (k)   => this._zoomBy(k),
                     computeDropX: (ev) => this._computeDropX(ev),
+                    // PR4b — sibling to computeDropX: which wall the HTML5
+                    // drop landed on (null when the ray misses every wall).
+                    computeDropWall: (ev) => this._computeDropWall(ev),
                 });
             }
         });
@@ -395,6 +398,20 @@ export class KitchenCanvas extends Component {
             this._ndcFromEvent(ev),
             (this.props.room && this.props.room.width_in) || 0,
         );
+    }
+
+    // PR4b — cast the HTML5 drop point against the tagged room-wall
+    // meshes and return which wall (back/left/right/front) the pointer
+    // dropped onto, reusing the exact `_raycastWall` the click / hover
+    // wall-picker already uses (kitchen_canvas.esm.js `_onMouseDown` /
+    // `_onMouseOver`). This adds NO placement math: it only names the
+    // wall. Returns null when the ray misses every wall mesh (e.g. a
+    // drop over open floor) so the caller can fall back to activeWall.
+    _computeDropWall(ev) {
+        const { activeCamera, raycaster } = this.T;
+        if (!activeCamera || !raycaster) return null;
+        raycaster.setFromCamera(this._ndcFromEvent(ev), activeCamera);
+        return this._raycastWall(raycaster);
     }
 
     // Golden-scene harness. Returns a sorted, order-independent list of every
