@@ -614,6 +614,85 @@ class SouthbrookKitchenDesign(models.Model):
         return {"corners": len(r["corners"]), "removed": len(r["removed_ids"]),
                 "inserted": len(r["inserted"])}
 
+    # ── PR4 (2026-07-12) — shared add-a-cabinet engine-placement helper ────
+    # Extracted from the website's `_sb_place_line_on_wall`
+    # (southbrook_estimating_website/controllers/main.py) so the backend
+    # 3D configurator's `save_design` (southbrook_kitchen_3d_configurator/
+    # controllers/main.py) can reach the SAME engine-delegation path
+    # instead of persisting client-computed (back-wall-only) geometry for
+    # cabinets on other walls. See docs/2026-07-12-renderer-contract.md
+    # and docs/2026-07-12-add-cabinet-sequence.md: the engine, not the
+    # client or a controller, decides a wall cabinet's pose.
+    def _place_lines_on_wall(self, lines):
+        """Place `lines` (a subset of self.cabinet_line_ids) onto their
+        assigned walls via the pure `kitchen_layout_engine`.
+
+        The engine is run over ALL of this design's configurator
+        cabinets (excluding filler/panel, mirroring
+        `action_auto_arrange`'s cab-list construction above) so a wall's
+        run positions correctly account for cabinets already there —
+        but only the passed `lines` are WRITTEN; every other line's
+        pose is left untouched. Callers decide which lines to pass
+        (e.g. only non-back-wall lines — back-wall placement is a
+        different, client-owned concern that predates PR4 and must not
+        change).
+
+        Returns {line_id: {x_position_in, y_position_in, z_position_in,
+        rotation_deg}} for the lines that were actually placed (a line
+        the engine has no cabinet for — e.g. it isn't in
+        self.cabinet_line_ids — is silently skipped, same as the
+        original `_sb_place_line_on_wall`).
+        """
+        self.ensure_one()
+        design = self.sudo()
+        lines = lines.sudo()
+        SaleOrder = self.env["sale.order"]
+        MM, IN = 25.4, 1.0 / 25.4
+        cabs = []
+        for dl in design.cabinet_line_ids:
+            if dl.origin != "configurator":
+                continue
+            if dl.cabinet_type in ("filler", "panel"):
+                continue
+            is_wall = dl.cabinet_type == "wall"
+            cabs.append({
+                "id": dl.id,
+                "width_mm": (dl.width_in or 0) * MM,
+                "height_mm": (dl.height_in or 0) * MM,
+                "depth_mm": (dl.depth_in or 0) * MM,
+                "family": "wall" if is_wall else "base",
+                "cabinet_type": dl.cabinet_type,
+                "zone": dl.zone or ("wall" if is_wall else "base_run"),
+                "wall": dl.wall or "back",
+                "run_seq": dl.run_seq or 0,
+            })
+        if not cabs:
+            return {}
+        room = {
+            "width_mm":  (design.room_width_in or 0) * MM,
+            "depth_mm":  (design.room_depth_in or 0) * MM,
+            "height_mm": (design.room_height_in or 0) * MM,
+        }
+        places = {p["id"]: p for p in kitchen_layout_engine.layout(
+            cabs, room,
+            zone_layout=SaleOrder._ZONE_LAYOUT,
+            worktop_cursor=SaleOrder._WORKTOP_CURSOR,
+            worktop_y=SaleOrder._WORKTOP_Y_FLOOR)}
+        result = {}
+        for line in lines:
+            p = places.get(line.id)
+            if not p:
+                continue
+            pose = {
+                "x_position_in": p["x"] * IN,
+                "y_position_in": p["y"] * IN,
+                "z_position_in": p["z"] * IN,
+                "rotation_deg":  p["rotation_deg"],
+            }
+            line.write(pose)
+            result[line.id] = pose
+        return result
+
     @api.model
     def action_open_from_sale_order(self, order_id):
         """Rec D Sprint 2c · reverse-lookup helper.

@@ -2930,47 +2930,17 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         lays out the whole wall run (so the new unit snaps to the next free
         position after the cabinets already there), but we persist just the
         new line — existing cabinets keep their positions and any D8 mount
-        heights untouched."""
-        SaleOrder = request.env["sale.order"]
-        MM, IN = 25.4, 1.0 / 25.4
-        cabs = []
-        for dl in design.cabinet_line_ids:
-            if dl.origin != "configurator":
-                continue
-            if dl.cabinet_type in ("filler", "panel"):
-                continue
-            is_wall = dl.cabinet_type == "wall"
-            cabs.append({
-                "id": dl.id,
-                "width_mm": (dl.width_in or 0) * MM,
-                "height_mm": (dl.height_in or 0) * MM,
-                "depth_mm": (dl.depth_in or 0) * MM,
-                "family": "wall" if is_wall else "base",
-                "cabinet_type": dl.cabinet_type,
-                "zone": dl.zone or ("wall" if is_wall else "base_run"),
-                "wall": dl.wall or "back",
-                "run_seq": dl.run_seq or 0,
-            })
-        if not cabs:
-            return
-        room = {
-            "width_mm":  (design.room_width_in or 0) * MM,
-            "depth_mm":  (design.room_depth_in or 0) * MM,
-            "height_mm": (design.room_height_in or 0) * MM,
-        }
-        places = {p["id"]: p for p in kitchen_layout_engine.layout(
-            cabs, room,
-            zone_layout=SaleOrder._ZONE_LAYOUT,
-            worktop_cursor=SaleOrder._WORKTOP_CURSOR,
-            worktop_y=SaleOrder._WORKTOP_Y_FLOOR)}
-        p = places.get(new_line.id)
-        if p:
-            new_line.write({
-                "x_position_in": p["x"] * IN,
-                "y_position_in": p["y"] * IN,
-                "z_position_in": p["z"] * IN,
-                "rotation_deg":  p["rotation_deg"],
-            })
+        heights untouched.
+
+        PR4 (2026-07-12) — this is now a thin call to the shared model
+        method `southbrook.kitchen.design._place_lines_on_wall`
+        (southbrook_kitchen_3d_configurator/models/kitchen_design.py),
+        extracted so the backend 3D configurator's `save_design` can
+        reach the SAME engine-delegation path instead of persisting
+        client-computed (back-wall-only) geometry for wall cabinets.
+        Behavior-preserving: identical engine call, identical single-line
+        write — see docs/2026-07-12-add-cabinet-sequence.md."""
+        design._place_lines_on_wall(new_line)
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d/remove",
