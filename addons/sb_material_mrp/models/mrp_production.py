@@ -7,6 +7,7 @@ Task 9 (Southbrook Materials Phase-1). Consumes `mrp.bom.material_weight_total`
 online cascade resolver).
 """
 from odoo import api, fields, models
+from odoo.tools import float_round
 
 
 class MrpProduction(models.Model):
@@ -59,8 +60,12 @@ class MrpProduction(models.Model):
     )
 
     def _weight_to_purchase(self, weight_total, scrap_pct):
-        """weight_total inflated by scrap_pct percent, HALF-even round to 2dp."""
-        return round(weight_total * (1.0 + (scrap_pct or 0.0) / 100.0), 2)
+        """weight_total inflated by scrap_pct percent, HALF-UP round to 2dp."""
+        return float_round(
+            weight_total * (1.0 + (scrap_pct or 0.0) / 100.0),
+            precision_digits=2,
+            rounding_method="HALF-UP",
+        )
 
     def _merge_provenance(self, rows):
         """Join the sorted, de-duplicated set of cost tiers found in `rows`.

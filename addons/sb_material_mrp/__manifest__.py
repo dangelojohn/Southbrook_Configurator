@@ -6,6 +6,6 @@
     "summary": "Density->weight + tiered cost sourcing on native MRP BoM/MO.",
     "license": "LGPL-3",
     "depends": ["sb_material_core", "mrp", "purchase", "southbrook_estimating"],
-    "data": ["security/ir.model.access.csv"],
+    "data": [],
     "installable": True,
 }

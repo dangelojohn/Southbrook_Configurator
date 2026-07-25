@@ -239,6 +239,12 @@ class MrpBom(models.Model):
              "counted once regardless of nesting depth (Task 7).",
     )
 
+    @api.depends(
+        "bom_line_ids.component_weight_kg",
+        "bom_line_ids.material_id",
+        "product_id",
+        "product_qty",
+    )
     def _compute_material_weight_total(self):
         for bom in self:
             total = 0.0
@@ -258,4 +264,6 @@ class MrpBom(models.Model):
                     else 0.0
                 )
                 total += line._weight_for_qty(m, vol, qty)
-            bom.material_weight_total = round(total, 2)
+            bom.material_weight_total = float_round(
+                total, precision_digits=2, rounding_method="HALF-UP"
+            )
