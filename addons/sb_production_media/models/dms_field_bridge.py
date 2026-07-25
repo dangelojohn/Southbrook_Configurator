@@ -1,5 +1,5 @@
 # License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 
 ORDERS_SUBDIR_NAME = "Orders"
 
@@ -21,6 +21,7 @@ class ProductTemplate(models.Model):
         compute="_compute_sb_media_file_count",
     )
 
+    @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
         records._sb_classify_dms_directory()
@@ -78,6 +79,7 @@ class MrpProduction(models.Model):
         compute="_compute_sb_media_file_count",
     )
 
+    @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
         records._sb_classify_dms_directory()
@@ -167,6 +169,7 @@ class StockPicking(models.Model):
         compute="_compute_sb_media_file_count",
     )
 
+    @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
         records._sb_classify_dms_directory()

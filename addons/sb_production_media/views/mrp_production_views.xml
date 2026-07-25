@@ -19,6 +19,7 @@
             </xpath>
             <xpath expr="//notebook" position="inside">
                 <page name="sb_media" string="Media" invisible="not id">
+                    <field name="media_required" string="Require media before completion"/>
                     <field name="dms_directory_ids" mode="dms_list" invisible="not id"/>
                 </page>
             </xpath>
