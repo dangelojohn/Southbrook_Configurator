@@ -40,6 +40,18 @@ class TestMediaRpc(TransactionCase):
         self.assertEqual(f.content, original_content)
         self.assertGreater(len(mo.message_ids), before, "should post a chatter audit note")
 
+    def test_rpc_roundtrip(self):
+        """Task C9: the narrow production.media RPC surface used by the
+        Process Explorer QC panel -- upload, list, and set QC status,
+        without any kitchen-specific logic (generic res_model/res_id)."""
+        p = self.env["product.product"].create({"name": "Z"})
+        mo = self.env["mrp.production"].create({"product_id": p.id})
+        pm = self.env["production.media"]
+        fid = pm.upload_media("mrp.production", mo.id, "a.jpg", "eA==", "image/jpeg")
+        data = pm.get_node_media("mrp.production", mo.id)
+        self.assertTrue(any(f["id"] == fid for f in data["files"]))
+        self.assertTrue(pm.set_qc_status(fid, "pass"))
+
     def test_no_anchor_skips_chatter_gracefully(self):
         """A file whose directory has no res_model/res_id anchor (e.g. a
         structural subfolder) must not crash when QC status is set."""
