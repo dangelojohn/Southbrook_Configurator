@@ -6,3 +6,4 @@ from . import test_file
 from . import test_benchmark
 from . import test_portal
 from . import test_port_constraints
+from . import test_port_binary

@@ -306,3 +306,20 @@ class DmsSecurityMixin(models.AbstractModel):
     def unlink(self):
         self._check_access_dms_record("unlink")
         return super().unlink()
+
+    def _can_return_content(self, field_name=None, access_token=None):
+        """Grant binary content access (e.g. file download/preview) when a
+        valid ``access_token`` is presented, even if the current user has no
+        direct read access to the record (e.g. anonymous/portal share link).
+        Falls through to ``super()`` (deny by default) otherwise; never a
+        blanket allow.
+        """
+        self.ensure_one()
+        if access_token and self.sudo().check_access_token(access_token):
+            # sudo because the user might not usually have access to the
+            # record but the token is valid, e.g. to display the file/icon
+            # on the portal or via a share link.
+            return True
+        return super()._can_return_content(
+            field_name=field_name, access_token=access_token
+        )
