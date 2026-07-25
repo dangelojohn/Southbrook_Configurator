@@ -7,6 +7,7 @@
     "depends": ["dms", "dms_field", "product", "mrp", "stock"],
     "data": [
         "data/storage_data.xml",
+        "data/dms_field_template_data.xml",
     ],
     "installable": True,
     "application": False,

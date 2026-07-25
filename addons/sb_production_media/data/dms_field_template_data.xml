@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Product template: one DMS directory per product, under Products root -->
+        <record id="dms_field_template_product_template" model="dms.field.template">
+            <field name="name">Product Media</field>
+            <field name="storage_id" ref="storage_production_media"/>
+            <field name="model_id" ref="product.model_product_template"/>
+            <field name="parent_directory_id" ref="dir_root_products"/>
+            <field name="directory_format_name">{{object.display_name.replace('/', '-')}}</field>
+        </record>
+
+        <!-- Manufacturing order: one DMS directory per MO, under Products root.
+             MO references (e.g. "WH/MO/00001") contain "/", which dms.directory
+             rejects as an invalid filesystem name, so slashes are sanitized. -->
+        <record id="dms_field_template_mrp_production" model="dms.field.template">
+            <field name="name">Manufacturing Order Media</field>
+            <field name="storage_id" ref="storage_production_media"/>
+            <field name="model_id" ref="mrp.model_mrp_production"/>
+            <field name="parent_directory_id" ref="dir_root_products"/>
+            <field name="directory_format_name">{{object.display_name.replace('/', '-')}}</field>
+        </record>
+
+        <!-- Stock picking (shipping): one DMS directory per picking, under Shipping root.
+             Picking references (e.g. "WH/OUT/00001") also contain "/". -->
+        <record id="dms_field_template_stock_picking" model="dms.field.template">
+            <field name="name">Shipping Media</field>
+            <field name="storage_id" ref="storage_production_media"/>
+            <field name="model_id" ref="stock.model_stock_picking"/>
+            <field name="parent_directory_id" ref="dir_root_shipping"/>
+            <field name="directory_format_name">{{object.display_name.replace('/', '-')}}</field>
+        </record>
+    </data>
+</odoo>
