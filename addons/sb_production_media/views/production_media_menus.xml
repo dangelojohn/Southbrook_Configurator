@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Manufacturing Orders Media Action -->
+    <record id="action_mo_media" model="ir.actions.act_window">
+        <field name="name">Manufacturing Orders Media</field>
+        <field name="res_model">dms.directory</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[("sb_dir_kind","=","mo")]</field>
+        <field name="context">{"default_sb_dir_kind": "mo"}</field>
+    </record>
+
+    <!-- Shipping QC Action -->
+    <record id="action_shipping_media" model="ir.actions.act_window">
+        <field name="name">Shipping QC</field>
+        <field name="res_model">dms.directory</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[("sb_dir_kind","=","shipping")]</field>
+        <field name="context">{"default_sb_dir_kind": "shipping"}</field>
+    </record>
+
+    <!-- Manufacturing Orders Media Menu -->
+    <menuitem id="menu_mo_media"
+              name="Manufacturing Orders Media"
+              parent="mrp.menu_mrp_root"
+              action="action_mo_media"
+              sequence="50"/>
+
+    <!-- Shipping QC Menu -->
+    <menuitem id="menu_shipping_media"
+              name="Shipping QC"
+              parent="mrp.menu_mrp_root"
+              action="action_shipping_media"
+              sequence="60"/>
+</odoo>

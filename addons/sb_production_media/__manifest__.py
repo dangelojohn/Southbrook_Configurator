@@ -8,6 +8,7 @@
     "data": [
         "data/storage_data.xml",
         "data/dms_field_template_data.xml",
+        "views/production_media_menus.xml",
     ],
     "installable": True,
     "application": False,

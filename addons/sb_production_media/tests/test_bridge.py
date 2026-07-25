@@ -71,3 +71,17 @@ class TestBridge(TransactionCase):
         self.assertEqual(picking_dir.sb_dir_kind, "shipping")
         shipping_root = self.env.ref("sb_production_media.dir_root_shipping")
         self.assertEqual(picking_dir.parent_id, shipping_root)
+
+    def test_flat_listings(self):
+        """Test that flat MO and Shipping QC listings are exposed via actions."""
+        # Test Manufacturing Orders Media action
+        mo_action = self.env.ref("sb_production_media.action_mo_media")
+        self.assertEqual(eval(mo_action.domain), [("sb_dir_kind", "=", "mo")])
+        self.assertEqual(mo_action.res_model, "dms.directory")
+        self.assertEqual(mo_action.view_mode, "list,form")
+
+        # Test Shipping QC action
+        shipping_action = self.env.ref("sb_production_media.action_shipping_media")
+        self.assertEqual(eval(shipping_action.domain), [("sb_dir_kind", "=", "shipping")])
+        self.assertEqual(shipping_action.res_model, "dms.directory")
+        self.assertEqual(shipping_action.view_mode, "list,form")
