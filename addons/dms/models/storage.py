@@ -111,8 +111,8 @@ class Storage(models.Model):
                 files.search(domain).action_migrate()
 
     def action_save_onboarding_storage_step(self):
-        self.env.user.company_id.set_onboarding_step_done(
-            "documents_onboarding_storage_state"
+        self.env["onboarding.onboarding.step"].sudo().action_validate_step(
+            "dms.onboarding_step_document_storage"
         )
 
     # Read, View

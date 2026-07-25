@@ -7,3 +7,4 @@ from . import test_benchmark
 from . import test_portal
 from . import test_port_constraints
 from . import test_port_binary
+from . import test_port_onboarding

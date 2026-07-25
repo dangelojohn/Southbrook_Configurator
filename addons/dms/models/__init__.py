@@ -16,7 +16,6 @@ from . import onboarding_onboarding_step
 from . import dms_category
 from . import tag
 
-from . import res_company
 from . import res_config_settings
 from . import ir_attachment
 from . import mail_thread

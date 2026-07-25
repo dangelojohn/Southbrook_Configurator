@@ -267,8 +267,8 @@ class DMSFile(models.Model):
             )
 
     def action_save_onboarding_file_step(self):
-        self.env.user.company_id.set_onboarding_step_done(
-            "documents_onboarding_file_state"
+        self.env["onboarding.onboarding.step"].sudo().action_validate_step(
+            "dms.onboarding_step_upload_file"
         )
 
     def action_wizard_dms_file_move(self):

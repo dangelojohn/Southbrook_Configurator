@@ -362,8 +362,8 @@ class DmsDirectory(models.Model):
 
     # Actions
     def action_save_onboarding_directory_step(self):
-        self.env.user.company_id.set_onboarding_step_done(
-            "documents_onboarding_directory_state"
+        self.env["onboarding.onboarding.step"].sudo().action_validate_step(
+            "dms.onboarding_step_create_directory"
         )
 
     # SearchPanel
