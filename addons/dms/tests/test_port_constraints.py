@@ -16,3 +16,10 @@ class TestPortConstraints(TransactionCase):
         with mute_logger("odoo.sql_db"), self.assertRaises(IntegrityError):
             with self.env.cr.savepoint():
                 self.env["dms.category"].create({"name": "dupcat"})
+
+    def test_tag_name_category_unique(self):
+        cat = self.env["dms.category"].create({"name": "cat1"})
+        self.env["dms.tag"].create({"name": "tag1", "category_id": cat.id})
+        with mute_logger("odoo.sql_db"), self.assertRaises(IntegrityError):
+            with self.env.cr.savepoint():
+                self.env["dms.tag"].create({"name": "tag1", "category_id": cat.id})
