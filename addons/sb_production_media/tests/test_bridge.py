@@ -85,3 +85,32 @@ class TestBridge(TransactionCase):
         self.assertEqual(eval(shipping_action.domain), [("sb_dir_kind", "=", "shipping")])
         self.assertEqual(shipping_action.res_model, "dms.directory")
         self.assertEqual(shipping_action.view_mode, "list,form")
+
+    def test_forms_load(self):
+        """Product/MO/Picking forms carry the inline Media tab (C6)."""
+        for model, xmlid in [
+            ("product.template", "product.product_template_form_view"),
+            ("mrp.production", "mrp.mrp_production_form_view"),
+            ("stock.picking", "stock.view_picking_form"),
+        ]:
+            view = self.env.ref(xmlid)
+            arch = self.env[model].get_view(view.id, "form")["arch"]
+            self.assertIn("dms_directory_ids", arch)
+
+    def test_media_smart_button_count(self):
+        """The smart-button count field is 0 before any file exists and is
+        robust to the dms_directory_ids cache-invalidation landmine."""
+        p = self.env["product.template"].create({"name": "Widget"})
+        self.assertEqual(p.sb_media_file_count, 0)
+        mo = self.env["mrp.production"].create({"product_id": p.product_variant_id.id})
+        self.assertEqual(mo.sb_media_file_count, 0)
+
+    def test_action_sb_open_media(self):
+        """action_sb_open_media returns a dms.file action scoped to the
+        record's own directory subtree."""
+        p = self.env["product.template"].create({"name": "Widget"})
+        p.invalidate_recordset(["dms_directory_ids"])
+        directory = p.dms_directory_ids[:1]
+        action = p.action_sb_open_media()
+        self.assertEqual(action["res_model"], "dms.file")
+        self.assertEqual(action["domain"], [("directory_id", "child_of", directory.ids)])

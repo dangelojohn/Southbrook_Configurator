@@ -1,12 +1,25 @@
 # License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
-from odoo import models
+from odoo import _, fields, models
 
 ORDERS_SUBDIR_NAME = "Orders"
+
+# LANDMINE (confirmed C3/C4/C6): dms_directory_ids is a One2many keyed on a
+# plain (res_model, res_id) domain rather than a true inverse Many2one, so the
+# ORM does NOT auto-invalidate the cached value once dms.field.mixin.create()
+# creates the linked dms.directory after the record insert (same
+# transaction), nor after the compute itself re-reads it on a stale cache.
+# Every read site (classify-on-create, the smart-button count, the "open
+# media" action) must invalidate first.
 
 
 class ProductTemplate(models.Model):
     _name = "product.template"
     _inherit = ["product.template", "dms.field.mixin"]
+
+    sb_media_file_count = fields.Integer(
+        string="Photos/Videos",
+        compute="_compute_sb_media_file_count",
+    )
 
     def create(self, vals_list):
         records = super().create(vals_list)
@@ -29,10 +42,41 @@ class ProductTemplate(models.Model):
             if directory:
                 directory.sudo().sb_dir_kind = "product"
 
+    def _compute_sb_media_file_count(self):
+        """Count files across the record's directory subtree (0 pre-create).
+
+        See LANDMINE note above: invalidate before reading
+        ``dms_directory_ids``, otherwise a record whose directory was just
+        created earlier in this same transaction reads an empty cache.
+        """
+        self.invalidate_recordset(["dms_directory_ids"])
+        for record in self:
+            directories = record.dms_directory_ids
+            record.sb_media_file_count = sum(directories.mapped("count_total_files"))
+
+    def action_sb_open_media(self):
+        """Open the files in this record's DMS directory (and subdirs)."""
+        self.ensure_one()
+        self.invalidate_recordset(["dms_directory_ids"])
+        directories = self.dms_directory_ids
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Photos/Videos"),
+            "res_model": "dms.file",
+            "view_mode": "kanban,list,form",
+            "domain": [("directory_id", "child_of", directories.ids)],
+            "context": {"default_directory_id": directories[:1].id},
+        }
+
 
 class MrpProduction(models.Model):
     _name = "mrp.production"
     _inherit = ["mrp.production", "dms.field.mixin"]
+
+    sb_media_file_count = fields.Integer(
+        string="Photos/Videos",
+        compute="_compute_sb_media_file_count",
+    )
 
     def create(self, vals_list):
         records = super().create(vals_list)
@@ -89,10 +133,39 @@ class MrpProduction(models.Model):
             )
         return orders_dir
 
+    def _compute_sb_media_file_count(self):
+        """Count files across the MO's directory subtree (0 pre-create).
+
+        Same cache-invalidation landmine as ``ProductTemplate`` above.
+        """
+        self.invalidate_recordset(["dms_directory_ids"])
+        for record in self:
+            directories = record.dms_directory_ids
+            record.sb_media_file_count = sum(directories.mapped("count_total_files"))
+
+    def action_sb_open_media(self):
+        """Open the files in this MO's DMS directory (and subdirs)."""
+        self.ensure_one()
+        self.invalidate_recordset(["dms_directory_ids"])
+        directories = self.dms_directory_ids
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Photos/Videos"),
+            "res_model": "dms.file",
+            "view_mode": "kanban,list,form",
+            "domain": [("directory_id", "child_of", directories.ids)],
+            "context": {"default_directory_id": directories[:1].id},
+        }
+
 
 class StockPicking(models.Model):
     _name = "stock.picking"
     _inherit = ["stock.picking", "dms.field.mixin"]
+
+    sb_media_file_count = fields.Integer(
+        string="Photos/Videos",
+        compute="_compute_sb_media_file_count",
+    )
 
     def create(self, vals_list):
         records = super().create(vals_list)
@@ -108,3 +181,27 @@ class StockPicking(models.Model):
             directory = record.dms_directory_ids[:1]
             if directory:
                 directory.sudo().sb_dir_kind = "shipping"
+
+    def _compute_sb_media_file_count(self):
+        """Count files across the picking's directory subtree (0 pre-create).
+
+        Same cache-invalidation landmine as ``ProductTemplate`` above.
+        """
+        self.invalidate_recordset(["dms_directory_ids"])
+        for record in self:
+            directories = record.dms_directory_ids
+            record.sb_media_file_count = sum(directories.mapped("count_total_files"))
+
+    def action_sb_open_media(self):
+        """Open the files in this picking's DMS directory (and subdirs)."""
+        self.ensure_one()
+        self.invalidate_recordset(["dms_directory_ids"])
+        directories = self.dms_directory_ids
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Photos/Videos"),
+            "res_model": "dms.file",
+            "view_mode": "kanban,list,form",
+            "domain": [("directory_id", "child_of", directories.ids)],
+            "context": {"default_directory_id": directories[:1].id},
+        }

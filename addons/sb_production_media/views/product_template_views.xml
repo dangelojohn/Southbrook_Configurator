@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- C6 — Media tab + "Photos/Videos" smart button on the Product form.
+         div[@name='button_box'] is the standard Odoo header smart-button
+         container; //notebook appends the tab after the built-in pages. -->
+    <record id="product_template_form_view_sb_media" model="ir.ui.view">
+        <field name="name">product.template.form.sb.production.media</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_sb_open_media"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-picture-o"
+                        invisible="not id">
+                    <field name="sb_media_file_count"
+                           widget="statinfo"
+                           string="Photos/Videos"/>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page name="sb_media" string="Media" invisible="not id">
+                    <field name="dms_directory_ids" mode="dms_list" invisible="not id"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- C6 — Media tab + "Photos/Videos" smart button on the Picking form. -->
+    <record id="view_picking_form_sb_media" model="ir.ui.view">
+        <field name="name">stock.picking.form.sb.production.media</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_sb_open_media"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-picture-o"
+                        invisible="not id">
+                    <field name="sb_media_file_count"
+                           widget="statinfo"
+                           string="Photos/Videos"/>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page name="sb_media" string="Media" invisible="not id">
+                    <field name="dms_directory_ids" mode="dms_list" invisible="not id"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
