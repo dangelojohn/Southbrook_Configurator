@@ -1073,19 +1073,32 @@ $sbk-amber:      #B45309;
 // container can still clip. Root switched from calc(100vh - 48px) to
 // height:100% so it fills whatever the parent gives it — the fixed
 // vh math didn't match the actual container height at all viewports.
-.o_action_manager {
+// v3 (2026-07-25): SCOPE THESE TO OUR OWN ACTION. This block ships in
+// web.assets_backend, which loads on EVERY backend page — so v2's bare
+// `.o_action_manager > .o_action > .o_content` matched every action in
+// the webclient, not just ours, and forced `flex-direction: column
+// !important` globally. That broke every search-panel view (Apps,
+// product catalog, any list/kanban with a side panel): core's
+// `.o_component_with_search_panel { display: flex }` (@media min-width
+// 768px) sets no direction and is NOT !important, so our rule won the
+// cascade and stacked the 539px search panel ON TOP of the records,
+// pushing them below the fold. Symptom looked like "the apps are gone".
+// `:has()` scopes each ancestor to the chain that actually contains our
+// root — verified to compile on this image's libsass 3.6.5, which
+// passes the selector through verbatim.
+.o_action_manager:has(.o_sbk_root) {
     overflow-y: auto !important;
     overflow-x: hidden !important;
 }
 
-.o_action_manager > .o_action {
+.o_action_manager > .o_action:has(.o_sbk_root) {
     height: 100% !important;
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
 }
 
-.o_action_manager > .o_action > .o_content {
+.o_action_manager > .o_action > .o_content:has(.o_sbk_root) {
     height: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
@@ -1171,10 +1184,13 @@ $sbk-amber:      #B45309;
 // Thin styled scrollbars so gutters don't eat layout width in the aside +
 // inventory panels. WebKit-only; Firefox uses `scrollbar-width: thin` set on
 // each panel would be a nicer future addition.
+// 2026-07-25: `.o_action_manager` scoped with :has() for the same reason as
+// the overflow block above — unscoped, it restyled the scrollbars of every
+// backend action, not just this configurator.
 .o_sbk_controls,
 .o_sbk_product_list,
 .o_sbk_detail,
-.o_action_manager {
+.o_action_manager:has(.o_sbk_root) {
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-track { background: $sbk-bg; }
     &::-webkit-scrollbar-thumb {
