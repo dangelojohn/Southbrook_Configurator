@@ -1,1 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_material_family_user,material.family.user,model_material_family,base.group_user,1,0,0,0
+access_material_family_manager,material.family.manager,model_material_family,base.group_system,1,1,1,1

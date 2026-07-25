@@ -1,5 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
+  <record id="fam_ewood" model="material.family">
+    <field name="name">Engineered Wood</field><field name="code">ewood</field>
+    <field name="default_weight_source">density_volume</field><field name="default_waste_pct">12</field>
+  </record>
+  <record id="fam_ewood_ply" model="material.family">
+    <field name="name">Plywood</field><field name="code">ewood_ply</field>
+    <field name="parent_id" ref="fam_ewood"/>
+  </record>
+  <record id="fam_swood" model="material.family"><field name="name">Solid Wood</field><field name="code">swood</field><field name="default_weight_source">density_volume</field></record>
+  <record id="fam_veneer" model="material.family"><field name="name">Wood Veneer</field><field name="code">veneer</field><field name="default_weight_source">density_area</field><field name="default_waste_pct">15</field></record>
+  <record id="fam_lam" model="material.family"><field name="name">Laminates &amp; Edgeband</field><field name="code">lam</field><field name="default_weight_source">linear_density</field></record>
+  <record id="fam_glass" model="material.family"><field name="name">Glass</field><field name="code">glass</field><field name="default_weight_source">density_area</field></record>
+  <record id="fam_stone" model="material.family"><field name="name">Stone / Quartz</field><field name="code">stone</field><field name="default_weight_source">none</field></record>
+  <record id="fam_ctop_stone" model="material.family"><field name="name">Countertop Stone</field><field name="code">ctop_stone</field><field name="parent_id" ref="fam_stone"/><field name="default_weight_source">none</field></record>
+  <record id="fam_ctop_lam" model="material.family"><field name="name">Countertop Laminate</field><field name="code">ctop_lam</field><field name="default_weight_source">none</field></record>
+  <record id="fam_tile" model="material.family"><field name="name">Ceramic Tile</field><field name="code">tile</field><field name="default_weight_source">none</field></record>
+  <record id="fam_drywall" model="material.family"><field name="name">Drywall / Gypsum</field><field name="code">drywall</field><field name="default_weight_source">none</field></record>
+  <record id="fam_metal" model="material.family"><field name="name">Metals</field><field name="code">metal</field><field name="default_weight_source">density_volume</field></record>
+  <record id="fam_plastic" model="material.family"><field name="name">Plastics</field><field name="code">plastic</field><field name="default_weight_source">density_volume</field></record>
+  <record id="fam_concrete" model="material.family"><field name="name">Concrete / Cement</field><field name="code">concrete</field><field name="default_weight_source">density_area</field></record>
+  <record id="fam_hw" model="material.family"><field name="name">Hardware / Fasteners</field><field name="code">hw</field><field name="default_weight_source">per_unit</field></record>
+  <record id="fam_finish" model="material.family"><field name="name">Adhesives &amp; Finishes</field><field name="code">finish</field><field name="default_weight_source">none</field></record>
     </data>
 </odoo>

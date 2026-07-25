@@ -1,3 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+  <record id="view_material_family_list" model="ir.ui.view">
+    <field name="name">material.family.list</field>
+    <field name="model">material.family</field>
+    <field name="arch" type="xml">
+      <list><field name="complete_name"/><field name="code"/><field name="default_weight_source"/></list>
+    </field>
+  </record>
+  <record id="action_material_family" model="ir.actions.act_window">
+    <field name="name">Material Families</field><field name="res_model">material.family</field>
+    <field name="view_mode">list,form</field>
+  </record>
 </odoo>
