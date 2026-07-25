@@ -123,7 +123,7 @@
                                     </h5>
                                     <div
                                         role="menuitem"
-                                        t-if="record.permission_write.raw_value and !record.is_locked.raw_value"
+                                        t-if="record.permission_write.raw_value &amp;&amp; !record.is_locked.raw_value"
                                     >
                                         <a name="lock" type="object">
                                             <i class="fa fa-lock" />
@@ -132,7 +132,7 @@
                                     </div>
                                     <div
                                         role="menuitem"
-                                        t-if="record.is_locked.raw_value  and record.is_lock_editor.raw_value"
+                                        t-if="record.is_locked.raw_value  &amp;&amp; record.is_lock_editor.raw_value"
                                     >
                                         <a name="unlock" type="object">
                                             <i class="fa fa-unlock-alt" />
@@ -141,7 +141,7 @@
                                     </div>
                                     <div
                                         role="menuitem"
-                                        t-if="record.permission_write.raw_value and record.active.raw_value and (!record.is_locked.raw_value or (record.is_locked.raw_value and record.is_lock_editor.raw_value))"
+                                        t-if="record.permission_write.raw_value &amp;&amp; record.active.raw_value &amp;&amp; (!record.is_locked.raw_value || (record.is_locked.raw_value &amp;&amp; record.is_lock_editor.raw_value))"
                                     >
                                         <a name="toggle_active" type="object">
                                             <i class="fa fa-archive" />
@@ -150,7 +150,7 @@
                                     </div>
                                     <div
                                         role="menuitem"
-                                        t-if="record.permission_write.raw_value and !record.active.raw_value and (!record.is_locked.raw_value or (record.is_locked.raw_value and record.is_lock_editor.raw_value))"
+                                        t-if="record.permission_write.raw_value &amp;&amp; !record.active.raw_value &amp;&amp; (!record.is_locked.raw_value || (record.is_locked.raw_value &amp;&amp; record.is_lock_editor.raw_value))"
                                     >
                                         <a name="toggle_active" type="object">
                                             <i class="fa fa-archive" />
@@ -190,7 +190,7 @@
                                     </div>
                                     <div
                                         role="menuitem"
-                                        t-if="record.permission_unlink.raw_value and (!record.is_locked.raw_value or (record.is_locked.raw_value and record.is_lock_editor.raw_value))"
+                                        t-if="record.permission_unlink.raw_value &amp;&amp; (!record.is_locked.raw_value || (record.is_locked.raw_value &amp;&amp; record.is_lock_editor.raw_value))"
                                     >
                                         <a type="delete">
                                             <i class="fa fa-trash-o" />
@@ -246,7 +246,7 @@
                                             class="o_dms_file_kanban_lock"
                                         >
                                             <i
-                                                t-attf-class="fa #{(record.is_locked.raw_value and !record.is_lock_editor.raw_value) ? 'fa-lock' : ''} #{((record.is_locked.raw_value and record.is_lock_editor.raw_value)) ? 'fa-unlock-alt' : ''}"
+                                                t-attf-class="fa #{(record.is_locked.raw_value &amp;&amp; !record.is_lock_editor.raw_value) ? 'fa-lock' : ''} #{((record.is_locked.raw_value &amp;&amp; record.is_lock_editor.raw_value)) ? 'fa-unlock-alt' : ''}"
                                                 t-att-title="record.locked_by.value"
                                             />
                                         </span>
@@ -628,7 +628,7 @@
         <field name="name">Move</field>
         <field name="model_id" ref="dms.model_dms_file" />
         <field name="binding_model_id" ref="dms.model_dms_file" />
-        <field name="groups_id" eval="[(4, ref('dms.group_dms_user'))]" />
+        <field name="group_ids" eval="[(4, ref('dms.group_dms_user'))]" />
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">

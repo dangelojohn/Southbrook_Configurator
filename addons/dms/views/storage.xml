@@ -204,7 +204,7 @@
             </sheet>
         </form>
     </field>
-</record>º
+</record>
     <record id="action_dms_storage" model="ir.actions.act_window">
     <field name="name">Storages</field>
     <field name="res_model">dms.storage</field>
