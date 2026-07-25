@@ -31,3 +31,43 @@ class TestBridge(TransactionCase):
         mo = self.env["mrp.production"].create({"product_id": p.product_variant_id.id})
         mo.invalidate_recordset()
         self.assertTrue(mo.dms_directory_ids, "MO should auto-create a DMS directory")
+
+    def test_mo_dir_nested_under_product(self):
+        """MO directory is classified sb_dir_kind='mo' and re-parented under a
+        get-or-created "Orders" subdirectory of its product's directory."""
+        p = self.env["product.template"].create({"name": "Cab"})
+        mo = self.env["mrp.production"].create({"product_id": p.product_variant_id.id})
+        # invalidate: dms_directory_ids is a plain-Integer-keyed One2many that
+        # the ORM doesn't auto-invalidate after the mixin's post-create directory
+        # insert (see class docstring / dms_field_bridge.py landmine notes).
+        p.invalidate_recordset()
+        mo.invalidate_recordset()
+        product_dir = p.dms_directory_ids[:1]
+        mo_dir = mo.dms_directory_ids[:1]
+        self.assertEqual(mo_dir.sb_dir_kind, "mo")
+        # nested: MO dir's parent is an "Orders" subdir, whose parent is the
+        # product's own directory.
+        orders_dir = mo_dir.parent_id
+        self.assertEqual(orders_dir.name, "Orders")
+        self.assertEqual(orders_dir.sb_dir_kind, "structural")
+        self.assertEqual(orders_dir.parent_id, product_dir)
+
+    def test_picking_dir_classified_shipping(self):
+        """Picking directory is classified sb_dir_kind='shipping' and sits
+        under the Shipping root (closes the C3 picking-coverage gap)."""
+        partner = self.env["res.partner"].create({"name": "Cab Customer"})
+        picking_type = self.env.ref("stock.picking_type_out")
+        picking = self.env["stock.picking"].create(
+            {
+                "partner_id": partner.id,
+                "picking_type_id": picking_type.id,
+                "location_id": picking_type.default_location_src_id.id,
+                "location_dest_id": picking_type.default_location_dest_id.id,
+            }
+        )
+        picking.invalidate_recordset()
+        picking_dir = picking.dms_directory_ids[:1]
+        self.assertTrue(picking_dir, "picking should auto-create a DMS directory")
+        self.assertEqual(picking_dir.sb_dir_kind, "shipping")
+        shipping_root = self.env.ref("sb_production_media.dir_root_shipping")
+        self.assertEqual(picking_dir.parent_id, shipping_root)
