@@ -64,12 +64,51 @@ class DmsFile(models.Model):
             )
         )
 
+    def _sb_scoped_metadata_write(self, vals):
+        """Write metadata-only ``vals`` (``qc_status``/``annotation_data``)
+        gated on the *anchored business record*'s write access, so any
+        ordinary internal user who can edit the anchored MO/product/picking
+        (``base.group_user`` alone -- not necessarily ``group_dms_user`` or
+        ``group_media_manager``) can annotate/QC its media, mirroring the
+        access gate ``production.media.upload_media()`` already uses
+        (``anchor_record.check_access("write")``). Never touches the binary
+        ``content`` field -- callers pass only ``qc_status``/
+        ``annotation_data``.
+
+        If the anchor's write-access check passes, the actual field write
+        runs under ``sudo()`` (metadata-only) so it is not itself blocked by
+        ``dms.file``'s own restrictive ACL (``base.group_user`` has
+        ``perm_write=0`` on ``dms.file`` upstream; only ``group_dms_user``/
+        ``group_media_manager`` do). If the file has no resolvable anchor
+        (a purely structural/unanchored file), fall back to a normal,
+        non-sudo write, so structural files still require direct ``dms``
+        write rights.
+
+        KNOWN LIMITATION (accepted for v1, see
+        task-C10-security-verify.md): this does not enforce internal-user
+        cross-record isolation -- i.e. it does not stop an internal user who
+        can write to *some* anchor record from also passing this same gate
+        for a *different* record's media, because the check is scoped to
+        "does this file's own anchor record grant write" rather than a
+        blanket internal-vs-internal boundary. That is a deliberate, decided
+        v1 scope (see task brief); the portal/public leak this task closes
+        is the ACL-layer override in ``security/ir.model.access.csv``, which
+        is unaffected by and unrelated to this limitation.
+        """
+        self.ensure_one()
+        anchor = self._sb_get_anchor_record()
+        if anchor:
+            anchor.check_access("write")  # raises AccessError if not permitted
+            self.sudo().write(vals)
+        else:
+            self.write(vals)
+
     def action_set_qc_status(self, status):
         """Set ``qc_status`` on each file and post a chatter audit note on
         each file's anchored record (skipped gracefully when there is none).
         """
         for record in self:
-            record.qc_status = status
+            record._sb_scoped_metadata_write({"qc_status": status})
             record._sb_post_audit_note(
                 _("QC status set to \"%s\"", dict(record._fields["qc_status"].selection).get(status, status))
             )
@@ -80,5 +119,5 @@ class DmsFile(models.Model):
         anchored record (skipped gracefully when there is none).
         """
         for record in self:
-            record.annotation_data = annotation_json
+            record._sb_scoped_metadata_write({"annotation_data": annotation_json})
             record._sb_post_audit_note(_("Annotation saved"))
