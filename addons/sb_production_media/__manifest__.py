@@ -6,6 +6,8 @@
     "author": "Southbrook Cabinetry",
     "depends": ["dms", "dms_field", "product", "mrp", "stock"],
     "data": [
+        "security/production_media_security.xml",
+        "security/ir.model.access.csv",
         "data/storage_data.xml",
         "data/dms_field_template_data.xml",
         "views/production_media_menus.xml",
