@@ -118,13 +118,21 @@ class TestPortConstraints(TransactionCase):
 
 - [ ] **Step 5: Commit.** `git commit -am "port(dms): _sql_constraints -> models.Constraint (access_group/category/tag)"`
 
-### Task A3: Fix XML — OWL operators, stray char, groups_id rename
+### Task A3: Fix XML + v19 renames (OWL operators, stray char, res.groups/res.users renames)
+
+> **Correction (found during A1 diagnostic install):** port report 01 wrongly assessed `res.groups.users` as unchanged in v19. It was renamed. v19 refactored `res.groups`: **`users` → `user_ids`** (also adds `all_user_ids`, `res.groups.privilege`). This task also fixes those, plus the `res.users.groups_id → group_ids` occurrences beyond the demo file.
 
 **Files:**
-- Modify: `addons/dms/views/dms_file.xml:126,135,144,153,193,249`; `addons/dms/views/storage.xml:207`; `addons/dms/demo/res_users.xml:10`
+- Modify: `addons/dms/views/dms_file.xml:126,135,144,153,193,249` (OWL operators) and `:631` (`groups_id` field — inspect the owning record; if it is a `res.users` field use `group_ids`; if it is an `ir.ui.menu`/`ir.actions` `groups_id`, confirm the v19 name for that model); `addons/dms/views/storage.xml:207` (stray char); `addons/dms/demo/res_users.xml:10` (`groups_id`→`group_ids`); `addons/dms/models/access_groups.py:146,152` (`group_ids.users`→`group_ids.user_ids` — NOT the `parent_group_id.users` paths at 144/154, which reference this module's own `users` field); `addons/dms/tests/test_storage_attachment.py:54,55` (`groups_id`→`group_ids`)
 
 **Interfaces:**
-- Produces: `dms` XML loads clean; kanban card conditionals evaluate in the browser.
+- Produces: `dms` XML loads clean; the `res.groups` refactor is handled; kanban card conditionals evaluate in the browser.
+
+**Extra steps (in addition to the OWL/stray-char/demo-rename steps below):**
+- In `access_groups.py`, change the `@api.depends` entry `"group_ids.users"` (line 146) to `"group_ids.user_ids"`, and in `_compute_users` change `record.group_ids.users` (line 152) to `record.group_ids.user_ids`. Leave `parent_group_id.users` (144/154) unchanged — `parent_group_id` is a self-relation to `dms.access.group`, whose own `users` field (access_groups.py:90) is module-local.
+- In `tests/test_storage_attachment.py:54,55`, change `{"groups_id": [(4, ...)]}` to `{"group_ids": [(4, ...)]}`.
+- Inspect `dms_file.xml:631`; apply the correct v19 field name for the owning model.
+- Verify with an install: `-i dms` should no longer raise the `_compute_users` `@depends` ValueError (it will still fail later steps until A4–A6, but the res.groups error must be gone).
 
 - [ ] **Step 1: Fix the stray character.** In `storage.xml:207`, remove the stray `º` immediately after `</record>`.
 
