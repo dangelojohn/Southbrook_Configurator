@@ -225,3 +225,37 @@ class MrpBomLine(models.Model):
             )
             line.component_volume_mm3 = vol
             line.component_weight_kg = self._weight_for_qty(m, vol, line.product_qty)
+
+
+class MrpBom(models.Model):
+    _inherit = "mrp.bom"
+
+    material_weight_total = fields.Float(
+        string="Total Material Weight (kg)",
+        compute="_compute_material_weight_total",
+        digits=(10, 2),
+        help="Sum of leaf-component weights, flattened via native "
+             "bom.explode() so nested/phantom sub-assembly BoMs are "
+             "counted once regardless of nesting depth (Task 7).",
+    )
+
+    def _compute_material_weight_total(self):
+        for bom in self:
+            total = 0.0
+            # explode to leaves so nested/phantom BoMs are flattened (blindspot #5)
+            _boms, lines = bom.explode(
+                bom.product_id or bom.product_tmpl_id.product_variant_id,
+                bom.product_qty,
+            )
+            for line, data in lines:
+                m = line.material_id
+                if not m:
+                    continue
+                qty = data.get("qty", line.product_qty)
+                vol = (
+                    line._panel_volume_mm3(line)
+                    if m.weight_source == "density_volume"
+                    else 0.0
+                )
+                total += line._weight_for_qty(m, vol, qty)
+            bom.material_weight_total = round(total, 2)
