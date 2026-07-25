@@ -5,7 +5,9 @@
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "depends": ["dms", "dms_field", "product", "mrp", "stock"],
-    "data": [],  # data files added incrementally by later tasks (C2/C3/C5/C6/C10)
+    "data": [
+        "data/storage_data.xml",
+    ],
     "installable": True,
     "application": False,
 }
