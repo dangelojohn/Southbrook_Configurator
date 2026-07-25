@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 WEIGHT_SOURCES = [
     ("density_volume", "Density × volume (sheet/solid wood)"),
@@ -33,3 +34,9 @@ class MaterialFamily(models.Model):
                 "%s / %s" % (fam.parent_id.complete_name, fam.name)
                 if fam.parent_id else fam.name
             )
+
+    @api.constrains("parent_id")
+    def _check_parent_id_recursion(self):
+        if self._has_cycle():
+            raise ValidationError(
+                "A material family cannot be its own ancestor.")

@@ -7,7 +7,9 @@ class TestMaterialFields(TransactionCase):
     def setUp(self):
         super().setUp()
         self.Mat = self.env["southbrook.kitchen.material"]
+        self.Fam = self.env["material.family"]
         self.fam_ply = self.env.ref("sb_material_core.fam_ewood_ply")
+        self.fam_ewood = self.env.ref("sb_material_core.fam_ewood")
 
     def test_effective_density_uses_own_value(self):
         m = self.Mat.create({"name": "Walnut Ply 18", "code": "WPL18",
@@ -22,3 +24,17 @@ class TestMaterialFields(TransactionCase):
                              "family_id": self.fam_ply.id, "density": 0.0,
                              "density_source": "family_default"})
         self.assertGreater(m.effective_density, 0.0)
+
+    def test_effective_density_walks_up_to_grandparent_default(self):
+        # child family's own code is NOT in FAMILY_DEFAULT_DENSITY, only its
+        # parent (fam_ewood, code "ewood" -> 0.68) is; effective_density must
+        # walk up the parent chain rather than stopping at the direct family.
+        fam_child = self.Fam.create({
+            "name": "Exotic Ewood Sub-Grade",
+            "code": "ewood_exotic_subgrade",
+            "parent_id": self.fam_ewood.id,
+        })
+        m = self.Mat.create({"name": "Exotic Ewood Panel", "code": "EEP",
+                             "family_id": fam_child.id, "density": 0.0,
+                             "density_source": "family_default"})
+        self.assertEqual(m.effective_density, 0.68)

@@ -5,7 +5,7 @@
     <field name="model">southbrook.kitchen.material</field>
     <field name="inherit_id" ref="southbrook_mrp_kitchen_workcenters.view_sbk_material_form"/>
     <field name="arch" type="xml">
-      <field name="note" position="before">
+      <xpath expr="//field[@name='note']/parent::group" position="before">
         <group string="Material Master">
           <field name="family_id"/>
           <field name="weight_source"/>
@@ -20,7 +20,7 @@
           <field name="manual_unit_price"/>
           <field name="currency_id" invisible="1"/>
         </group>
-      </field>
+      </xpath>
     </field>
   </record>
 </odoo>

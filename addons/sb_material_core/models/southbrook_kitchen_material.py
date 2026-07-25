@@ -34,7 +34,7 @@ class KitchenMaterial(models.Model):
         string="Manual Unit Price", currency_field="currency_id",
         help="Manual cost-basis override for the sourcing cascade (Tier 2).")
 
-    @api.depends("density", "density_source", "family_id")
+    @api.depends("density", "density_source", "family_id", "family_id.parent_id")
     def _compute_effective_density(self):
         for m in self:
             if m.density_source == "material" and m.density:
