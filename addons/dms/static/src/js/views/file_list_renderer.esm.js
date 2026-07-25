@@ -10,7 +10,3 @@ export class FileListRenderer extends ListRenderer {
         super.setup();
     }
 }
-
-FileListRenderer.components = {
-    ...FileListRenderer.components,
-};
