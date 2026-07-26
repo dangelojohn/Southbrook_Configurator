@@ -16,3 +16,5 @@ from . import test_effective_waste
 # for the 2 live legacy sheet components that previously fell back to the
 # 3/4"=19.05mm cut constant via the generic melamine/mdf materials.
 from . import test_thickness_specific_materials
+# Cutlist Precision Task 1 — sb.panel.role tag model + material.panel_role_ids.
+from . import test_panel_role

@@ -38,6 +38,13 @@ class KitchenMaterial(models.Model):
     _inherit = "southbrook.kitchen.material"
 
     family_id = fields.Many2one("material.family", index=True)
+    panel_role_ids = fields.Many2many(
+        "sb.panel.role", string="Panel Roles",
+        help="Which cabinet panel roles this material makes. Drives exact "
+             "per-BoM-line material demand: a line's demand is the summed "
+             "area of the panels whose role its material uniquely owns on "
+             "that BoM. Leave empty to keep the estimation-grade share.",
+    )
     weight_source = fields.Selection(WEIGHT_SOURCES, default="density_volume")
     density = fields.Float(string="Density (g/cm³)", digits=(8, 3),
                            help="Effective density — estimation grade (±15%).")

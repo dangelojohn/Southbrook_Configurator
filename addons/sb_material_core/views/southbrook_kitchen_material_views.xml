@@ -8,6 +8,7 @@
       <xpath expr="//field[@name='note']/parent::group" position="before">
         <group string="Material Master">
           <field name="family_id"/>
+          <field name="panel_role_ids" widget="many2many_tags"/>
           <field name="weight_source"/>
           <field name="density"/>
           <field name="density_source"/>
