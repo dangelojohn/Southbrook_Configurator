@@ -157,6 +157,22 @@ class MrpBomLine(models.Model):
         store=True,
         digits=(10, 2),
     )
+    material_demand_qty = fields.Float(
+        string="Material Demand",
+        compute="_compute_material_demand_qty",
+        store=True,
+        digits=(12, 4),
+        help="Consumption of this component per this BoM, in the material's "
+             "canonical demand unit: m² for sheet/area goods (density_volume/"
+             "density_area), linear m for edgebanding (linear_density), or "
+             "units for hardware (per_unit/none). Continuous families reuse "
+             "the geometry→volume pipeline; hardware passes product_qty "
+             "through unchanged. 0.0 when geometry is genuinely absent "
+             "(never fabricated). Drives the suggested purchase quantity — "
+             "the native BoM product_qty is left untouched (Fork 1).",
+    )
+
+    _SB_DEFAULT_SHEET_THICKNESS_MM = 19.05  # 3/4" — documented fallback
 
     # Task B1: Per-line geometry override fields (Increment B)
     sb_line_width_mm = fields.Integer(
@@ -243,6 +259,40 @@ class MrpBomLine(models.Model):
         # density_area / none: no volumetric weight tracked in Phase 1.
         return 0.0
 
+    def _sb_resolve_geo(self):
+        """Resolve the cabinet geometry dict for this line: per-line override
+        (all three sb_line_* set) merged over the cabinet variant geometry,
+        else the variant geometry, else {} (honesty). Single source of truth
+        shared by _panel_volume_mm3 and _compute_material_demand_qty.
+
+        Extracted verbatim (Phase-2 Task 3) from the geometry-resolution
+        block that used to live inline in `_panel_volume_mm3` — a pure
+        refactor, not a behavior change; `_panel_volume_mm3` now calls this
+        method instead of resolving geo itself.
+        """
+        self.ensure_one()
+        cab = self.bom_id.product_id or self.bom_id.product_tmpl_id.product_variant_id
+        base_geo = cab._sb_geometry_inputs() if hasattr(cab, "_sb_geometry_inputs") else {}
+
+        # Task B2 (Materials geometry-writeback plan, Increment B): a
+        # per-line geometry override (mrp.bom.line.sb_line_width_mm/
+        # sb_line_height_mm/sb_line_depth_mm, Task B1) wins over the
+        # variant's own geometry, but ONLY when all three are set (>0) —
+        # a partial override is not a real override and falls back to the
+        # variant (A4 behavior), preserving the honesty contract. When the
+        # override does apply, only width/height/depth are replaced; the
+        # variant's family/door_count/drawer_count/finished_sides are kept
+        # so panel-count-driven hardware/edge-banding stays correct.
+        line_geo = {}
+        if self.sb_line_width_mm and self.sb_line_height_mm and self.sb_line_depth_mm:
+            line_geo = {
+                **base_geo,
+                "width_mm": self.sb_line_width_mm,
+                "height_mm": self.sb_line_height_mm,
+                "depth_mm": self.sb_line_depth_mm,
+            }
+        return line_geo or base_geo
+
     # ----------------------------------------------------------------
     # Volume source — see the module docstring for the full investigation.
     # Returns 0.0 (never fabricated) whenever the cabinet's width/height/
@@ -300,28 +350,9 @@ class MrpBomLine(models.Model):
             )
             return 0.0
 
-        cab = line.bom_id.product_id or line.bom_id.product_tmpl_id.product_variant_id
-        base_geo = cab._sb_geometry_inputs() if hasattr(cab, "_sb_geometry_inputs") else {}
-
-        # Task B2 (Materials geometry-writeback plan, Increment B): a
-        # per-line geometry override (mrp.bom.line.sb_line_width_mm/
-        # sb_line_height_mm/sb_line_depth_mm, Task B1) wins over the
-        # variant's own geometry, but ONLY when all three are set (>0) —
-        # a partial override is not a real override and falls back to the
-        # variant (A4 behavior), preserving the honesty contract. When the
-        # override does apply, only width/height/depth are replaced; the
-        # variant's family/door_count/drawer_count/finished_sides are kept
-        # so panel-count-driven hardware/edge-banding stays correct.
-        line_geo = {}
-        if line.sb_line_width_mm and line.sb_line_height_mm and line.sb_line_depth_mm:
-            line_geo = {
-                **base_geo,
-                "width_mm": line.sb_line_width_mm,
-                "height_mm": line.sb_line_height_mm,
-                "depth_mm": line.sb_line_depth_mm,
-            }
-        geo = line_geo or base_geo
+        geo = line._sb_resolve_geo()
         if not geo:
+            cab = line.bom_id.product_id or line.bom_id.product_tmpl_id.product_variant_id
             _logger.debug(
                 "_panel_volume_mm3: no geometry on variant %s (line %s) -> "
                 "0.0 (not fabricated).", cab.id, line.id,
@@ -523,6 +554,61 @@ class MrpBomLine(models.Model):
             )
             line.component_volume_mm3 = vol
             line.component_weight_kg = self._weight_for_qty(m, vol, line.product_qty)
+
+    @api.depends(
+        "product_id", "product_qty", "material_id",
+        "material_id.weight_source", "material_id.thickness_mm",
+        "sb_line_width_mm", "sb_line_height_mm", "sb_line_depth_mm",
+        "bom_id.product_id.sb_width_mm",
+        "bom_id.product_id.sb_height_mm",
+        "bom_id.product_id.sb_depth_mm",
+    )
+    def _compute_material_demand_qty(self):
+        """Consumption of this component per this BoM, in the material's
+        canonical demand unit (Phase-2 Task 3 — see field help for the full
+        rule). Computation rule (exact, per weight_source):
+
+        - density_volume / density_area: area_m2 = this line's product_qty-
+          weighted SHARE of the carcass volume (`_sb_component_share_volume_
+          mm3`, the same sibling-attribution-aware volume `component_volume_
+          mm3` already uses) / effective_thickness_mm / 1_000_000.0, where
+          effective_thickness_mm is material.thickness_mm when > 0, else the
+          3/4" cut-constant fallback (`_SB_DEFAULT_SHEET_THICKNESS_MM`,
+          19.05 — same cut-constant family `_panel_volume_mm3` already
+          uses). 0.0 when the share volume is 0.0 (honesty — geometry
+          genuinely absent).
+        - linear_density: resolve the cabinet geometry exactly as
+          `_panel_volume_mm3` does (`_sb_resolve_geo`), then length_m =
+          `_compute_panel_dimensions(**geo)["edge_banding_length_mm"] /
+          1000.0 * line.product_qty`. 0.0 when geo is {} (honesty).
+        - per_unit / none / no material_id: material_demand_qty =
+          line.product_qty (straight pass-through — the native count model
+          is already correct for hardware).
+        """
+        Bom = self.env["mrp.bom"]
+        has_geo = hasattr(Bom, "_compute_panel_dimensions")
+        for line in self:
+            mat = line.material_id
+            src = mat.weight_source if mat else "none"
+            if src in ("density_volume", "density_area"):
+                vol = line._sb_component_share_volume_mm3(line)
+                if not vol:
+                    line.material_demand_qty = 0.0
+                    continue
+                th = mat.thickness_mm if mat.thickness_mm > 0 else \
+                    line._SB_DEFAULT_SHEET_THICKNESS_MM
+                line.material_demand_qty = vol / th / 1_000_000.0
+            elif src == "linear_density":
+                geo = line._sb_resolve_geo() if has_geo else {}
+                if not geo:
+                    line.material_demand_qty = 0.0
+                    continue
+                dims = Bom._compute_panel_dimensions(**geo)
+                length_mm = dims.get("edge_banding_length_mm") or 0
+                line.material_demand_qty = length_mm / 1000.0 * line.product_qty
+            else:
+                # per_unit / none / no material: native count model is correct
+                line.material_demand_qty = line.product_qty
 
 
 class MrpBom(models.Model):
