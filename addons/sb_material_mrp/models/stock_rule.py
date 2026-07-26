@@ -44,6 +44,19 @@ class StockRule(models.Model):
                 continue
             if po.amount_total > company.sb_material_po_auto_confirm_max_amount:
                 continue
+            if po.amount_total <= 0.0:
+                # Fail-safe lower bound: a zero/negative-amount draft PO must
+                # NEVER be auto-confirmed, no matter the threshold setting
+                # (0.0 <= threshold is otherwise True for any positive
+                # threshold). Leave it draft for a human to review.
+                continue
+            # Residual (v1, accepted): `_make_po_get_domain` follows native
+            # `purchase_stock` PO-merge scoping. If native merges this run's
+            # procurement line onto a PRE-EXISTING human draft RFQ for the
+            # same vendor/company/currency (native grouping behaviour), the
+            # whole PO -- including the human's other lines -- gets
+            # confirmed here. This mirrors native grouping semantics exactly
+            # and is accepted for v1; revisit if it causes surprises.
             _logger.info(
                 "sb_material_mrp: auto-confirming RFQ %s (%.2f <= threshold "
                 "%.2f) for %s -- Phase-2b Task 5, gated, default-off.",

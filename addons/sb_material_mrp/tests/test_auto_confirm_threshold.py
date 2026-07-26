@@ -48,3 +48,30 @@ class TestAutoConfirmThreshold(TransactionCase):
         self.env.company.sb_material_po_auto_confirm_max_amount = 0.0
         po = self._draft_rfq_via_scheduler("AutoConfirm ZeroCeiling Vendor")
         self.assertEqual(po.state, "draft")
+
+    def test_zero_amount_po_stays_draft_failsafe(self):
+        # CRITICAL fail-safe: a $0.00 draft PO must never auto-confirm, even
+        # with the feature ON and a real positive threshold -- 0.0 <= 1000.0
+        # is otherwise True, so without the explicit lower-bound guard this
+        # PO would be confirmed. Must stay draft for human review.
+        self.env.company.sb_material_po_auto_confirm = True
+        self.env.company.sb_material_po_auto_confirm_max_amount = 1000.0
+        po = self._draft_rfq_via_scheduler(
+            "AutoConfirm ZeroAmount Vendor", price=0.0, min_qty=1.0)
+        self.assertTrue(po)
+        self.assertEqual(po.amount_total, 0.0)
+        self.assertEqual(po.state, "draft")
+
+    def test_audit_trail_posted_exactly_once(self):
+        # Exactly one audit trace per auto-confirm -- not zero (silent
+        # auto-confirm) and not two (duplicate posting from a re-entrant
+        # scheduler pass or a stray second call site).
+        self.env.company.sb_material_po_auto_confirm = True
+        self.env.company.sb_material_po_auto_confirm_max_amount = 1000.0
+        po = self._draft_rfq_via_scheduler(
+            "AutoConfirm Audit Vendor", price=40.0, min_qty=1.0)
+        self.assertEqual(po.state, "purchase")
+        audit_msgs = po.message_ids.filtered(
+            lambda m: "Auto-confirmed by Southbrook Materials" in (m.body or "")
+        )
+        self.assertEqual(len(audit_msgs), 1)
