@@ -142,6 +142,26 @@ class KitchenMaterial(models.Model):
                     fam = fam.parent_id
                 m.effective_density = val
 
+    def _effective_waste_pct(self):
+        """Structural waste percentage for this material (e.g. 12.0 == 12%).
+
+        Material override (`waste_pct`) wins; else the nearest ancestor
+        family's `default_waste_pct` (walk up `family_id.parent_id`); else
+        0.0. Mirrors the fallback shape of `_compute_effective_density`.
+        This is the STRUCTURAL waste (cutting/offcut loss) applied before
+        the ceiling round-up in the purchase-qty suggestion — kept separate
+        from the operational `mrp.production.scrap_factor`.
+        """
+        self.ensure_one()
+        if self.waste_pct:
+            return self.waste_pct
+        fam = self.family_id
+        while fam:
+            if fam.default_waste_pct:
+                return fam.default_waste_pct
+            fam = fam.parent_id
+        return 0.0
+
     # ------------------------------------------------------------------
     # Repair Wave 2, Upgrade 1 — live data upgrade for the 10 pre-existing
     # `southbrook.kitchen.material` records seeded by

@@ -10,3 +10,5 @@ from . import test_family_density_backfill
 from . import test_product_material_fallback
 # Task 1 — supplierinfo.uom_yield_qty for procurement (Phase-2 T1).
 from . import test_supplierinfo_yield
+# Task 2 — _effective_waste_pct() material/family fallback (Phase-2 T2).
+from . import test_effective_waste
