@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+import re
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -28,10 +29,23 @@ class TestAccess(TransactionCase):
                       {r["name"] for r in payload["rows"]})
 
     def test_provider_source_contains_no_sudo(self):
-        """The catalog must never elevate to read records."""
+        """The catalog must never elevate to read records.
+
+        This check catches the substring '.sudo(' preceded by a dot, with
+        optional whitespace between the dot and opening paren. It catches
+        common forms like .sudo(), .sudo(user), and .sudo (with space).
+
+        Does NOT catch:
+        - Aliased or dynamically-constructed calls (e.g., via variable ref)
+        - Comments that happen to contain the text
+        """
         import inspect
         from odoo.addons.sb_materials_hardware.models import (
             tools_catalog_provider, catalog_provider)
+        sudo_pattern = re.compile(r"\.sudo\s*\(")
         for module in (tools_catalog_provider, catalog_provider):
             source = inspect.getsource(module)
-            self.assertNotIn(".sudo()", source)
+            self.assertIsNone(
+                sudo_pattern.search(source),
+                f"Found .sudo() call in {module.__name__}"
+            )
