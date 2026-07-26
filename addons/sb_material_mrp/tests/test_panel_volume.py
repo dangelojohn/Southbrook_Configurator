@@ -384,3 +384,104 @@ class TestPanelVolume(TransactionCase):
             partial_override_line._panel_volume_mm3(partial_override_line),
             baseline_volume,
         )
+
+    # ------------------------------------------------------------------
+    # Live defect fix (2026-07-26) — sibling weight-attribution.
+    # `_panel_volume_mm3` correctly returns the FULL carcass for a
+    # configurator-built BoM's single sheet line, but a hand-built/
+    # imported BoM that repeats the same sheet product across several
+    # per-panel lines (live: BoM 256, 5x SBK-SHEET-MB34-WW) got the WHOLE
+    # carcass on EVERY such line, over-counting the BoM total ~5-6x.
+    # These tests exercise `_sb_component_share_volume_mm3` (the new
+    # sibling-share wrapper) through the real stored-field compute chain.
+    # ------------------------------------------------------------------
+    def test_five_equal_qty_siblings_split_carcass_evenly(self):
+        """5 lines of the same density_volume component (qty 1 each) on
+        one BoM: EACH line's stored weight must be the single-line
+        weight / 5 (the qty-weighted share collapses to an even split
+        when every sibling has the same qty), and the BoM's
+        `material_weight_total` must equal the single-line BoM's total
+        for the identical geometry/material — the carcass counted
+        exactly once, not 5 times.
+        """
+        component = self._density_volume_component("Melamine 5/8 (5-sib)")
+
+        single_bom = self._cabinet_bom(with_geometry=True)
+        single_line = self.env["mrp.bom.line"].create({
+            "bom_id": single_bom.id, "product_id": component.id, "product_qty": 1,
+        })
+        single_weight = single_line.component_weight_kg
+        self.assertGreater(single_weight, 0.0)
+        single_bom.invalidate_recordset()
+        single_total = single_bom.material_weight_total
+        self.assertAlmostEqual(single_total, single_weight, places=2)
+
+        multi_bom = self._cabinet_bom(with_geometry=True)
+        lines = self.env["mrp.bom.line"].create([
+            {"bom_id": multi_bom.id, "product_id": component.id, "product_qty": 1}
+            for _ in range(5)
+        ])
+        # "(+/- rounding)" per the spec: each line's weight goes through
+        # the LOCKED HALF-UP-2dp round independently, so summing 5
+        # independently-rounded shares can drift a few cents from the
+        # single, once-rounded reference total — bound the drift instead
+        # of demanding bit-exact equality.
+        for line in lines:
+            self.assertAlmostEqual(
+                line.component_weight_kg, single_weight / 5, delta=0.03,
+                msg="each of 5 equal-qty siblings must carry ~1/5 of the "
+                    "single-line weight",
+            )
+        multi_bom.invalidate_recordset()
+        self.assertAlmostEqual(
+            multi_bom.material_weight_total, single_total, delta=0.05,
+            msg="BoM total must count the carcass exactly once (within "
+                "per-line rounding drift), regardless of how many "
+                "sibling lines reference it",
+        )
+
+    def test_mixed_qty_siblings_split_80_20(self):
+        """Two density_volume siblings on one BoM, qty 4 and qty 1 (total
+        qty 5): the qty-4 line must carry 80% of the single-line weight
+        and the qty-1 line 20%, and the BoM total must still equal the
+        single-line BoM's total (carcass counted once).
+        """
+        component = self._density_volume_component("Melamine 5/8 (80-20)")
+
+        single_bom = self._cabinet_bom(with_geometry=True)
+        single_line = self.env["mrp.bom.line"].create({
+            "bom_id": single_bom.id, "product_id": component.id, "product_qty": 1,
+        })
+        single_weight = single_line.component_weight_kg
+        self.assertGreater(single_weight, 0.0)
+        single_bom.invalidate_recordset()
+        single_total = single_bom.material_weight_total
+
+        mixed_bom = self._cabinet_bom(with_geometry=True)
+        heavy_line = self.env["mrp.bom.line"].create({
+            "bom_id": mixed_bom.id, "product_id": component.id, "product_qty": 4,
+        })
+        light_line = self.env["mrp.bom.line"].create({
+            "bom_id": mixed_bom.id, "product_id": component.id, "product_qty": 1,
+        })
+        heavy_line.invalidate_recordset(["component_weight_kg"])
+        light_line.invalidate_recordset(["component_weight_kg"])
+
+        # "(+/- rounding)" per the spec — see the equivalent comment in
+        # test_five_equal_qty_siblings_split_carcass_evenly above.
+        self.assertAlmostEqual(
+            heavy_line.component_weight_kg, single_weight * 0.8, delta=0.03,
+            msg="qty-4 sibling (of total qty 5) must carry ~80% of the "
+                "single-line weight",
+        )
+        self.assertAlmostEqual(
+            light_line.component_weight_kg, single_weight * 0.2, delta=0.03,
+            msg="qty-1 sibling (of total qty 5) must carry ~20% of the "
+                "single-line weight",
+        )
+        mixed_bom.invalidate_recordset()
+        self.assertAlmostEqual(
+            mixed_bom.material_weight_total, single_total, delta=0.05,
+            msg="BoM total must count the carcass exactly once (within "
+                "per-line rounding drift) even with mixed sibling qty",
+        )

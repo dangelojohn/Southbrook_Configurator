@@ -90,6 +90,35 @@ never fabricated, whenever geometry is genuinely absent.
 
 The pure helpers (`_weight_from_volume`, `_weight_for_qty`) and the
 weight_source dispatch remain independent of this wiring and unaffected.
+
+--------------------------------------------------------------------------
+UPDATE — sibling weight-attribution fix (live defect, 2026-07-26)
+--------------------------------------------------------------------------
+`_panel_volume_mm3` (below) resolves and returns the FULL carcass volume
+for the cabinet `line.bom_id` belongs to — that has always been correct
+for a configurator-built BoM, which has exactly ONE density_volume sheet
+line per cabinet. It is WRONG for a hand-built/imported BoM that lists the
+same sheet product on several per-panel lines (observed live: BoM 256, 5x
+SBK-SHEET-MB34-WW; BoMs 280-286, several sheet lines each) — every such
+line got the WHOLE carcass, over-counting the BoM's total material weight
+by roughly the sibling count (live: ~5-6x, e.g. B24 = 247.98 kg vs a
+realistic ~35-40 kg).
+
+The fix does NOT change `_panel_volume_mm3` itself (every existing direct
+caller/test of it keeps getting the raw, undivided carcass volume for the
+line's own geometry — override-aware, byte-identical). Instead, the two
+integration points that turn a volume into a stored/rolled-up weight
+(`_compute_component_weight` and `_compute_material_weight_total`'s
+explode loop) now route density_volume lines through a new wrapper,
+`_sb_component_share_volume_mm3`, which divides that line's own carcass
+volume by the total `product_qty` of every density_volume-resolving
+SIBLING line on the same `bom_id` (itself included) — an estimation-grade,
+product_qty-weighted attribution. This is Phase-2 cutlist territory to
+solve precisely (which physical panel is which line); the invariant this
+fix guarantees for Phase 1 is: **the BoM's total material weight counts
+the carcass exactly once**, however many sibling lines happen to
+reference it. A single density_volume line is its own only sibling, so
+its share is 100% and its stored weight is unchanged.
 """
 import logging
 
@@ -114,9 +143,13 @@ class MrpBomLine(models.Model):
         string="Component Volume (mm3)",
         compute="_compute_component_weight",
         store=True,
-        help="Cabinet cutlist volume attributable to this component. "
-             "0.0 when the volumetric source (cabinet width/height/depth) "
-             "is unavailable — see _panel_volume_mm3 docstring.",
+        help="This line's product_qty-weighted SHARE of the cabinet "
+             "carcass volume — full carcass when this is the only "
+             "density_volume line on the BoM, a fraction of it when "
+             "sibling lines repeat the same sheet product (see "
+             "_sb_component_share_volume_mm3 docstring). 0.0 when the "
+             "volumetric source (cabinet width/height/depth) is "
+             "unavailable — see _panel_volume_mm3 docstring.",
     )
     component_weight_kg = fields.Float(
         string="Weight (kg)",
@@ -345,6 +378,81 @@ class MrpBomLine(models.Model):
             total += shelf[0] * shelf[1] * th * (dims.get("shelf_count") or 0)
         return total
 
+    def _sb_density_volume_sibling_total_qty(self, line):
+        """Sum of `product_qty` over every line on `line.bom_id` that also
+        resolves to a `density_volume` material — `line` itself included.
+
+        Uses each sibling's raw, un-exploded `product_qty` (not an
+        explode()-multiplied quantity) deliberately: the multiplier a
+        phantom/nested BoM applies is uniform across all sibling lines of
+        the SAME `bom_id`, so it cancels out of the qty-weighted RATIO
+        this total feeds into (`_sb_component_share_volume_mm3` below) —
+        using the raw column keeps this helper a pure, cheap ORM read
+        with no dependency on the caller's explode() context.
+
+        Falls back to `line.product_qty or 1.0` in the (pathological)
+        case where the sibling set sums to 0, to avoid a division by
+        zero while still never fabricating a weight for a genuinely
+        zero-qty line.
+        """
+        siblings = line.bom_id.bom_line_ids.filtered(
+            lambda l: l.material_id and l.material_id.weight_source == "density_volume"
+        )
+        total_qty = sum(siblings.mapped("product_qty"))
+        return total_qty or line.product_qty or 1.0
+
+    def _sb_component_share_volume_mm3(self, line, _dims_cache=None):
+        """Estimation-grade weight attribution (live defect fix,
+        2026-07-26) — this line's product_qty-weighted SHARE of the
+        carcass volume `_panel_volume_mm3` resolves for it.
+
+        A configurator-built BoM has exactly one density_volume sheet
+        line per cabinet, so `_panel_volume_mm3`'s full-carcass answer
+        was always correct there. Live hand-built/imported BoMs instead
+        repeat the same sheet product across several per-panel lines
+        (e.g. one line per side/top/bottom/shelf), and giving EACH of
+        those lines the whole carcass over-counted the BoM's total
+        material weight by roughly the sibling count. Determining which
+        physical panel belongs to which line is Phase-2 cutlist
+        territory (out of scope here); the invariant THIS fix
+        guarantees is that the BoM's total counts the carcass exactly
+        once, split proportionally by each sibling's own `product_qty`:
+
+            line_share = carcass_vol * (line.product_qty / total_qty)
+
+        where `total_qty` is the sum of `product_qty` over every
+        density_volume-resolving sibling line on the same `bom_id`
+        (`_sb_density_volume_sibling_total_qty`, itself included).
+
+        Implementation note: `_weight_for_qty` (the LOCKED conversion's
+        caller) already multiplies whatever volume it's given by
+        `line.product_qty` — so the PER-UNIT volume this method must
+        return is `carcass_vol / total_qty` (the `line.product_qty`
+        factor in `line_share` above is supplied by that existing
+        multiplication, not duplicated here). This also correctly
+        collapses to `carcass_vol / line.product_qty` for a lone
+        sibling — which, multiplied back by `line.product_qty` in
+        `_weight_for_qty`, reproduces `carcass_vol` exactly: a single
+        density_volume line's stored weight is therefore BYTE-IDENTICAL
+        to the pre-fix behavior (100% share, never divided in practice
+        for the qty=1 lines every existing single-line test uses).
+
+        A line carrying its own `sb_line_*` geometry override still
+        computes its OWN carcass volume from those override dims (via
+        `_panel_volume_mm3`'s existing merge semantics) — this method
+        then divides THAT override-based volume by the same
+        sibling-qty total, rather than special-casing overridden lines
+        out of the shared attribution.
+
+        Honesty contract unchanged: 0.0 (never fabricated) whenever
+        `_panel_volume_mm3` itself returns 0.0 (no geometry).
+        """
+        carcass_vol = self._panel_volume_mm3(line, _dims_cache=_dims_cache)
+        if not carcass_vol:
+            return 0.0
+        total_qty = self._sb_density_volume_sibling_total_qty(line)
+        return carcass_vol / total_qty
+
     @api.depends(
         "material_id",
         "product_qty",
@@ -387,6 +495,14 @@ class MrpBomLine(models.Model):
         "bom_id.product_id.sb_door_count",
         "bom_id.product_id.sb_drawer_count",
         "bom_id.product_id.sb_finished_sides",
+        # Sibling weight-attribution fix (live defect, 2026-07-26) — this
+        # line's share depends on every OTHER density_volume-resolving
+        # line on the same bom_id, not just its own fields: adding or
+        # editing a sibling's qty/material must retrigger this line's
+        # stored share too, or it goes stale exactly like the defect
+        # this fix closes.
+        "bom_id.bom_line_ids.product_qty",
+        "bom_id.bom_line_ids.material_id",
     )
     def _compute_component_weight(self):
         # FIX-D (repair wave 1, finding #9) — one cache dict for this
@@ -401,7 +517,7 @@ class MrpBomLine(models.Model):
                 line.component_weight_kg = 0.0
                 continue
             vol = (
-                self._panel_volume_mm3(line, _dims_cache=dims_cache)
+                self._sb_component_share_volume_mm3(line, _dims_cache=dims_cache)
                 if m.weight_source == "density_volume"
                 else 0.0
             )
@@ -444,7 +560,7 @@ class MrpBom(models.Model):
                     continue
                 qty = data.get("qty", line.product_qty)
                 vol = (
-                    line._panel_volume_mm3(line, _dims_cache=dims_cache)
+                    line._sb_component_share_volume_mm3(line, _dims_cache=dims_cache)
                     if m.weight_source == "density_volume"
                     else 0.0
                 )
