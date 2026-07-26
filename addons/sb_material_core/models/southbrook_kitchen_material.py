@@ -24,9 +24,14 @@ def _mm_to_in(mm):
     return round(mm / MM_PER_IN, 3) if mm else 0.0
 
 
-def _in_to_mm(inch):
-    """in -> mm, rounded to 2dp (canonical mm precision)."""
-    return round(inch * MM_PER_IN, 2) if inch else 0.0
+def _in_to_mm(inch, ndigits=2):
+    """in -> mm, rounded to `ndigits` (per-field canonical mm precision).
+
+    Sheet width/height are digits=(8,2) -> default ndigits=2. thickness_mm is
+    digits=(6,3) precisely so standard thicknesses like 5/8" (15.875mm) don't
+    lose precision -- its inverse passes ndigits=3 explicitly.
+    """
+    return round(inch * MM_PER_IN, ndigits) if inch else 0.0
 
 
 class KitchenMaterial(models.Model):
@@ -89,7 +94,9 @@ class KitchenMaterial(models.Model):
 
     def _inverse_thickness_in(self):
         for m in self:
-            m.thickness_mm = _in_to_mm(m.thickness_in)
+            # thickness_mm is digits=(6,3) -- standard thicknesses like 5/8"
+            # need 3dp precision (0.625in -> 15.875mm, not 15.88).
+            m.thickness_mm = _in_to_mm(m.thickness_in, ndigits=3)
 
     @api.depends("sheet_width_mm")
     def _compute_sheet_width_in(self):

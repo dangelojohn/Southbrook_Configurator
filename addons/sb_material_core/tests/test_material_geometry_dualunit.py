@@ -64,6 +64,17 @@ class TestMaterialGeometryDualUnit(TransactionCase):
         self.assertEqual(m.sheet_width_mm, 0.0)
         self.assertEqual(m.sheet_width_in, 0.0)
 
+    def test_thickness_in_five_eighth_preserves_3dp_precision(self):
+        # Regression: _in_to_mm used to hardcode round(inch*25.4, 2), which
+        # collapses 5/8" (0.625in) to 15.88mm instead of the exact 15.875mm
+        # that thickness_mm's digits=(6,3) precision exists to hold. Sheet
+        # dims stay at 2dp; only the thickness inverse needs 3dp.
+        m = self.Mat.create({"name": "5/8in Ply", "code": "TQ58",
+                             "thickness_in": 0.625})
+        self.assertAlmostEqual(m.thickness_mm, 15.875, delta=0.0005)
+        m.invalidate_recordset(["thickness_in"])
+        self.assertAlmostEqual(m.thickness_in, 0.625, delta=0.0005)
+
     def test_standard_thickness_quickpick_sets_thickness_mm(self):
         m = self.Mat.create({"name": "Quickpick 3/4", "code": "QP34"})
         m.standard_thickness = "three_quarter"
