@@ -27,6 +27,11 @@ class KitchenMaterial(models.Model):
     waste_pct = fields.Float(string="Waste %")
     linear_density = fields.Float(string="Linear density (kg/m)", help="Edgebanding etc.")
     weight_per_unit = fields.Float(string="Weight per unit (kg)", help="Hardware etc.")
+    thickness_mm = fields.Float(
+        "Thickness (mm)", digits=(6, 3),
+        help="Sheet thickness; e.g. 1/2\"=12.70, 5/8\"=15.875, 3/4\"=19.05. "
+             "Overrides the cut-constant thickness in the weight calc when "
+             "set.")
     # Cost cascade Tier-2 (manual) inputs — consumed by material.cost.source (Task 8).
     currency_id = fields.Many2one(
         "res.currency", default=lambda self: self.env.company.currency_id)

@@ -264,14 +264,46 @@ class MrpBomLine(models.Model):
             return 0.0
 
         dims = Bom._compute_panel_dimensions(**geo)
+
+        # Task C1 (weight-accuracy refinement): when the line's resolved
+        # material carries a real sheet thickness (sb_material_core,
+        # southbrook.kitchen.material.thickness_mm > 0), that thickness
+        # OVERRIDES the fixed cut-constant thickness (`box_th`, baked into
+        # `p[2]` by _compute_panel_dimensions) for the BOX panels only —
+        # side_L, side_R, top, bottom, shelf. This makes a 1/2" carcass
+        # weigh less than a 3/4" carcass built from the identical cabinet
+        # geometry, instead of both being pinned to the same cut constant.
+        #
+        # The BACK panel is deliberately EXCLUDED from this override and
+        # keeps its own returned thickness (`p[2]`, i.e. `back_th`) — a
+        # cabinet back is typically a different, thinner material (e.g.
+        # 1/4" ply/hardboard) than the box sheet good this `material_id`
+        # represents, mirroring the existing door-exclusion rationale above.
+        # Mapping each panel role to its OWN resolved material (so back/door
+        # thickness could likewise come from a material field) is a
+        # documented follow-up, not solved here.
+        #
+        # Fallback (honesty contract, unchanged): when thickness_mm is 0.0/
+        # unset, box panels keep using the returned `p[2]` (pre-Task-C1 / A4
+        # behavior) — never fabricated, never silently defaulted to a
+        # made-up constant.
+        mat_thickness_mm = (
+            line.material_id.thickness_mm if line.material_id else 0.0
+        )
+
         total = 0.0
-        for key in ("side_L", "side_R", "top", "bottom", "back"):
+        for key in ("side_L", "side_R", "top", "bottom"):
             p = dims.get(key)
             if p:
-                total += p[0] * p[1] * p[2]
+                th = mat_thickness_mm if mat_thickness_mm > 0 else p[2]
+                total += p[0] * p[1] * th
+        back = dims.get("back")
+        if back:
+            total += back[0] * back[1] * back[2]
         shelf = dims.get("shelf")
         if shelf:
-            total += shelf[0] * shelf[1] * shelf[2] * (dims.get("shelf_count") or 0)
+            th = mat_thickness_mm if mat_thickness_mm > 0 else shelf[2]
+            total += shelf[0] * shelf[1] * th * (dims.get("shelf_count") or 0)
         return total
 
     @api.depends(
@@ -281,6 +313,7 @@ class MrpBomLine(models.Model):
         "material_id.effective_density",
         "material_id.linear_density",
         "material_id.weight_per_unit",
+        "material_id.thickness_mm",
     )
     def _compute_component_weight(self):
         for line in self:
