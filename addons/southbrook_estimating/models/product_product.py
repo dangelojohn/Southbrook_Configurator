@@ -53,6 +53,34 @@ class ProductProduct(models.Model):
              "surface area rather than per-piece.",
     )
 
+    # Task A1 — Materials geometry-writeback fields
+    sb_width_mm = fields.Integer(
+        string="Cabinet Width (mm)",
+        help="Configured outer width; set at variant creation for the Materials weight calc.",
+    )
+    sb_height_mm = fields.Integer(
+        string="Cabinet Height (mm)",
+    )
+    sb_depth_mm = fields.Integer(
+        string="Cabinet Depth (mm)",
+    )
+    sb_panel_family = fields.Char(
+        string="Panel Family",
+        default="base",
+    )
+    sb_door_count = fields.Integer(
+        string="Door Count",
+        default=1,
+    )
+    sb_drawer_count = fields.Integer(
+        string="Drawer Count",
+        default=0,
+    )
+    sb_finished_sides = fields.Char(
+        string="Finished Sides",
+        default="none",
+    )
+
     @api.depends("product_template_attribute_value_ids",
                  "product_template_attribute_value_ids.product_attribute_value_id",
                  "product_tmpl_id.southbrook_category")
@@ -154,3 +182,23 @@ class ProductProduct(models.Model):
         if 540.0 < width_mm <= 920.0:
             return 2
         return 1
+
+    def _sb_geometry_inputs(self):
+        """Task A1 — Return geometry inputs dict for Materials calc.
+
+        Returns a dict with keys {width_mm, height_mm, depth_mm, family,
+        door_count, drawer_count, finished_sides} when all three dimensions
+        are non-zero; returns {} otherwise.
+        """
+        self.ensure_one()
+        if not (self.sb_width_mm and self.sb_height_mm and self.sb_depth_mm):
+            return {}
+        return {
+            "width_mm": self.sb_width_mm,
+            "height_mm": self.sb_height_mm,
+            "depth_mm": self.sb_depth_mm,
+            "family": self.sb_panel_family or "base",
+            "door_count": self.sb_door_count,
+            "drawer_count": self.sb_drawer_count,
+            "finished_sides": self.sb_finished_sides or "none",
+        }
