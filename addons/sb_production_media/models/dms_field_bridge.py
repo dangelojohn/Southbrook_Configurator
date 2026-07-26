@@ -70,6 +70,25 @@ class ProductTemplate(models.Model):
         }
 
 
+class ProductProduct(models.Model):
+    _inherit = "product.product"
+
+    # These mirror the product.template media members so the product.template
+    # button-box + Media tab (which compose into the primary product.product
+    # variant form, id 688) validate and work on the variant form too — a
+    # variant's media is its template's media.
+    sb_media_file_count = fields.Integer(
+        related="product_tmpl_id.sb_media_file_count",
+    )
+    dms_directory_ids = fields.One2many(
+        related="product_tmpl_id.dms_directory_ids",
+    )
+
+    def action_sb_open_media(self):
+        self.ensure_one()
+        return self.product_tmpl_id.action_sb_open_media()
+
+
 class MrpProduction(models.Model):
     _name = "mrp.production"
     _inherit = ["mrp.production", "dms.field.mixin"]

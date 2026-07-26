@@ -114,3 +114,40 @@ class TestBridge(TransactionCase):
         action = p.action_sb_open_media()
         self.assertEqual(action["res_model"], "dms.file")
         self.assertEqual(action["domain"], [("directory_id", "child_of", directory.ids)])
+
+    def test_product_product_delegates_to_template(self):
+        """The product.template button-box + Media tab compose into the
+        primary product.product variant form (id 688: product.product.form),
+        so the three members the arch references must resolve on
+        product.product too. They must delegate to product_tmpl_id rather
+        than create their own per-variant DMS directory (Option A)."""
+        p = self.env["product.template"].create({"name": "Widget With Variant"})
+        variant = p.product_variant_id
+        p.invalidate_recordset(["dms_directory_ids"])
+
+        # sb_media_file_count and dms_directory_ids mirror the template's.
+        self.assertEqual(variant.sb_media_file_count, p.sb_media_file_count)
+        self.assertEqual(variant.dms_directory_ids, p.dms_directory_ids)
+
+        # action_sb_open_media on the variant delegates to the template's
+        # action (same dms.file action, scoped to the template's directory).
+        template_action = p.action_sb_open_media()
+        variant_action = variant.action_sb_open_media()
+        self.assertEqual(variant_action, template_action)
+
+        # No second DMS directory was created for the variant itself.
+        self.assertEqual(
+            self.env["dms.directory"].search_count(
+                [("res_model", "=", "product.product"), ("res_id", "=", variant.id)]
+            ),
+            0,
+        )
+
+    def test_product_product_form_view_loads(self):
+        """The primary product.product variant form (id 688) composes the
+        product.template button-box + Media tab and must validate/load
+        without a ParseError (this is the bug's actual failure surface)."""
+        view = self.env.ref("product.product_normal_form_view")
+        arch = self.env["product.product"].get_view(view.id, "form")["arch"]
+        self.assertIn("action_sb_open_media", arch)
+        self.assertIn("dms_directory_ids", arch)
