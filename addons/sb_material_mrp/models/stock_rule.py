@@ -42,6 +42,24 @@ class StockRule(models.Model):
             po = self.env["purchase.order"].sudo().search(domain, limit=1)
             if not po or po.state != "draft":
                 continue
+            # I-1 (final review, 2026-07-26): `_run_buy` fires for EVERY buy
+            # procurement (MTO, sale-driven dropship, manual reordering,
+            # MRO/stationery...), not just material-component orderpoints --
+            # but the res.company help text implies material RFQs only.
+            # Scope the confirm: only auto-confirm when this is genuinely a
+            # MATERIAL RFQ, i.e. every real (non-section/note) line's
+            # product resolves to a southbrook.kitchen.material via the
+            # established resolver (product.product._resolve_material():
+            # variant-attribute path first, product_tmpl_id.material_id
+            # fallback). If ANY line does not resolve -- or the PO has no
+            # real product lines at all -- SKIP auto-confirm (fail-safe:
+            # leave draft). We never attempt to split a mixed PO.
+            material_lines = po.order_line.filtered(lambda l: not l.display_type)
+            if not material_lines or any(
+                not (line.product_id and line.product_id._resolve_material())
+                for line in material_lines
+            ):
+                continue
             if po.amount_total > company.sb_material_po_auto_confirm_max_amount:
                 continue
             if po.amount_total <= 0.0:
