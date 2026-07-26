@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+    <record id="res_config_settings_view_form_sb_material" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.sb.material</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="purchase.res_config_settings_view_form_purchase"/>
+        <field name="arch" type="xml">
+            <!-- Grep-verified against addons/purchase/views/res_config_settings_views.xml
+                 (block name="matrix_setting_container" is the last block inside
+                 the app[@name='purchase'] node in this build) -->
+            <xpath expr="//block[@name='matrix_setting_container']" position="after">
+                <block title="Southbrook Materials" name="sb_material_settings">
+                    <setting id="sb_material_po_auto_confirm_setting"
+                             help="Default OFF. Auto-confirm a draft material RFQ under the amount threshold below.">
+                        <field name="sb_material_po_auto_confirm"/>
+                        <div class="content-group" invisible="not sb_material_po_auto_confirm">
+                            <field name="sb_material_po_auto_confirm_max_amount"/>
+                        </div>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>

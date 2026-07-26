@@ -25,3 +25,5 @@ from . import test_orderpoint_sync
 from . import test_scheduler_draft_rfq
 # Phase-2b Task 4 — material-aware suggestion note on native PO line.
 from . import test_purchase_line_material_note
+# Phase-2b Task 5 — gated default-OFF auto-confirm-below-threshold.
+from . import test_auto_confirm_threshold
