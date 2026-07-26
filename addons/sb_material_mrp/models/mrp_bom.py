@@ -259,6 +259,33 @@ class MrpBomLine(models.Model):
     @api.depends(
         "material_demand_qty", "material_id",
         "material_id.waste_pct", "material_id.family_id",
+        # M-2 (final review, 2026-07-26) — retrigger when a family's
+        # default_waste_pct is edited IN PLACE (not just on family
+        # re-link, which "material_id.family_id" above already covers).
+        # `_effective_waste_pct()` also walks `family_id.parent_id` chains
+        # arbitrarily deep for the inherited-waste fallback; that
+        # multi-level parent walk can't be expressed as a static dotted
+        # depends (unbounded, data-dependent depth) — same documented
+        # limitation as the geometry-fallback note above
+        # (_compute_component_weight). This one-level dep covers the
+        # common case (editing the material's own family's pct).
+        "material_id.family_id.default_waste_pct",
+        # I-1 (final review, 2026-07-26) — the suggestion reads
+        # `product_id._select_seller().uom_yield_qty`, but only
+        # `product_id` (the relation itself) was in the depends, so
+        # entering the net-new vendor yield on an EXISTING supplierinfo —
+        # the feature's core post-deploy data-entry step — never
+        # retriggered this stored field. Add the seller fields actually
+        # read: the yield itself, plus every field `_select_seller`
+        # ranks sellers on (min_qty/price/date_start/date_end) and the
+        # seller's UoM (feeds suggested_purchase_uom_id below).
+        "product_id.seller_ids",
+        "product_id.seller_ids.uom_yield_qty",
+        "product_id.seller_ids.min_qty",
+        "product_id.seller_ids.price",
+        "product_id.seller_ids.date_start",
+        "product_id.seller_ids.date_end",
+        "product_id.seller_ids.product_uom_id",
         "product_id",
     )
     def _compute_suggested_purchase_qty(self):
@@ -275,7 +302,16 @@ class MrpBomLine(models.Model):
                 continue
             waste = mat._effective_waste_pct()
             gross = demand * (1.0 + waste / 100.0)
-            line.suggested_purchase_qty = float(math.ceil(gross / yield_qty))
+            # M-1 (final review, 2026-07-26) — round the ratio to 4dp before
+            # ceil. Raw float division on an exact-integer boundary (e.g.
+            # 5.94 / 2.97 == 2.0 mathematically) can land a hair above the
+            # integer (2.0000000000000004) due to binary FP representation,
+            # and `math.ceil` on that over-orders by a whole purchase unit.
+            # float_round to 4dp is well below any real yield/demand
+            # precision this module carries, so it never masks a genuine
+            # fractional ratio (e.g. 1.885 still rounds to 1.885 -> ceil 2).
+            ratio = float_round(gross / yield_qty, precision_digits=4)
+            line.suggested_purchase_qty = float(math.ceil(ratio))
             line.suggested_purchase_uom_id = (
                 seller.product_uom_id or line.product_id.uom_id
             ).id
@@ -651,15 +687,35 @@ class MrpBomLine(models.Model):
         canonical demand unit (Phase-2 Task 3 — see field help for the full
         rule). Computation rule (exact, per weight_source):
 
-        - density_volume / density_area: area_m2 = this line's product_qty-
-          weighted SHARE of the carcass volume (`_sb_component_share_volume_
-          mm3`, the same sibling-attribution-aware volume `component_volume_
-          mm3` already uses) / effective_thickness_mm / 1_000_000.0, where
+        - density_volume / density_area: area_m2 = (this line's product_qty-
+          weighted SHARE of the carcass volume, `_sb_component_share_volume_
+          mm3` — the same sibling-attribution-aware PER-UNIT volume
+          `component_volume_mm3` already uses) * line.product_qty /
+          effective_thickness_mm / 1_000_000.0 — the `* line.product_qty`
+          mirrors the weight path (`_weight_for_qty`) and the linear branch
+          below, both of which multiply their per-unit quantity through;
+          the share helper's contract is explicitly PER-UNIT (see its
+          docstring), so the caller must apply product_qty (C-1 fix, final
+          review 2026-07-26 — previously omitted here, silently
+          under-counting demand on any density line with product_qty != 1).
           effective_thickness_mm is material.thickness_mm when > 0, else the
           3/4" cut-constant fallback (`_SB_DEFAULT_SHEET_THICKNESS_MM`,
           19.05 — same cut-constant family `_panel_volume_mm3` already
           uses). 0.0 when the share volume is 0.0 (honesty — geometry
           genuinely absent).
+
+          M-3 (doc only, final review 2026-07-26): `density_area` lines are
+          NOT members of the `density_volume`-only sibling set
+          (`_sb_density_volume_sibling_total_qty` filters on
+          `weight_source == "density_volume"`), so a `density_area` line's
+          demand is always standalone — its `total_qty` falls back to its
+          own `product_qty` rather than being shared with any
+          `density_volume` siblings on the same BoM. Accepted as-is:
+          `density_area` is rare and already produces 0.0 weight in
+          `_compute_component_weight` today (see `_weight_for_qty`'s
+          density_area branch); the filter is deliberately NOT changed here
+          to avoid altering the locked `density_volume` attribution
+          invariant this review is closing out.
         - linear_density: resolve the cabinet geometry exactly as
           `_panel_volume_mm3` does (`_sb_resolve_geo`), then length_m =
           `_compute_panel_dimensions(**geo)["edge_banding_length_mm"] /
@@ -667,26 +723,43 @@ class MrpBomLine(models.Model):
         - per_unit / none / no material_id: material_demand_qty =
           line.product_qty (straight pass-through — the native count model
           is already correct for hardware).
+
+        M-4 (perf, final review 2026-07-26): a single `dims_cache` dict is
+        threaded through this whole compute pass (mirroring
+        `_compute_component_weight`'s `dims_cache`) so lines sharing a
+        `bom_id`/geometry hit the cache instead of re-solving
+        `_compute_panel_dimensions` once per line — for both the density
+        share wrapper AND the linear-branch's direct call. Behavior is
+        byte-identical: a cache hit returns the exact same `dims` a fresh
+        call would produce (see `_panel_volume_mm3`'s cache docstring).
         """
         Bom = self.env["mrp.bom"]
         has_geo = hasattr(Bom, "_compute_panel_dimensions")
+        dims_cache = {}
         for line in self:
             mat = line.material_id
             src = mat.weight_source if mat else "none"
             if src in ("density_volume", "density_area"):
-                vol = line._sb_component_share_volume_mm3(line)
+                vol = line._sb_component_share_volume_mm3(line, _dims_cache=dims_cache)
                 if not vol:
                     line.material_demand_qty = 0.0
                     continue
                 th = mat.thickness_mm if mat.thickness_mm > 0 else \
                     line._SB_DEFAULT_SHEET_THICKNESS_MM
-                line.material_demand_qty = vol / th / 1_000_000.0
+                # C-1 fix (final review, 2026-07-26): `vol` is the PER-UNIT
+                # share (see docstring above) — multiply by product_qty,
+                # exactly like the weight path and the linear branch below.
+                line.material_demand_qty = vol * line.product_qty / th / 1_000_000.0
             elif src == "linear_density":
                 geo = line._sb_resolve_geo() if has_geo else {}
                 if not geo:
                     line.material_demand_qty = 0.0
                     continue
-                dims = Bom._compute_panel_dimensions(**geo)
+                cache_key = tuple(sorted(geo.items()))
+                dims = dims_cache.get(cache_key)
+                if dims is None:
+                    dims = Bom._compute_panel_dimensions(**geo)
+                    dims_cache[cache_key] = dims
                 length_mm = dims.get("edge_banding_length_mm") or 0
                 line.material_demand_qty = length_mm / 1000.0 * line.product_qty
             else:
