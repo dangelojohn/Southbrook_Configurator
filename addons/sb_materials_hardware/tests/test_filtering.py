@@ -130,3 +130,38 @@ class TestFilteringEndToEnd(TransactionCase):
         self.assertNotIn("TEST E2E Coarse 4x40", names)   # length 40 < 45
         self.assertNotIn("TEST E2E Euro 6.3x13", names)   # wrong thread type
         self.assertEqual(total, 1)
+
+    def test_max_only_range_excludes_unset_but_keeps_genuine_zero(self):
+        """A max-only range facet must exclude a row where the field was
+        never set, while still returning a row whose value is a genuine
+        stored 0 — the bug this whole fix wave is about (F2). `length <= 50`
+        naively matches unset rows too, because Odoo's domain-to-SQL layer
+        ORs in "field IS NULL" whenever the field's falsy value (0 for
+        Float/Integer/Monetary) itself satisfies the comparison. Go through
+        get_catalog(), the real entry point, not `_facet_domain` directly.
+        """
+        Tmpl = self.env["product.template"]
+        Tmpl.create({
+            "name": "TEST E2E Zero-length screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            "x_southbrook_screw_length_mm": 0.0,
+        })
+        Tmpl.create({
+            "name": "TEST E2E In-range screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            "x_southbrook_screw_length_mm": 25.0,
+        })
+        Tmpl.create({
+            "name": "TEST E2E Unset-length screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            # x_southbrook_screw_length_mm intentionally left unset -> NULL
+        })
+        names, total = self._names(
+            {"x_southbrook_screw_length_mm": {"max": 50.0}})
+        self.assertIn("TEST E2E Zero-length screw", names)
+        self.assertIn("TEST E2E In-range screw", names)
+        self.assertNotIn("TEST E2E Unset-length screw", names)
+        self.assertEqual(total, len(names))

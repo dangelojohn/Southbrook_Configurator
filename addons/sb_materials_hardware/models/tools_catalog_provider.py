@@ -5,6 +5,8 @@ This is the ONLY file that knows about x_southbrook_* fields or
 southbrook.tool.category. Phase 2's hardware provider is a sibling file.
 """
 from odoo import api, models
+from odoo.fields import Domain
+from odoo.tools import SQL
 
 PROVENANCE = (
     "Read-only view of the tool and consumable master. Specs are optional — "
@@ -345,6 +347,8 @@ class ToolsCatalogProvider(models.AbstractModel):
                 continue
             if isinstance(selection, dict):          # range
                 low, high = selection.get("min"), selection.get("max")
+                if low is None and high is None:
+                    continue
                 # F2: on a nullable Float/Integer/Monetary column, Odoo's
                 # domain-to-SQL layer ORs in "field IS NULL" for a `<=`/`>=`
                 # leaf whenever the field's falsy value (0) itself satisfies
@@ -353,28 +357,53 @@ class ToolsCatalogProvider(models.AbstractModel):
                 # (max-only, or a min <= 0) leaves the null-acceptance in
                 # place for the whole AND'ed domain, so rows with NO value
                 # recorded come back alongside genuine matches.
-                null_would_match = True
-                if low is not None:
-                    domain.append((field_name, ">=", low))
-                    null_would_match = null_would_match and low <= 0
-                if high is not None:
-                    domain.append((field_name, "<=", high))
-                    null_would_match = null_would_match and high >= 0
-                if (low is not None or high is not None) and null_would_match:
-                    # There is no clean domain leaf for "IS NOT NULL, but a
-                    # genuine 0 still counts" on these field types: the only
-                    # available leaf, `(field_name, "!=", False)`, compiles
-                    # to `NOT IN (0.0)` (falsy_value=0), which also excludes
-                    # a row whose value really is 0 — the same trap as the
-                    # facet min/max aggregate (see _facets(), finding F1).
-                    # Deliberate trade-off: a range filter must never surface
-                    # unset rows, even at the cost of also hiding a real
-                    # zero under this one filter shape (max-only, or a
-                    # min <= 0). Min-only and both-bounds-with-min>0 don't
-                    # need this — a positive ">=" leaf already fails outright
-                    # (rather than OR-ing in IS NULL) for a NULL column, so
-                    # the AND with any other leaf already excludes it.
-                    domain.append((field_name, "!=", False))
+                null_would_match = ((low is None or low <= 0)
+                                     and (high is None or high >= 0))
+                if not null_would_match:
+                    # A plain leaf already excludes NULL outright here (a
+                    # positive ">=" fails a NULL column rather than OR-ing
+                    # in IS NULL), so the simple leaves are already correct.
+                    if low is not None:
+                        domain.append((field_name, ">=", low))
+                    if high is not None:
+                        domain.append((field_name, "<=", high))
+                    continue
+                # Refuted compromise: the previous fix here used
+                # `(field_name, "!=", False)` to force NULL exclusion, but
+                # that compiles to `NOT IN (0.0)` (falsy_value=0 on these
+                # field types), which also drops a row whose value really
+                # is 0 — the same trap as the facet min/max aggregate (see
+                # _facets(), finding F1). No plain domain leaf can express
+                # "IS NOT NULL, but a genuine 0 still counts", because every
+                # leaf gets rewritten by the same per-field falsy-value
+                # machinery. Domain.custom(to_sql=...) bypasses that
+                # rewriting entirely and emits the SQL directly — nested
+                # under a relational "any" so it plugs into an ordinary
+                # domain list without special-casing elsewhere (mirrors
+                # Odoo core's own use of this pattern for a predicate plain
+                # operators can't express: purchase.order._search_is_late,
+                # addons/purchase/models/purchase_order.py:372-388).
+                # `product_tmpl_id` is the many2one _rows already filters
+                # product.product through (it prefixes every plain tuple
+                # leaf with "product_tmpl_id.%s" for the same reason: the
+                # spec field lives on product.template, not product.product,
+                # and _rows's domain is built for the latter). A Domain
+                # object is not a tuple, so it skips that prefixing and is
+                # appended to _rows's domain as-is (see _rows) — it must
+                # therefore name the relation itself. This only resolves
+                # correctly against a model that has a product_tmpl_id
+                # field (product.product); a direct product.template query
+                # would need this same leaf unwrapped one level.
+                def _to_sql(model, alias, query, fn=field_name, lo=low, hi=high):
+                    sql_field = model._field_to_sql(alias, fn, query)
+                    parts = [SQL("%s IS NOT NULL", sql_field)]
+                    if lo is not None:
+                        parts.append(SQL("%s >= %s", sql_field, lo))
+                    if hi is not None:
+                        parts.append(SQL("%s <= %s", sql_field, hi))
+                    return SQL(" AND ").join(parts)
+                domain.append(
+                    Domain("product_tmpl_id", "any", Domain.custom(to_sql=_to_sql)))
                 continue
             values = [v for v in (selection or []) if v not in (None, "")]
             if not values:
