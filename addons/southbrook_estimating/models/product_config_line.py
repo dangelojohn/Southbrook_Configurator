@@ -173,6 +173,42 @@ class ProductConfigSession(models.Model):
         "SB-VANITY":        ("vanity",    2,    0,      762, 800,  533),
         "SB-ACCESSORY":     ("accessory", 0,    0,      600, 762,   18),
         "SB-WORKTOP":       ("worktop",   0,    0,     1200,  25,  600),
+        # ------------------------------------------------------------
+        # Repair Wave 2, Upgrade 2 — live shorthand `default_code`s found
+        # on live BoM'd templates that don't match any row above, so
+        # `_sb_backfill_geometry()` honestly left them at 0/0/0. Each
+        # row below REUSES the exact H/D/family/door/drawer values of
+        # its mapped existing row (never invented); only width is
+        # overridden where the live product name states a specific
+        # width, using this table's own 24"/30" convention (609/762,
+        # same values as attr_width's value_mm for 24in/30in above —
+        # see product_product.py's "24-36in (~609-914mm)" door-count
+        # comment for the same 24in=609mm anchor).
+        # ------------------------------------------------------------
+        # B24 "B24 Base Cabinet" -> SB-BASE-2DR, width=24in.
+        "B24":              ("base",      2,    0,      609, 762,  609),
+        # DB24 "DB24 3-Drawer Base" -> SB-DRAWER, width=24in (already
+        # SB-DRAWER's own width; kept explicit per the live mapping).
+        "DB24":             ("drawer",    0,    3,      609, 762,  609),
+        # SB-BASE-3DRW "Base Cabinet - 3-Drawer Stack" -> SB-DRAWER,
+        # width left at SB-DRAWER's own table width (no width override
+        # given for this code).
+        "SB-BASE-3DRW":     ("drawer",    0,    3,      609, 762,  609),
+        # SB30 "SB30 Sink Base 30in" -> SB-SINK-BASE, width=30in
+        # (already SB-SINK-BASE's own width; kept explicit).
+        "SB30":             ("sink",      2,    0,      762, 762,  609),
+        # T24 "T24 Tall Pantry Cabinet" -> SB-TALL-PANTRY, width=24in.
+        "T24":              ("tall",      2,    0,      609, 2100, 609),
+        # W24 "W24 Wall Cabinet" -> SB-WALL-2DR, width=24in.
+        "W24":              ("wall",      2,    0,      609, 762,  350),
+        # W24-2 "W24-2 Wall Cabinet 2 Door" -> SB-WALL-2DR, width=24in.
+        "W24-2":            ("wall",      2,    0,      609, 762,  350),
+        # FP3 "FP3 Filler Panel 3in" -- DELIBERATELY EXCLUDED. A filler
+        # panel has no carcass (no family/door/drawer/H/D to honestly
+        # assign); per the honesty contract this code is left OUT of
+        # the table so `_sb_backfill_geometry()` continues to leave it
+        # at 0/0/0 rather than fabricate carcass dimensions for a part
+        # that isn't a cabinet.
     }
 
     def _extract_cabinet_inputs(self):
