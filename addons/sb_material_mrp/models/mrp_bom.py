@@ -637,6 +637,14 @@ class MrpBomLine(models.Model):
         "bom_id.product_id.sb_width_mm",
         "bom_id.product_id.sb_height_mm",
         "bom_id.product_id.sb_depth_mm",
+        # T3 review fix: edge_banding_length_mm (linear_density branch)
+        # varies with finished_sides; and the density_volume/area branch's
+        # _sb_component_share_volume_mm3 is sibling-qty-weighted, so it must
+        # recompute when a sibling line's qty/material changes — mirror the
+        # deps _compute_component_weight already carries for the same share.
+        "bom_id.product_id.sb_finished_sides",
+        "bom_id.bom_line_ids.product_qty",
+        "bom_id.bom_line_ids.material_id",
     )
     def _compute_material_demand_qty(self):
         """Consumption of this component per this BoM, in the material's
