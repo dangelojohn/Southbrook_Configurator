@@ -8,10 +8,16 @@ class TestRows(TransactionCase):
         super().setUp()
         self.Provider = self.env["materials.catalog.provider"]
         self.cat = self.env.ref("southbrook_mrp_kitchen_tools.cat_screws")
-        self.env["materials.catalog.column"].create({
+        # Reuse seeded col_screws_length rather than creating a duplicate
+        # (category, field_name) pair which would violate the uniqueness constraint.
+        self.env["materials.catalog.column"].search([
+            ("category_id", "=", self.cat.id),
+            ("field_name", "=", "x_southbrook_screw_length_mm")
+        ]) or self.env["materials.catalog.column"].create({
             "name": "Length (mm)", "category_id": self.cat.id,
             "field_name": "x_southbrook_screw_length_mm", "align": "right",
         })
+        # Use a field not in the seeded declarations to avoid conflict
         self.env["materials.catalog.column"].create({
             "name": "Material Grade", "category_id": self.cat.id,
             "field_name": "x_southbrook_material_grade", "align": "left",

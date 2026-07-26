@@ -56,7 +56,11 @@ class TestFacets(TransactionCase):
             "name": "TEST Confirmat", "x_southbrook_tool_category_id": cat.id,
             "x_southbrook_thread_type": "confirmat",
         })
-        self.Facet.create({
+        # Reuse the seeded facet_screws_thread instead of creating a duplicate
+        facet = self.env["materials.catalog.facet"].search([
+            ("category_id", "=", cat.id),
+            ("field_name", "=", "x_southbrook_thread_type")
+        ]) or self.Facet.create({
             "name": "Thread type", "category_id": cat.id,
             "field_name": "x_southbrook_thread_type", "facet_type": "enum",
         })
@@ -74,7 +78,11 @@ class TestFacets(TransactionCase):
                 "x_southbrook_tool_category_id": cat.id,
                 "x_southbrook_screw_length_mm": length,
             })
-        self.Facet.create({
+        # Reuse the seeded facet_screws_length instead of creating a duplicate
+        facet = self.env["materials.catalog.facet"].search([
+            ("category_id", "=", cat.id),
+            ("field_name", "=", "x_southbrook_screw_length_mm")
+        ]) or self.Facet.create({
             "name": "Length", "category_id": cat.id,
             "field_name": "x_southbrook_screw_length_mm", "facet_type": "range",
         })
@@ -109,21 +117,22 @@ class TestFacets(TransactionCase):
         self.env["product.template"].create({
             "name": "TEST Confirmat Dedup",
             "x_southbrook_tool_category_id": child.id,
-            "x_southbrook_thread_type": "confirmat",
+            "x_southbrook_drive_type": "phillips",
+        })
+        # Use drive_type instead of thread_type to avoid collision with seeded facet_screws_thread
+        self.Facet.create({
+            "name": "Drive type (ancestor label)", "category_id": parent.id,
+            "field_name": "x_southbrook_drive_type", "facet_type": "enum",
         })
         self.Facet.create({
-            "name": "Thread type (ancestor label)", "category_id": parent.id,
-            "field_name": "x_southbrook_thread_type", "facet_type": "enum",
-        })
-        self.Facet.create({
-            "name": "Thread type (child label)", "category_id": child.id,
-            "field_name": "x_southbrook_thread_type", "facet_type": "enum",
+            "name": "Drive type (child label)", "category_id": child.id,
+            "field_name": "x_southbrook_drive_type", "facet_type": "enum",
         })
         payload = self.Provider.get_catalog(scope="tools", category_id=child.id)
         matches = [f for f in payload["facets"]
-                   if f["key"] == "x_southbrook_thread_type"]
+                   if f["key"] == "x_southbrook_drive_type"]
         self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0]["label"], "Thread type (child label)")
+        self.assertEqual(matches[0]["label"], "Drive type (child label)")
 
     def test_m2m_facet_sorts_alphabetically_by_label(self):
         """Relation-valued ("value" is a database id) facets must sort by

@@ -23,29 +23,33 @@ class TestColumns(TransactionCase):
         self.assertIn("default_code", keys)
 
     def test_declared_column_appears(self):
+        # Use a field name not in seeded declarations to avoid uniqueness conflict
         self.Column.create({
-            "name": "Length (mm)", "category_id": self.parent.id,
-            "field_name": "x_southbrook_screw_length_mm", "align": "right",
+            "name": "Material Grade", "category_id": self.parent.id,
+            "field_name": "x_southbrook_material_grade", "align": "left",
         })
-        self.assertIn("x_southbrook_screw_length_mm", self._keys(self.parent))
+        self.assertIn("x_southbrook_material_grade", self._keys(self.parent))
 
     def test_ancestor_columns_inherited_by_child(self):
+        # Use a field name not in seeded declarations to avoid uniqueness conflict
         self.Column.create({
-            "name": "Length (mm)", "category_id": self.parent.id,
-            "field_name": "x_southbrook_screw_length_mm",
+            "name": "Material Grade", "category_id": self.parent.id,
+            "field_name": "x_southbrook_material_grade",
         })
-        self.assertIn("x_southbrook_screw_length_mm", self._keys(self.child))
+        self.assertIn("x_southbrook_material_grade", self._keys(self.child))
 
     def test_child_declaration_overrides_ancestor_label(self):
+        # Use a field name not in seeded declarations to avoid uniqueness conflict
+        # on the parent, but test the override mechanism on (cat_screw_confirmat, x_southbrook_screw_length_mm)
         self.Column.create({
-            "name": "Length (mm)", "category_id": self.parent.id,
-            "field_name": "x_southbrook_screw_length_mm",
+            "name": "Material Grade", "category_id": self.parent.id,
+            "field_name": "x_southbrook_material_grade",
         })
         self.Column.create({
-            "name": "Screw length", "category_id": self.child.id,
-            "field_name": "x_southbrook_screw_length_mm",
+            "name": "Screw material", "category_id": self.child.id,
+            "field_name": "x_southbrook_material_grade",
         })
         payload = self.Provider.get_catalog(
             scope="tools", category_id=self.child.id)
         labels = {c["key"]: c["label"] for c in payload["columns"]}
-        self.assertEqual(labels["x_southbrook_screw_length_mm"], "Screw length")
+        self.assertEqual(labels["x_southbrook_material_grade"], "Screw material")

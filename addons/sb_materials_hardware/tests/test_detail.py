@@ -8,7 +8,12 @@ class TestDetail(TransactionCase):
         super().setUp()
         self.Provider = self.env["materials.catalog.provider"]
         self.cat = self.env.ref("southbrook_mrp_kitchen_tools.cat_adhesives")
-        self.env["materials.catalog.column"].create({
+        # Reuse seeded col_adh_open instead of creating a duplicate
+        # (category, field_name) pair which would violate the uniqueness constraint.
+        self.env["materials.catalog.column"].search([
+            ("category_id", "=", self.cat.id),
+            ("field_name", "=", "x_southbrook_open_time_min")
+        ]) or self.env["materials.catalog.column"].create({
             "name": "Open time (min)", "category_id": self.cat.id,
             "field_name": "x_southbrook_open_time_min", "align": "right",
         })
