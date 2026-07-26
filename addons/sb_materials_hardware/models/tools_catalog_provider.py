@@ -142,8 +142,14 @@ class ToolsCatalogProvider(models.AbstractModel):
         """Facet chips for the category, declared via materials.catalog.facet.
 
         Declarations from the selected category and all its ancestors apply,
-        same rule as _columns. Each facet's values are built with ONE grouped
-        query (or one search_read for range), never a query per value.
+        same rule as _columns — INCLUDING the nearest-wins dedupe: the same
+        field_name can legitimately be declared as a facet on both an
+        ancestor and the selected category (the uniqueness constraint is
+        scoped per category_id), and the frontend keys chips on "key", so
+        only the nearest declaration may reach the payload.
+
+        Each facet's values are built with ONE grouped query (or one
+        aggregate query for range), never a query per value.
         """
         if not category:
             return []
@@ -153,23 +159,39 @@ class ToolsCatalogProvider(models.AbstractModel):
         if not declared:
             return []
 
+        # Nearest declaration wins: order by depth of its category in `ids`,
+        # then collapse into a dict keyed on field_name (mirrors _columns).
+        depth = {cat_id: i for i, cat_id in enumerate(ids)}
+        by_field = {}
+        for dec in declared.sorted(
+                lambda d: (depth.get(d.category_id.id, -1), d.sequence, d.id)):
+            by_field[dec.field_name] = dec
+
         Tmpl = self.env["product.template"]
         tmpl_domain = [("x_southbrook_tool_category_id", "child_of", category.id)]
         out = []
-        for dec in declared:
+        for dec in by_field.values():
             field = Tmpl._fields.get(dec.field_name)
             if not field:
                 continue
             entry = {"key": dec.field_name, "label": dec.name,
                      "type": dec.facet_type, "values": []}
             if dec.facet_type == "range":
-                rows = Tmpl.search_read(
+                # Aggregate in Postgres — a bare aggregate query (no GROUP
+                # BY, since groupby=[]) always returns exactly one row, even
+                # when zero records match. Confirmed against this build's
+                # _read_group: NULL aggregates postprocess to False, which we
+                # normalise to None — the "no data" sentinel must not be
+                # confused with a legitimate all-zero dataset.
+                grouped = Tmpl._read_group(
                     tmpl_domain + [(dec.field_name, "!=", False)],
-                    [dec.field_name])
-                nums = [r[dec.field_name] for r in rows
-                        if isinstance(r[dec.field_name], (int, float))]
-                entry["min"] = min(nums) if nums else 0.0
-                entry["max"] = max(nums) if nums else 0.0
+                    groupby=[],
+                    aggregates=["%s:min" % dec.field_name,
+                                "%s:max" % dec.field_name],
+                )
+                raw_min, raw_max = grouped[0] if grouped else (False, False)
+                entry["min"] = raw_min if raw_min is not False else None
+                entry["max"] = raw_max if raw_max is not False else None
             elif dec.facet_type == "flag":
                 entry["values"] = [{"value": True, "label": dec.name,
                                     "count": Tmpl.search_count(
@@ -196,14 +218,27 @@ class ToolsCatalogProvider(models.AbstractModel):
                             ).get(val, val)
                         raw.append({"value": val, "label": label,
                                     "count": count})
-                entry["values"] = self._order_values(raw)
+                # Relation-valued facets ("value" is a database id) must
+                # sort alphabetically by label, never numerically — an id
+                # is always numeric-parseable, so the numeric-aware ordering
+                # would otherwise sort chips by arbitrary internal id order.
+                entry["values"] = self._order_values(
+                    raw, alpha=(dec.facet_type == "m2m"))
             out.append(entry)
         return out
 
     @api.model
-    def _order_values(self, raw):
-        """Numeric-aware ordering; unparseable values keep their label and
-        sort last."""
+    def _order_values(self, raw, alpha=False):
+        """Order facet values for display.
+
+        Numeric-aware by default: unparseable values keep their label and
+        sort last (see _numeric_prefix). Pass alpha=True for relation-valued
+        facets (m2m) — their "value" is a database id, which would otherwise
+        parse as a number and sort by arbitrary internal id order instead of
+        by label.
+        """
+        if alpha:
+            return sorted(raw, key=lambda item: str(item["label"]))
         numbered, unnumbered = [], []
         for item in raw:
             n = self._numeric_prefix(item["value"])
