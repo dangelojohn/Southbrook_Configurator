@@ -5,3 +5,5 @@ from . import test_panel_volume
 from . import test_production_totals
 from . import test_weight_line
 from . import test_weight_rollup_multilevel
+# Repair Wave 3 — end-to-end money test: template material_id fallback.
+from . import test_component_material_fallback_e2e
