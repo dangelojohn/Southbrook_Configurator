@@ -1,2 +1,2 @@
 # SPDX-License-Identifier: LGPL-3.0-only
-from . import test_install, test_declarations, test_provider_contract, test_category_tree
+from . import test_install, test_declarations, test_provider_contract, test_category_tree, test_columns

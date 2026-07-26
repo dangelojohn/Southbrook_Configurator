@@ -11,6 +11,12 @@ PROVENANCE = (
     "an absent value is shown as a dash, never as zero."
 )
 
+GENERIC_COLUMNS = [
+    {"key": "name", "label": "Description", "align": "left", "sortable": True},
+    {"key": "default_code", "label": "Reference", "align": "left",
+     "sortable": True},
+]
+
 
 class ToolsCatalogProvider(models.AbstractModel):
     _name = "tools.catalog.provider"
@@ -29,7 +35,7 @@ class ToolsCatalogProvider(models.AbstractModel):
             "scope": scope,
             "categories": self._categories(),
             "facets": [],
-            "columns": [],
+            "columns": self._columns(category),
             "rows": [],
             "detail": {},
             "total": 0,
@@ -91,3 +97,42 @@ class ToolsCatalogProvider(models.AbstractModel):
             "count": rollup.get(c.id, 0),
             "has_children": c.id in child_ids,
         } for c in cats.sorted(lambda r: (r.complete_name or ""))]
+
+    @api.model
+    def _ancestor_ids(self, category):
+        """Category's own id plus every ancestor id, nearest LAST.
+
+        parent_path is '/1/7/33/' — root first, self last.
+        """
+        if not category:
+            return []
+        return [int(x) for x in (category.parent_path or "").strip("/").split("/") if x]
+
+    @api.model
+    def _columns(self, category):
+        """Columns for the category, generics first, then declared ones.
+
+        Declarations from the selected category and all its ancestors apply.
+        When the same field_name is declared at two levels, the nearest
+        declaration wins — a child's label overrides its ancestor's.
+        """
+        cols = list(GENERIC_COLUMNS)
+        if not category:
+            return cols
+        ids = self._ancestor_ids(category)
+        if not ids:
+            return cols
+        declared = self.env["materials.catalog.column"].search(
+            [("category_id", "in", ids)])
+        # Nearest declaration wins: order by depth of its category in `ids`.
+        depth = {cat_id: i for i, cat_id in enumerate(ids)}
+        by_field = {}
+        for dec in declared.sorted(
+                lambda d: (depth.get(d.category_id.id, -1), d.sequence, d.id)):
+            by_field[dec.field_name] = {
+                "key": dec.field_name,
+                "label": dec.name,
+                "align": dec.align,
+                "sortable": dec.sortable,
+            }
+        return cols + list(by_field.values())
