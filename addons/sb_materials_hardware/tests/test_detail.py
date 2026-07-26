@@ -42,7 +42,7 @@ class TestDetail(TransactionCase):
     def test_hazard_badge_present(self):
         """Only x_southbrook_hazardous is set on this fixture — assert the
         other badge fields are absent too, not just that the set one shows
-        up (finding F9). Without the negative assertion, a regression to
+        up. Without the negative assertion, a regression to
         "show every badge whose field exists" would pass unnoticed.
         """
         detail = self.Provider.get_detail(self.product.id)
@@ -59,6 +59,34 @@ class TestDetail(TransactionCase):
 
     def test_unknown_product_degrades(self):
         detail = self.Provider.get_detail(-1)
+        self.assertFalse(detail["ok"])
+
+    def test_product_with_no_tool_category_is_out_of_scope(self):
+        """get_detail is a TOOLS-catalog endpoint. A product with no
+        x_southbrook_tool_category_id at all must degrade rather than serve
+        its (unrelated) vendor/stock/lifecycle engineering rail — the spec
+        grid was already correctly empty for such a product (no category ->
+        no declared columns), but ENGINEERING_FIELDS was being read
+        unconditionally, so any product id on the instance, tool or not,
+        returned a fully populated engineering rail.
+        """
+        uncategorized = self.env["product.template"].create({
+            "name": "TEST No-category widget",
+        })
+        detail = self.Provider.get_detail(
+            uncategorized.product_variant_ids[0].id)
+        self.assertFalse(detail["ok"])
+        self.assertFalse(detail["engineering"])
+        self.assertFalse(detail["specs"])
+
+    def test_archived_product_degrades(self):
+        """browse()/exists() both ignore the `active` flag, so an archived
+        product still satisfies `exists()` even though get_catalog's own
+        search()-based listing would never surface it again. A stale link
+        to a discontinued item must not keep working forever.
+        """
+        self.product.write({"active": False})
+        detail = self.Provider.get_detail(self.product.id)
         self.assertFalse(detail["ok"])
 
     def test_null_vs_zero_and_unset_char_via_get_detail(self):

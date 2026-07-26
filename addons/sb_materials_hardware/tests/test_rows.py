@@ -99,16 +99,76 @@ class TestRows(TransactionCase):
         self.assertIn("TEST Pocket screw",
                       {r["name"] for r in self._payload(search="SB-PKT")["rows"]})
 
+    def test_search_underscore_is_a_literal_not_a_wildcard(self):
+        """`_` is a legitimate character in a part number and must not be
+        treated as "match any single character" — a search for a literal
+        underscore must match the row that has one and NOT a row that
+        merely has some other character in the same position.
+        """
+        Tmpl = self.env["product.template"]
+        Tmpl.create({
+            "name": "TEST Underscore Part",
+            "default_code": "SBK-TOOL-C_B",
+            "x_southbrook_tool_category_id": self.cat.id,
+        })
+        Tmpl.create({
+            "name": "TEST NonUnderscore Part",
+            "default_code": "SBK-TOOL-CXB",
+            "x_southbrook_tool_category_id": self.cat.id,
+        })
+        names = {r["name"] for r in self._payload(search="C_B")["rows"]}
+        self.assertIn("TEST Underscore Part", names)
+        self.assertNotIn("TEST NonUnderscore Part", names)
+
+    def test_search_percent_is_a_literal_not_a_wildcard(self):
+        """A bare `%` (or a term containing one) must not turn into
+        "match anything" — only a row that genuinely contains that literal
+        substring should match.
+        """
+        Tmpl = self.env["product.template"]
+        Tmpl.create({
+            "name": "TEST Percent Part",
+            "default_code": "SB-50%-TRIM",
+            "x_southbrook_tool_category_id": self.cat.id,
+        })
+        Tmpl.create({
+            "name": "TEST NonPercent Part",
+            "default_code": "SB-50X-TRIM",
+            "x_southbrook_tool_category_id": self.cat.id,
+        })
+        names = {r["name"] for r in self._payload(search="50%")["rows"]}
+        self.assertIn("TEST Percent Part", names)
+        self.assertNotIn("TEST NonPercent Part", names)
+
+    def test_search_term_is_trimmed_of_leading_and_trailing_whitespace(self):
+        Tmpl = self.env["product.template"]
+        Tmpl.create({
+            "name": "TEST Padded Panel Match",
+            "x_southbrook_tool_category_id": self.cat.id,
+        })
+        names = {r["name"] for r in self._payload(search="  Panel  ")["rows"]}
+        self.assertIn("TEST Padded Panel Match", names)
+
+    def test_limit_zero_follows_odoo_search_semantics_and_returns_everything(self):
+        """`limit=0` is documented (get_catalog's docstring) to keep plain
+        Odoo search() semantics — "no limit" — rather than being
+        special-cased to mean "zero rows". Pin that choice with a test so a
+        future change is a deliberate decision, not an accident.
+        """
+        payload = self._payload(limit=0)
+        self.assertEqual(len(payload["rows"]), payload["total"])
+        self.assertEqual(payload["total"], 3)
+
     def test_total_is_count_before_pagination(self):
         payload = self._payload(limit=1)
         self.assertEqual(len(payload["rows"]), 1)
         # Fixture pins this exactly (self.a, self.b, self.c) — a fixed
-        # count deserves an exact assertion, not a lower bound (finding F10).
+        # count deserves an exact assertion, not a lower bound.
         self.assertEqual(payload["total"], 3)
 
     def test_offset_pagination_returns_a_different_correctly_ordered_row(self):
         """offset=1 must return the next row in `default_code, name` order,
-        not repeat offset=0's row or silently return nothing (finding F11).
+        not repeat offset=0's row or silently return nothing.
         """
         first_page = self._payload(limit=1, offset=0)["rows"]
         second_page = self._payload(limit=1, offset=1)["rows"]
@@ -122,7 +182,7 @@ class TestRows(TransactionCase):
     def test_many2one_column_renders_display_name_not_tuple_or_id(self):
         """_rows() must route relation values through the same normalizer
         _build_detail() uses, so a declared many2one column never renders
-        Odoo's raw (id, display_name) read()-tuple or a bare id (finding F4).
+        Odoo's raw (id, display_name) read()-tuple or a bare id.
         """
         vendor = self.env["res.partner"].create({"name": "TEST Vendor Co"})
         self.env["materials.catalog.column"].create({

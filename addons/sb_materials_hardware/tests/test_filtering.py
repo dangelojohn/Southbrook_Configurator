@@ -70,8 +70,8 @@ class TestFilteringEndToEnd(TransactionCase):
     """_rows() re-wraps every `_facet_domain` leaf as
     `product_tmpl_id.<field>` before applying it to product.product — the
     tests above apply the domain builder's output directly to
-    product.template, unprefixed, so that transform was never exercised
-    (finding F7). If it broke, every facet click would silently return
+    product.template, unprefixed, so that transform was never exercised.
+    If it broke, every facet click would silently return
     everything while all the facet/filter tests above stayed green. These
     go through the real entry point, get_catalog(), instead.
     """
@@ -134,11 +134,11 @@ class TestFilteringEndToEnd(TransactionCase):
     def test_max_only_range_excludes_unset_but_keeps_genuine_zero(self):
         """A max-only range facet must exclude a row where the field was
         never set, while still returning a row whose value is a genuine
-        stored 0 — the bug this whole fix wave is about (F2). `length <= 50`
-        naively matches unset rows too, because Odoo's domain-to-SQL layer
-        ORs in "field IS NULL" whenever the field's falsy value (0 for
-        Float/Integer/Monetary) itself satisfies the comparison. Go through
-        get_catalog(), the real entry point, not `_facet_domain` directly.
+        stored 0. `length <= 50` naively matches unset rows too, because
+        Odoo's domain-to-SQL layer ORs in "field IS NULL" whenever the
+        field's falsy value (0 for Float/Integer/Monetary) itself satisfies
+        the comparison. Go through get_catalog(), the real entry point, not
+        `_facet_domain` directly.
         """
         Tmpl = self.env["product.template"]
         Tmpl.create({
@@ -164,4 +164,79 @@ class TestFilteringEndToEnd(TransactionCase):
         self.assertIn("TEST E2E Zero-length screw", names)
         self.assertIn("TEST E2E In-range screw", names)
         self.assertNotIn("TEST E2E Unset-length screw", names)
+        self.assertEqual(total, len(names))
+
+    def test_min_only_range_with_zero_lower_bound_excludes_unset_but_keeps_zero(self):
+        """The same NULL-vs-zero danger zone the code's own comment names
+        also applies to a MIN-only range whose bound is exactly 0: `length
+        >= 0` is satisfied by NULL's coerced falsy value (0) just as
+        `length <= 50` was in the max-only case above, so a min-only leaf
+        with `low == 0` must take the same NOT-NULL custom-SQL path.
+        """
+        Tmpl = self.env["product.template"]
+        Tmpl.create({
+            "name": "TEST E2E Min-zero screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            "x_southbrook_screw_length_mm": 0.0,
+        })
+        Tmpl.create({
+            "name": "TEST E2E Min-positive screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            "x_southbrook_screw_length_mm": 25.0,
+        })
+        Tmpl.create({
+            "name": "TEST E2E Min-unset screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            # x_southbrook_screw_length_mm intentionally left unset -> NULL
+        })
+        names, total = self._names(
+            {"x_southbrook_screw_length_mm": {"min": 0.0}})
+        self.assertIn("TEST E2E Min-zero screw", names)
+        self.assertIn("TEST E2E Min-positive screw", names)
+        self.assertNotIn("TEST E2E Min-unset screw", names)
+        self.assertEqual(total, len(names))
+
+    def test_both_bounds_straddling_zero_excludes_unset_but_keeps_zero_and_negative(self):
+        """A two-sided range whose bounds straddle zero (min < 0 < max) is
+        the third danger-zone shape the code's own comment names: NULL's
+        coerced falsy value (0) satisfies both `>= low` and `<= high` here
+        too, so this must also take the NOT-NULL custom-SQL path — proven
+        with a genuinely negative in-range value alongside zero, not just
+        zero alone, so a fix that only special-cases 0 would still fail
+        this test on the -5 row.
+        """
+        Tmpl = self.env["product.template"]
+        Tmpl.create({
+            "name": "TEST E2E Straddle-zero screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            "x_southbrook_screw_length_mm": 0.0,
+        })
+        Tmpl.create({
+            "name": "TEST E2E Straddle-negative screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            "x_southbrook_screw_length_mm": -5.0,
+        })
+        Tmpl.create({
+            "name": "TEST E2E Straddle-out-of-range screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            "x_southbrook_screw_length_mm": 20.0,
+        })
+        Tmpl.create({
+            "name": "TEST E2E Straddle-unset screw",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_thread_type": "confirmat",
+            # x_southbrook_screw_length_mm intentionally left unset -> NULL
+        })
+        names, total = self._names(
+            {"x_southbrook_screw_length_mm": {"min": -10.0, "max": 10.0}})
+        self.assertIn("TEST E2E Straddle-zero screw", names)
+        self.assertIn("TEST E2E Straddle-negative screw", names)
+        self.assertNotIn("TEST E2E Straddle-out-of-range screw", names)
+        self.assertNotIn("TEST E2E Straddle-unset screw", names)
         self.assertEqual(total, len(names))

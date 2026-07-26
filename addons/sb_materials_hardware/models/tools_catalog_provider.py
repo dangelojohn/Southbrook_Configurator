@@ -4,9 +4,13 @@
 This is the ONLY file that knows about x_southbrook_* fields or
 southbrook.tool.category. Phase 2's hardware provider is a sibling file.
 """
+import logging
+
 from odoo import api, models
 from odoo.fields import Domain
 from odoo.tools import SQL
+
+_logger = logging.getLogger(__name__)
 
 PROVENANCE = (
     "Read-only view of the tool and consumable master. Specs are optional — "
@@ -40,7 +44,7 @@ def _normalize_value(value, field, is_null=False):
     Shared by _rows() (table cells) and _detail_value() (spec grid +
     engineering rail) so there is exactly one place that decides both
     what "absent" means AND how a relational value is shaped — the row
-    and the detail panel can never disagree (finding F4).
+    and the detail panel can never disagree about the same field.
 
     `value` may be a batched read()'s raw shape: a many2one comes back as
     Odoo's (id, display_name) tuple, which is unwrapped to the display
@@ -99,7 +103,12 @@ class ToolsCatalogProvider(models.AbstractModel):
         category = self.env["southbrook.tool.category"].browse(
             category_id) if category_id else None
         if category is not None and not category.exists():
-            return self._degrade("Unknown category: %s" % category_id, scope)
+            # A bad category_id is a bad SELECTION, not a broken category
+            # tree — the rail itself is still perfectly computable, so show
+            # it rather than wiping the whole navigation panel over one
+            # invalid id.
+            return self._degrade("Unknown category: %s" % category_id, scope,
+                                 categories=self._categories_best_effort())
         columns = self._columns(category)
         rows, total = self._rows(category, facets, search, offset, limit,
                                   columns)
@@ -115,6 +124,24 @@ class ToolsCatalogProvider(models.AbstractModel):
             "total": total,
             "provenance": PROVENANCE,
         }
+
+    @api.model
+    def _categories_best_effort(self):
+        """Best-effort category rail for a degraded payload.
+
+        Overrides the base no-op: this provider DOES have a rail concept,
+        so recompute it here. Called by get_catalog only after its
+        savepoint has already rolled back whatever failed, so the cursor is
+        healthy. If _categories() itself raises again, that means the rail
+        computation is what's actually broken — degrade to an empty rail,
+        same as the base default, rather than raising a second time out of
+        an already-degraded response.
+        """
+        try:
+            return self._categories()
+        except Exception:
+            _logger.exception("Category rail unavailable during degrade")
+            return []
 
     @api.model
     def _categories(self):
@@ -183,78 +210,96 @@ class ToolsCatalogProvider(models.AbstractModel):
         return [int(x) for x in (category.parent_path or "").strip("/").split("/") if x]
 
     @api.model
+    def _resolve_declarations(self, model_name, category):
+        """Ancestor-inclusive declarations for `category`, nearest wins.
+
+        The module's central claim is that facets and columns are both
+        declarations resolved by ONE consistent rule: gather every
+        declaration on `category` and its ancestors, then for any
+        field_name declared at more than one level, keep only the nearest
+        one (the uniqueness constraint on materials.catalog.facet/column is
+        scoped per category_id, so the same field_name can legitimately be
+        declared at two levels — e.g. a broad ancestor default overridden
+        by a more specific child label).
+
+        `_columns` and `_facets` each shape their own output from the
+        records this returns; `_facet_domain` also consults it to learn a
+        facet's declared type. One shared resolver means the three call
+        sites cannot silently diverge on which declaration wins.
+
+        Returns an empty recordset of `model_name` when there is nothing to
+        resolve (no category, or no ancestors, or nothing declared).
+        """
+        if not category:
+            return self.env[model_name]
+        ids = self._ancestor_ids(category)
+        if not ids:
+            return self.env[model_name]
+        declared = self.env[model_name].search([("category_id", "in", ids)])
+        if not declared:
+            return declared
+        # Nearest declaration wins: order by depth of its category in `ids`
+        # (ancestors first, `category` itself last), then collapse into a
+        # dict keyed on field_name — the LAST write for a given field_name
+        # is therefore the nearest one. dict preserves the position of each
+        # field_name's FIRST appearance, so output order still follows
+        # ancestor-to-nearest for distinct fields.
+        depth = {cat_id: i for i, cat_id in enumerate(ids)}
+        by_field = {}
+        for dec in declared.sorted(
+                lambda d: (depth.get(d.category_id.id, -1), d.sequence, d.id)):
+            by_field[dec.field_name] = dec
+        return self.env[model_name].browse(
+            [dec.id for dec in by_field.values()])
+
+    @api.model
     def _columns(self, category):
         """Columns for the category, generics first, then declared ones.
 
         Declarations from the selected category and all its ancestors apply.
         When the same field_name is declared at two levels, the nearest
-        declaration wins — a child's label overrides its ancestor's.
+        declaration wins — a child's label overrides its ancestor's. The
+        resolution itself lives in `_resolve_declarations`; this method only
+        shapes the winning records into column dicts.
         """
         cols = list(GENERIC_COLUMNS)
-        if not category:
-            return cols
-        ids = self._ancestor_ids(category)
-        if not ids:
-            return cols
-        declared = self.env["materials.catalog.column"].search(
-            [("category_id", "in", ids)])
-        # Nearest declaration wins: order by depth of its category in `ids`.
-        depth = {cat_id: i for i, cat_id in enumerate(ids)}
-        by_field = {}
-        for dec in declared.sorted(
-                lambda d: (depth.get(d.category_id.id, -1), d.sequence, d.id)):
-            by_field[dec.field_name] = {
-                "key": dec.field_name,
-                "label": dec.name,
-                "align": dec.align,
-                "sortable": dec.sortable,
-            }
-        return cols + list(by_field.values())
+        declared = self._resolve_declarations("materials.catalog.column", category)
+        return cols + [{
+            "key": dec.field_name,
+            "label": dec.name,
+            "align": dec.align,
+            "sortable": dec.sortable,
+        } for dec in declared]
 
     @api.model
     def _facets(self, category):
         """Facet chips for the category, declared via materials.catalog.facet.
 
         Declarations from the selected category and all its ancestors apply,
-        same rule as _columns — INCLUDING the nearest-wins dedupe: the same
-        field_name can legitimately be declared as a facet on both an
-        ancestor and the selected category (the uniqueness constraint is
-        scoped per category_id), and the frontend keys chips on "key", so
-        only the nearest declaration may reach the payload.
+        resolved by the same nearest-wins rule `_columns` uses — see
+        `_resolve_declarations`. The frontend keys chips on "key", so only
+        the nearest declaration for a given field_name may reach the payload.
 
         Each facet's values are built with ONE grouped query (or one
         aggregate query for range), never a query per value.
 
         Counts are variant-scoped (product.product), to match the category
-        rail and the table's `total` (finding F3) — EXCEPT range facets,
-        which carry no per-value count at all, only a min/max. A numeric
-        spec lives on product.template and is identical across every
-        variant of that template, so a variant-scoped aggregate would
-        report the same numbers as a template-scoped one; it is also not
-        mechanically available in one query, because _read_group's
-        aggregate spec (unlike its groupby spec) must name a field
-        declared directly on the queried model — "product_tmpl_id.<field>"
-        is rejected for aggregates even though the identical path is
-        accepted for groupby. Range facets are left grouped against
-        product.template deliberately; nothing here is silently
-        inconsistent, there is simply no "count" for this shape to disagree
-        about.
+        rail and the table's `total` — EXCEPT range facets, which carry no
+        per-value count at all, only a min/max. A numeric spec lives on
+        product.template and is identical across every variant of that
+        template, so a variant-scoped aggregate would report the same
+        numbers as a template-scoped one; it is also not mechanically
+        available in one query, because _read_group's aggregate spec
+        (unlike its groupby spec) must name a field declared directly on
+        the queried model — "product_tmpl_id.<field>" is rejected for
+        aggregates even though the identical path is accepted for groupby.
+        Range facets are left grouped against product.template deliberately;
+        nothing here is silently inconsistent, there is simply no "count"
+        for this shape to disagree about.
         """
-        if not category:
-            return []
-        ids = self._ancestor_ids(category)
-        declared = self.env["materials.catalog.facet"].search(
-            [("category_id", "in", ids)])
+        declared = self._resolve_declarations("materials.catalog.facet", category)
         if not declared:
             return []
-
-        # Nearest declaration wins: order by depth of its category in `ids`,
-        # then collapse into a dict keyed on field_name (mirrors _columns).
-        depth = {cat_id: i for i, cat_id in enumerate(ids)}
-        by_field = {}
-        for dec in declared.sorted(
-                lambda d: (depth.get(d.category_id.id, -1), d.sequence, d.id)):
-            by_field[dec.field_name] = dec
 
         Tmpl = self.env["product.template"]
         Product = self.env["product.product"]
@@ -262,7 +307,7 @@ class ToolsCatalogProvider(models.AbstractModel):
         variant_domain = [("product_tmpl_id.x_southbrook_tool_category_id",
                            "child_of", category.id)]
         out = []
-        for dec in by_field.values():
+        for dec in declared:
             field = Tmpl._fields.get(dec.field_name)
             if not field:
                 continue
@@ -277,7 +322,7 @@ class ToolsCatalogProvider(models.AbstractModel):
                 # normalise to None — the "no data" sentinel must not be
                 # confused with a legitimate all-zero dataset.
                 #
-                # No `!= False` leaf here (finding F1): MIN/MAX skip NULL
+                # No `!= False` leaf here: MIN/MAX skip NULL
                 # natively in SQL, so the leaf was never needed for
                 # correctness — and on a Float/Integer/Monetary field it
                 # actively hurt: falsy_value=0 means the ORM rewrites
@@ -301,7 +346,7 @@ class ToolsCatalogProvider(models.AbstractModel):
             else:
                 # Odoo 17+ API: list of (group_value, count) tuples.
                 # Grouped over product.product via the product_tmpl_id.*
-                # path — one query, variant-scoped counts (finding F3).
+                # path — one query, variant-scoped counts.
                 grouped = Product._read_group(
                     variant_domain + [(variant_field, "!=", False)],
                     groupby=[variant_field],
@@ -352,21 +397,58 @@ class ToolsCatalogProvider(models.AbstractModel):
         return [item for _n, item in numbered] + [item for _n, item in unnumbered]
 
     @api.model
-    def _facet_domain(self, facets):
+    def _facet_domain(self, facets, category=None):
         """Domain fragment for the selected facet values.
 
         Within one facet, selected values are OR'ed. Across facets, the
         fragments are AND'ed (Odoo domains are implicitly AND).
+
+        Each facet's selection must be a `list` (a set of values to OR
+        together) or a `dict` (a `{"min": ..., "max": ...}` range) — nothing
+        else. A `str` is the classic trap: Python happily iterates it
+        character-by-character, silently turning "cnc_router_bit" into an OR
+        of 14 single-character comparisons that matches nothing, with no
+        hint to the client that the shape was wrong. Any other non-list,
+        non-dict value is equally malformed. Both are rejected here by
+        raising — get_catalog's outer try/except turns that into an honest
+        `{"ok": False, "reason": ...}` naming the offending key, rather than
+        degrading silently to an empty-looking result.
+
+        `category` (optional) is used only to look up each facet's DECLARED
+        type via `_resolve_declarations`, to catch the inverse shape
+        mismatch: a `list` submitted for a field declared `facet_type ==
+        "range"`. That combination is rejected outright rather than
+        guessing which list element is the min and which is the max —
+        a `[lo, hi]` list is genuinely ambiguous (what does a single-element
+        or three-element list mean?), whereas the `{"min":, "max":}` dict
+        the range branch below already expects says exactly what it means.
+        Callers that don't pass `category` (there is one: the domain-builder
+        unit tests, which exercise `_facet_domain` directly without going
+        through `get_catalog`) simply skip this check — the direct-call path
+        has no category to resolve declarations against, and everything
+        downstream still degrades safely if it disagrees with the facet's
+        true type.
         """
+        declared_types = {}
+        if category:
+            for dec in self._resolve_declarations(
+                    "materials.catalog.facet", category):
+                declared_types[dec.field_name] = dec.facet_type
+
         domain = []
         for field_name, selection in (facets or {}).items():
             if field_name not in self.env["product.template"]._fields:
                 continue
+            if not isinstance(selection, (list, dict)):
+                raise ValueError(
+                    "Malformed facet selection for %r: expected a list of "
+                    "values or a {\"min\": ..., \"max\": ...} range dict, "
+                    "got %s" % (field_name, type(selection).__name__))
             if isinstance(selection, dict):          # range
                 low, high = selection.get("min"), selection.get("max")
                 if low is None and high is None:
                     continue
-                # F2: on a nullable Float/Integer/Monetary column, Odoo's
+                # On a nullable Float/Integer/Monetary column, Odoo's
                 # domain-to-SQL layer ORs in "field IS NULL" for a `<=`/`>=`
                 # leaf whenever the field's falsy value (0) itself satisfies
                 # the comparison — e.g. `<= 50` matches unset rows too,
@@ -389,8 +471,8 @@ class ToolsCatalogProvider(models.AbstractModel):
                 # `(field_name, "!=", False)` to force NULL exclusion, but
                 # that compiles to `NOT IN (0.0)` (falsy_value=0 on these
                 # field types), which also drops a row whose value really
-                # is 0 — the same trap as the facet min/max aggregate (see
-                # _facets(), finding F1). No plain domain leaf can express
+                # is 0 — the same trap as the facet min/max aggregate in
+                # _facets(). No plain domain leaf can express
                 # "IS NOT NULL, but a genuine 0 still counts", because every
                 # leaf gets rewritten by the same per-field falsy-value
                 # machinery. Domain.custom(to_sql=...) bypasses that
@@ -422,7 +504,20 @@ class ToolsCatalogProvider(models.AbstractModel):
                 domain.append(
                     Domain("product_tmpl_id", "any", Domain.custom(to_sql=_to_sql)))
                 continue
-            values = [v for v in (selection or []) if v not in (None, "")]
+            # selection is a list at this point. A list submitted against a
+            # field DECLARED as a numeric range is the inverse malformed
+            # shape (see docstring): reject it rather than guess at [lo, hi]
+            # ordering. Fields with no known declaration (declared_types has
+            # no entry — including every direct `_facet_domain` unit-test
+            # call, which passes no `category`) fall through to the plain
+            # enum/OR handling below unchanged.
+            if declared_types.get(field_name) == "range":
+                raise ValueError(
+                    "Malformed facet selection for %r: this facet is a "
+                    "numeric range and must be selected with a "
+                    "{\"min\": ..., \"max\": ...} dict, not a list"
+                    % field_name)
+            values = [v for v in selection if v not in (None, "")]
             if not values:
                 continue
             if len(values) == 1:
@@ -431,6 +526,25 @@ class ToolsCatalogProvider(models.AbstractModel):
                 domain += ["|"] * (len(values) - 1)
                 domain += [(field_name, "=", v) for v in values]
         return domain
+
+    _LIKE_ESCAPE_TABLE = str.maketrans({
+        "\\": "\\\\",
+        "%": "\\%",
+        "_": "\\_",
+    })
+
+    @api.model
+    def _escape_like_term(self, term):
+        """Escape a user search term for use inside an `ilike` domain leaf.
+
+        Postgres's LIKE/ILIKE honours backslash as the escape character by
+        default. `str.translate` rewrites each character once, in a single
+        pass, so escaping the backslash itself first is safe — it cannot be
+        re-escaped by the `%`/`_` substitutions that follow in the same
+        table, because a translation table maps individual input characters
+        to their replacement text independent of each other.
+        """
+        return term.translate(self._LIKE_ESCAPE_TABLE)
 
     @api.model
     def _null_mask(self, tmpl_ids, keys):
@@ -500,11 +614,11 @@ class ToolsCatalogProvider(models.AbstractModel):
           Postgres directly, where the distinction genuinely exists, and
           that answer is what actually decides None vs. 0 here.
 
-        No category (finding F6): an unscoped call must not fan out across
-        every product on the instance. `_columns(None)` and `_facets(None)`
-        already degrade safely to "nothing declared yet"; `_rows` mirrors
-        that with an empty result rather than a scoped default — there is
-        no principled "default" category to fall back to, and picking one
+        No category: an unscoped call must not fan out across every product
+        on the instance. `_columns(None)` and `_facets(None)` already
+        degrade safely to "nothing declared yet"; `_rows` mirrors that with
+        an empty result rather than a scoped default — there is no
+        principled "default" category to fall back to, and picking one
         would silently show a different, arbitrary subset instead of the
         rail's neutral "choose a category" state the frontend already
         renders when `categoryId` is null.
@@ -515,12 +629,22 @@ class ToolsCatalogProvider(models.AbstractModel):
         Tmpl = self.env["product.template"]
         domain = [("product_tmpl_id.x_southbrook_tool_category_id",
                    "child_of", category.id)]
-        for leaf in self._facet_domain(facets):
+        for leaf in self._facet_domain(facets, category):
             domain.append(("product_tmpl_id.%s" % leaf[0], leaf[1], leaf[2])
                           if isinstance(leaf, tuple) else leaf)
+        search = (search or "").strip()
         if search:
-            domain += ["|", ("name", "ilike", search),
-                       ("default_code", "ilike", search)]
+            # `ilike` reaches Postgres as a plain LIKE pattern: `%` and `_`
+            # are wildcards there regardless of how the parameter got bound,
+            # so a literal `_` in a part number (these are common — e.g.
+            # "SBK-TOOL-C_B") would otherwise match any single character,
+            # and a bare `%` or `_` search term would match every row. Escape
+            # the escape character itself first, then the two wildcards, so
+            # Postgres's own (default) backslash-escape convention makes the
+            # match literal again.
+            escaped = self._escape_like_term(search)
+            domain += ["|", ("name", "ilike", escaped),
+                       ("default_code", "ilike", escaped)]
 
         total = Product.search_count(domain)
         products = Product.search(domain, offset=offset, limit=limit,
@@ -573,24 +697,45 @@ class ToolsCatalogProvider(models.AbstractModel):
         (one extra query, same _null_mask helper) so a numeric spec can
         never render 0 here for a row that showed a dash, or vice versa.
 
-        Access (finding F5): get_catalog's scope check is incidental — it
-        only happens because _build_payload always calls _categories(),
-        which searches southbrook.tool.category (readable only by
-        group_tool_operator and friends). _build_detail has no equivalent
-        forced touch: _columns(category) short-circuits to the generic
-        columns whenever `category` is falsy, so a product with NO
+        Access: get_catalog's scope check is incidental — it only happens
+        because _build_payload always calls _categories(), which searches
+        southbrook.tool.category (readable only by group_tool_operator and
+        friends). _build_detail has no equivalent forced touch:
+        _columns(category) short-circuits to the generic columns whenever
+        `category` is falsy, so a product with NO
         x_southbrook_tool_category_id set never reaches that model at all,
         and a base.group_user-only account could otherwise call get_detail
         directly and read title/specs/badges/engineering with no gate.
         Enforce the same scope check unconditionally, before any data is
         assembled, rather than relying on it happening to fire.
+
+        Scope: this is a TOOLS-catalog endpoint. A product with no tool
+        category at all (its own `x_southbrook_tool_category_id` is unset)
+        is out of scope even though it may still exist and be perfectly
+        readable through other models — degrade rather than serve vendor,
+        stock and lifecycle data for a product the tools catalog was never
+        meant to describe. Without this check, ENGINEERING_FIELDS was read
+        unconditionally regardless of category, so any product id in the
+        database — not just tools — returned a fully populated engineering
+        rail; only the (correctly empty) spec grid hinted anything was
+        scoped at all.
+
+        Archived: `browse()`/`exists()` both ignore the `active` flag, so
+        an archived product still satisfies `exists()` even though
+        get_catalog's own `search()`-based listing (which does respect
+        `active`) would never surface it again. A stale link to a
+        discontinued item must not keep working forever — treat "exists but
+        archived" the same as "does not exist".
         """
         self.env["southbrook.tool.category"].browse().check_access("read")
         product = self.env["product.product"].browse(product_id)
-        if not product.exists():
+        if not product.exists() or not product.active:
             return self._degrade_detail("Unknown product")
         tmpl = product.product_tmpl_id
         category = tmpl.x_southbrook_tool_category_id
+        if not category:
+            return self._degrade_detail(
+                "Product is not in the tools catalog")
         columns = self._columns(category)
 
         spec_keys = [c["key"] for c in columns
@@ -632,8 +777,8 @@ class ToolsCatalogProvider(models.AbstractModel):
 
         `data` came from a batched tmpl.read(); a many2one there is Odoo's
         (id, display_name) tuple. Tuple-unwrapping and the absence rule
-        both live in _normalize_value (finding F4) — the same helper
-        _rows() uses for its cells — so a relation column can never render
+        both live in _normalize_value — the same helper _rows() uses for
+        its cells — so a relation column can never render
         differently in the table than in this detail panel.
 
         `nulls` is this template's slice of _null_mask() — {key: True} for

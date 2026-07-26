@@ -34,7 +34,7 @@ class TestAccess(TransactionCase):
         southbrook.tool.category. _build_detail reaches that model only
         via _columns(category), which short-circuits when category is
         falsy — so a product with NO category set let a base.group_user
-        -only account read get_detail() with no gate at all (finding F5).
+        -only account read get_detail() with no gate at all.
         Use a product with no category to hit exactly that gap.
         """
         uncategorized = self.env["product.template"].create({

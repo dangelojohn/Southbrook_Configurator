@@ -115,32 +115,39 @@ class TestCategoryTree(TransactionCase):
     def test_rollup_counts_variants_not_templates(self):
         """Verify _categories counts product.product (variants), not templates.
 
-        Regression test for Finding 1: counts must include all variants of a
-        template, not just the template itself. Without this test, a reversion
-        to grouping product.template would silently pass the suite if variants
+        Regression test: counts must include all variants of a template,
+        not just the template itself. Without this test, a reversion to
+        grouping product.template would silently pass the suite if variants
         are never created during test runs.
+
+        Two genuine variants need two distinct attribute-value combinations
+        — an attribute line with two values lets Odoo generate them itself.
+        (A manually created second product.product with no attribute
+        combination collides with the template's own auto-created default
+        variant on the real `product_product_combination_unique` constraint
+        — both would carry the same empty combination_indices — so it is
+        not a legitimate way to get a second variant.)
         """
         cat_drawer = self.env.ref(
             "southbrook_mrp_kitchen_tools.cat_screw_drawer")
 
-        # Create 1 template with manually-created extra variant
-        # (Tests that _categories counts product.product, not product.template)
+        attribute = self.env["product.attribute"].create({
+            "name": "TEST Drawer Screw Finish",
+            "value_ids": [
+                (0, 0, {"name": "TEST Finish A"}),
+                (0, 0, {"name": "TEST Finish B"}),
+            ],
+        })
         tmpl_drawer = self.env["product.template"].create({
             "name": "Drawer Screw Multi-Variant",
             "x_southbrook_tool_category_id": cat_drawer.id,
+            "attribute_line_ids": [(0, 0, {
+                "attribute_id": attribute.id,
+                "value_ids": [(6, 0, attribute.value_ids.ids)],
+            })],
         })
-        # Default variant created automatically; count should be 1 so far
-        self.assertEqual(tmpl_drawer.product_variant_count, 1)
-
-        # Manually create an extra variant in the same template
-        # Use the default variant as a template and create a sibling
-        default_variant = tmpl_drawer.product_variant_ids[0]
-        extra_variant = self.env["product.product"].create({
-            "product_tmpl_id": tmpl_drawer.id,
-            "name": f"{tmpl_drawer.name} (2)",
-        })
-        # Now template has 2 variants
-        tmpl_drawer.invalidate_recordset(['product_variant_count'])
+        # Two attribute values on one attribute line -> Odoo auto-generates
+        # 2 variants, each with its own distinct combination.
         self.assertEqual(tmpl_drawer.product_variant_count, 2)
 
         # Refresh categories

@@ -165,6 +165,34 @@ class TestFacets(TransactionCase):
         self.assertEqual(labels, ["Apple Material", "Mango Material",
                                   "Zebra Material"])
 
+    def test_string_facet_selection_degrades_naming_the_offending_key(self):
+        """A string selection (instead of a list) must not be silently
+        iterated character-by-character — that produces an OR of single
+        characters matching nothing, with no hint the shape was wrong.
+        Must degrade instead, with a reason that names the field.
+        """
+        payload = self.Provider.get_catalog(
+            scope="tools", category_id=self.cat.id,
+            facets={"x_southbrook_grit": "120"})
+        self.assertFalse(payload["ok"])
+        self.assertIn("x_southbrook_grit", payload["reason"])
+
+    def test_list_selection_for_declared_range_facet_degrades(self):
+        """A list where a {"min":, "max":} range dict was meant (e.g.
+        [0, 100]) must not silently fall through to the enum/OR path and be
+        interpreted as "equals 0 OR equals 100" — the facet is declared as
+        a numeric range, so a list selection against it is rejected outright
+        rather than guessed at.
+        """
+        cat = self.env.ref("southbrook_mrp_kitchen_tools.cat_screws")
+        # facet_screws_length (seeded) declares x_southbrook_screw_length_mm
+        # as facet_type="range" on this category.
+        payload = self.Provider.get_catalog(
+            scope="tools", category_id=cat.id,
+            facets={"x_southbrook_screw_length_mm": [0, 100]})
+        self.assertFalse(payload["ok"])
+        self.assertIn("x_southbrook_screw_length_mm", payload["reason"])
+
     def test_flag_facet_reports_single_chip_with_count(self):
         cat = self.env.ref("southbrook_mrp_kitchen_tools.cat_screw_wood")
         Tmpl = self.env["product.template"]
