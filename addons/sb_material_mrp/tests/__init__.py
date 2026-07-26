@@ -21,3 +21,5 @@ from . import test_cutlist_precision_review_fixes
 from . import test_demand_qty_uom_conversion
 # Phase-2b Task 2 — orderpoint MAX sync from open-MO demand rollup.
 from . import test_orderpoint_sync
+# Phase-2b Task 3 — native scheduler drafts RFQ off Buy route + orderpoint.
+from . import test_scheduler_draft_rfq
