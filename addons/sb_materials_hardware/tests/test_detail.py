@@ -12,12 +12,18 @@ class TestDetail(TransactionCase):
             "name": "Open time (min)", "category_id": self.cat.id,
             "field_name": "x_southbrook_open_time_min", "align": "right",
         })
+        self.vendor = self.env["res.partner"].create({
+            "name": "TEST Adhesive Supply Co",
+        })
+        self.uom = self.env.ref("uom.product_uom_unit")
         self.tmpl = self.env["product.template"].create({
             "name": "TEST PVA Type II",
             "x_southbrook_tool_category_id": self.cat.id,
             "x_southbrook_open_time_min": 8.0,
             "x_southbrook_hazardous": True,
             "x_southbrook_min_stock_qty": 4.0,
+            "x_southbrook_preferred_vendor_id": self.vendor.id,
+            "x_southbrook_issue_uom_id": self.uom.id,
         })
         self.product = self.tmpl.product_variant_ids[0]
 
@@ -40,3 +46,15 @@ class TestDetail(TransactionCase):
     def test_unknown_product_degrades(self):
         detail = self.Provider.get_detail(-1)
         self.assertFalse(detail["ok"])
+
+    def test_engineering_relation_fields_show_display_name(self):
+        """A many2one engineering field (vendor, issue UoM) must render its
+        display name string in the payload — never a raw id, and never the
+        (id, display_name) tuple Odoo's read() returns internally.
+        """
+        detail = self.Provider.get_detail(self.product.id)
+        labels = {e["label"]: e["value"] for e in detail["engineering"]}
+        self.assertEqual(labels["Preferred vendor"], self.vendor.display_name)
+        self.assertEqual(labels["Issue UoM"], self.uom.display_name)
+        self.assertNotIsInstance(labels["Preferred vendor"], tuple)
+        self.assertNotIsInstance(labels["Preferred vendor"], int)
