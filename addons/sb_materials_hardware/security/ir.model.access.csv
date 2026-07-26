@@ -1,1 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_materials_catalog_facet_user,materials.catalog.facet.user,model_materials_catalog_facet,base.group_user,1,0,0,0
+access_materials_catalog_facet_manager,materials.catalog.facet.manager,model_materials_catalog_facet,base.group_system,1,1,1,1
+access_materials_catalog_column_user,materials.catalog.column.user,model_materials_catalog_column,base.group_user,1,0,0,0
+access_materials_catalog_column_manager,materials.catalog.column.manager,model_materials_catalog_column,base.group_system,1,1,1,1
