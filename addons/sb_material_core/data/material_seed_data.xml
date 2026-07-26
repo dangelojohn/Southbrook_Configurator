@@ -82,5 +82,47 @@
     <field name="sheet_height_mm">2438.4</field>
   </record>
 
+  <!--
+      Hygiene A2 (2026-07-26): thickness-specific materials for the 2
+      live legacy sheet components that currently resolve to the
+      GENERIC `melamine`/`mdf` materials (southbrook_mrp_kitchen_
+      workcenters seed, code='melamine'/'mdf') — those generic records
+      carry NO thickness_mm (family-default-only, used at MULTIPLE
+      thicknesses across the catalog), so `material_demand_qty`'s
+      area calc falls back to the 3/4"=19.05mm cut constant even
+      though the live components are 5/8" and 1/4" respectively,
+      under-stating the true panel area for the thinner sheets.
+
+      Setting thickness_mm on the shared generic material would be
+      WRONG (it would wrongly apply to every OTHER product still
+      correctly resolving to the generic 3/4" default). Correct fix:
+      dedicated thickness-specific materials, relinked by the
+      migration below (mirrors the mat_ply_14_back / mat_melamine_34
+      pattern already in this file).
+
+      Family kept as `fam_ewood` (density 0.68) to match the current
+      estimation-grade density these components already resolve to —
+      thickness_mm is what fixes the demand AREA calc; density
+      refinement (e.g. a dedicated hardboard/fiberboard density) is a
+      separate follow-up, not solved here.
+  -->
+  <record id="mat_mel_58" model="southbrook.kitchen.material">
+    <field name="name">Melamine 5/8"</field>
+    <field name="code">MEL58</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">15.875</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_hardboard_14" model="southbrook.kitchen.material">
+    <field name="name">Hardboard 1/4"</field>
+    <field name="code">HB14</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">6.35</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
     </data>
 </odoo>

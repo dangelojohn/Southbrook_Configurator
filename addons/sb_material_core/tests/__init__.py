@@ -12,3 +12,7 @@ from . import test_product_material_fallback
 from . import test_supplierinfo_yield
 # Task 2 — _effective_waste_pct() material/family fallback (Phase-2 T2).
 from . import test_effective_waste
+# Hygiene A2 — thickness-specific materials (mat_mel_58 / mat_hardboard_14)
+# for the 2 live legacy sheet components that previously fell back to the
+# 3/4"=19.05mm cut constant via the generic melamine/mdf materials.
+from . import test_thickness_specific_materials
