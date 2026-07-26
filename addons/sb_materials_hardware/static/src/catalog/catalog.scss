@@ -28,8 +28,6 @@
     --mc-accent-soft: #fbeced;
     --mc-row-hover: #fff8e1;
     --mc-flag: #fff3d6;
-    --mc-in-stock: #1e7a3a;
-    --mc-out-stock: #b8242a;
     --mc-link: #1851a8;
     --mc-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
@@ -48,8 +46,6 @@
         --mc-accent-soft: #2e1c1e;
         --mc-row-hover: #2a2418;
         --mc-flag: #2e2718;
-        --mc-in-stock: #4caf72;
-        --mc-out-stock: #e2686c;
         --mc-link: #7aa6e8;
     }
 
@@ -284,8 +280,6 @@
     --mc-accent-soft: #2e1c1e;
     --mc-row-hover: #2a2418;
     --mc-flag: #2e2718;
-    --mc-in-stock: #4caf72;
-    --mc-out-stock: #e2686c;
     --mc-link: #7aa6e8;
 }
 :root[data-theme="light"] .o_matcat {
@@ -303,7 +297,5 @@
     --mc-accent-soft: #fbeced;
     --mc-row-hover: #fff8e1;
     --mc-flag: #fff3d6;
-    --mc-in-stock: #1e7a3a;
-    --mc-out-stock: #b8242a;
     --mc-link: #1851a8;
 }
