@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Repair Wave 3 — the final link in the materials weight chain.
+
+  BoM component products (e.g. sheet goods like "3/4in Melamine Sheet")
+  are plain products with no attributes, so product.product._resolve_
+  material() (sb_material_core) had no way to resolve a material for
+  them, so every downstream weight computed to 0 despite geometry+density
+  being live. This exposes the new product.template.material_id fallback
+  field (see models/product_template.py) so a component can be linked to
+  a southbrook.kitchen.material by hand, internal-facing only.
+-->
+<odoo>
+
+  <record id="view_product_template_form_material" model="ir.ui.view">
+    <field name="name">product.template.form.southbrook.material</field>
+    <field name="model">product.template</field>
+    <field name="inherit_id" ref="product.product_template_form_view"/>
+    <field name="arch" type="xml">
+      <group name="group_general" position="inside">
+        <field name="material_id"
+               help="Fallback material used when no variant attribute value resolves one — mainly for plain BoM component products (sheet goods) that carry no attributes."/>
+      </group>
+    </field>
+  </record>
+
+</odoo>

@@ -1,0 +1,10 @@
+id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
+access_sb_production_media_dms_directory_manager,sb_production_media.dms_directory_manager,dms.model_dms_directory,group_media_manager,1,1,1,1
+access_sb_production_media_dms_file_manager,sb_production_media.dms_file_manager,dms.model_dms_file,group_media_manager,1,1,1,1
+dms.access_dms_file_portal,dms_file_portal,dms.model_dms_file,base.group_portal,0,0,0,0
+dms.access_dms_file_public,dms_file_public,dms.model_dms_file,base.group_public,0,0,0,0
+dms.access_dms_directory_portal,dms_directory_portal,dms.model_dms_directory,base.group_portal,0,0,0,0
+dms.access_dms_directory_public,dms_directory_public,dms.model_dms_directory,base.group_public,0,0,0,0
+dms.access_dms_storage_portal,dms_storage_portal,dms.model_dms_storage,base.group_portal,0,0,0,0
+dms.access_dms_access_group_portal,access_dms_access_group_portal,dms.model_dms_access_group,base.group_portal,0,0,0,0
+dms.access_dms_access_group_public,access_dms_access_group_public,dms.model_dms_access_group,base.group_public,0,0,0,0

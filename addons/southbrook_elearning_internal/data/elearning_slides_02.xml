@@ -1129,8 +1129,8 @@ in-tick exception that was caught.</p>
 </tr>
 <tr>
 <td>4</td>
-<td>Southbrook: Weekly Planning Baseline</td>
-<td>Sundays ~02:00</td>
+<td>Southbrook: Weekly Planning Baseline — <strong>NOT ACTIVE</strong></td>
+<td>&#8212; (see Cron 4 note)</td>
 <td>B2</td>
 </tr>
 <tr>
@@ -1278,6 +1278,26 @@ written for — a domain narrowing on <code>order_line.product_id.categ_id</code
 is the right fix.</p>
 <hr>
 <h2 id="cron-4-cron_weekly_planning_baseline">Cron 4 — <code>cron_weekly_planning_baseline</code></h2>
+<p style="border-left:4px solid #b45309;background:#fffbeb;padding:10px 14px;margin:0 0 14px;">
+<strong>STATUS: NOT ACTIVE (verified 2026-07-26).</strong> This cron does not
+exist in the running system — there is no <code>ir.cron</code> record for it,
+and the Python that backed it
+(<code>mrp_planning_run_cron.py</code>) was deleted on 2026-06-23. Do not go
+looking for it in Settings → Technical → Scheduled Actions; you will not
+find it. The five orchestration crons that <em>are</em> active are 1, 2, 3, 5
+and 6 in the table above.<br><br>
+<strong>Why it was disabled:</strong> it inherited
+<code>mrp.planning.run</code>, which is provided by
+<code>openvalue_mrp_planning_engine</code>. At the time that module was
+believed absent, and the inherit crashed registry init. The module has in
+fact been installed since 2026-06-26, so that reason no longer holds.<br><br>
+<strong>Why it has not simply been switched back on:</strong> the planning
+engine is driven by <code>stock.warehouse.orderpoint</code> records, of which
+there are none, and its sales-demand path filters on
+<code>is_storable</code>, which is <code>false</code> on every finished-goods
+product. A run today therefore produces zero planning lines. Re-enabling is
+blocked on product-model and reorder-point decisions, not on code. Treat the
+rest of this section as a specification for a feature that is not yet live.</p>
 <p><strong>Name in UI:</strong> Southbrook: Weekly Planning Baseline
 <strong>Fires:</strong> every 7 days, staggered to Sunday at ~02:00 local time
 <strong>Model:</strong> <code>mrp.planning.run</code>

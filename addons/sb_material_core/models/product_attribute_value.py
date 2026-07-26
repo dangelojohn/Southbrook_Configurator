@@ -14,9 +14,22 @@ class ProductProduct(models.Model):
     _inherit = "product.product"
 
     def _resolve_material(self):
-        """Return the southbrook.kitchen.material for this variant via its
-        'Material' attribute value, else empty recordset."""
+        """Return the southbrook.kitchen.material for this variant.
+
+        Precedence (unchanged from before Repair Wave 3, attribute path
+        first):
+        1. The 'Material' attribute value on this variant, if any attribute
+           value carries one.
+        2. Wave 3 fallback: `self.product_tmpl_id.material_id`, for plain
+           component products (e.g. sheet goods) that carry no attributes
+           at all — every BoM component product needs SOME way to resolve
+           a material, not just configurable cabinet variants.
+        3. Neither set -> empty recordset (honesty contract: never
+           fabricate a material).
+        """
         self.ensure_one()
         vals = self.product_template_attribute_value_ids.mapped(
             "product_attribute_value_id").filtered("material_id")
-        return vals[:1].material_id
+        if vals:
+            return vals[:1].material_id
+        return self.product_tmpl_id.material_id

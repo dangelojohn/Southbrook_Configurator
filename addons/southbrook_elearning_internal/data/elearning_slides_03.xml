@@ -229,9 +229,11 @@ honest without anyone clicking anything:</p>
 <td>Captures analytics rows for confirmed SOs that don't have one yet.</td>
 </tr>
 <tr>
-<td>Southbrook: Weekly Planning Baseline</td>
-<td>every 7 days (Sun 02:00)</td>
-<td>Creates and runs the fresh weekly <code>mrp.planning.run</code> baseline.</td>
+<td>Southbrook: Weekly Planning Baseline — <strong>NOT ACTIVE</strong></td>
+<td>&#8212; (not installed)</td>
+<td><strong>Not running (verified 2026-07-26).</strong> Would create and run the
+weekly <code>mrp.planning.run</code> baseline. No <code>ir.cron</code> record
+exists. See Cron 4 in the Scheduled Actions deck for why.</td>
 </tr>
 <tr>
 <td>Southbrook: Quality Dry-Run Nightly</td>

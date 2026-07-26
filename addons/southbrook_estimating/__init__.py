@@ -151,6 +151,33 @@ def _backfill_single_value_attribute_defaults(env):
         )
 
 
+def post_init_backfill_geometry(env):
+    """Task A3 (Materials geometry-writeback plan, 2026-07-24).
+
+    A2 (commit 9458739) only stamps `sb_width_mm`/`sb_height_mm`/
+    `sb_depth_mm` etc. onto variants materialised THROUGH the OCA
+    configurator wizard (`product.config.session.get_variant_vals`)
+    from that commit forward. Every variant that already existed on a
+    live database before A2 landed — plus any variant created via a
+    path that bypasses `get_variant_vals` (direct `create()`, imports,
+    demo data) — is missing real geometry, which starves the Materials
+    weight calc.
+
+    Delegates to `product.product._sb_backfill_geometry()`, which is
+    idempotent on its own (only ever writes rows where all three dims
+    are currently 0), so this hook is safe to run on every `-u` of
+    southbrook_estimating, not just the initial `-i`.
+
+    Registered standalone (not folded silently into the resolver logic)
+    so it stays independently callable/testable per the A3 brief, but
+    chained into `_southbrook_estimating_post_init` below rather than
+    claiming a second `post_init_hook` manifest key — Odoo only invokes
+    one hook name per module (`odoo/modules/loading.py`:
+    `getattr(py_module, post_init)(env)`).
+    """
+    env["product.product"]._sb_backfill_geometry()
+
+
 def _southbrook_estimating_post_init(env):
     """Combined post-init hook for southbrook_estimating.
 
@@ -161,3 +188,4 @@ def _southbrook_estimating_post_init(env):
     _ensure_sales_journal(env)
     _configure_southbrook_report_branding(env)
     _backfill_single_value_attribute_defaults(env)
+    post_init_backfill_geometry(env)

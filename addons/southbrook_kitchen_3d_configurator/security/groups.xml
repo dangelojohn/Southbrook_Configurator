@@ -43,25 +43,34 @@
 
         <!-- Migration: assign every existing non-share internal user
              to Manager so a -u upgrade preserves the pre-taxonomy
-             full-access default. Runs on -i and -u; idempotent. -->
-        <!-- NOTE: the model="res.users" attribute below is load-bearing, not
-             decoration. Odoo's _eval_xml() injects `obj` into the eval context
-             only when the node itself declares a model (tools/convert.py:
-             _get_eval_context sets context['obj'] = env[model_str].browse, and
-             _eval_xml reads f_model = node.get('model') per node). A bare
-             <value eval="..."> inherits nothing from the enclosing <function>,
-             so without it `obj` is undefined and the whole file dies with
-             "Could not eval(...) for None" — which blocks installing this
-             module, and every module that depends on it, on a fresh database. -->
+             full-access default. Runs on -i and -u; idempotent.
+
+             v19 fix (hygiene A1, 2026-07-26): convert.py's <function>
+             eval context does NOT provide a bare `obj()` or `env` —
+             `obj` (= env[model].browse) is only injected into a VALUE
+             node's own eval when that <value> itself carries a model=
+             attribute (see _get_eval_context / _eval_xml in
+             odoo/tools/convert.py; same idiom already proven in
+             data/canonical_catalog_tag.xml's product.template backfill).
+             The prior `obj().env['res.users'].search(...)` referenced
+             a Python builtin `obj` that convert.py never defines here,
+             so a FRESH -i of this module raised NameError under a
+             ParseError wrapper. Fix: put model="res.users" on this
+             <value> so obj() browses an empty res.users recordset,
+             then call .search(...) on it directly — matches the
+             canonical_catalog_tag.xml precedent exactly. -->
         <function model="res.groups" name="write">
             <value eval="[ref('group_kitchen_manager')]"/>
-            <!-- all_group_ids, NOT group_ids. Odoo 19 split the concept:
-                 group_ids is "Groups explicitly assigned to the user", while
-                 implied groups (base.group_user comes via group_system, etc.)
-                 live in all_group_ids, which carries search='_search_all_group_ids'
-                 so it is queryable. Searching group_ids here matched nobody —
-                 no user holds base.group_user explicitly — so this migration
-                 silently granted nothing until this was corrected. -->
+            <!-- all_group_ids, NOT group_ids. The fix above made this block
+                 PARSE; this line makes it actually DO something. Odoo 19 split
+                 the concept on res.users: group_ids is "Groups explicitly
+                 assigned to the user", while implied groups live in
+                 all_group_ids (which carries search='_search_all_group_ids',
+                 so it is queryable). base.group_user is normally held by
+                 implication, not explicitly — verified against a live database,
+                 where searching group_ids returned 0 users and all_group_ids
+                 returned the expected set. Searching group_ids here therefore
+                 granted nothing at all, silently. -->
             <value model="res.users" eval="{'user_ids': [(4, u.id) for u in
                 obj().search([
                     ('all_group_ids', 'in', [ref('base.group_user')]),

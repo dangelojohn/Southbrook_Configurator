@@ -8,6 +8,7 @@
       <xpath expr="//field[@name='note']/parent::group" position="before">
         <group string="Material Master">
           <field name="family_id"/>
+          <field name="panel_role_ids" widget="many2many_tags"/>
           <field name="weight_source"/>
           <field name="density"/>
           <field name="density_source"/>
@@ -19,6 +20,30 @@
           <field name="weight_per_unit" invisible="weight_source != 'per_unit'"/>
           <field name="manual_unit_price"/>
           <field name="currency_id" invisible="1"/>
+        </group>
+        <group string="Dimensions (mm + Imperial)">
+          <field name="standard_thickness"/>
+          <label for="thickness_mm" string="Thickness"/>
+          <div class="o_row">
+            <field name="thickness_mm"/>
+            <span>mm</span>
+            <field name="thickness_in"/>
+            <span>in</span>
+          </div>
+          <label for="sheet_width_mm" string="Sheet Width"/>
+          <div class="o_row">
+            <field name="sheet_width_mm"/>
+            <span>mm</span>
+            <field name="sheet_width_in"/>
+            <span>in</span>
+          </div>
+          <label for="sheet_height_mm" string="Sheet Height"/>
+          <div class="o_row">
+            <field name="sheet_height_mm"/>
+            <span>mm</span>
+            <field name="sheet_height_in"/>
+            <span>in</span>
+          </div>
         </group>
       </xpath>
     </field>

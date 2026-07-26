@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Task C3: standard starter catalog of southbrook.kitchen.material
+        records so a fresh install has real (non-zero) family/thickness data
+        for the geometry-writeback weight calc, instead of an empty catalog.
+
+        noupdate="1": seeded once, then user-editable (a shop may correct
+        thicknesses/sheet size/family on their own copy without a later
+        `-u` clobbering their edits).
+
+        Canonical unit is mm — only thickness_mm / sheet_width_mm /
+        sheet_height_mm are set here. thickness_in / sheet_width_in /
+        sheet_height_in are computed-with-inverse from the mm fields and
+        derive automatically. effective_density is computed from family_id
+        (FAMILY_DEFAULT_DENSITY walk-up) — do NOT set density directly.
+
+        Prices are intentionally deferred to Phase-2 vendor data.
+    -->
+    <data noupdate="1">
+
+  <!--
+      Cutlist Precision Task 4: panel-role assignment on the carcass box
+      sheet goods (`sb.panel.role`, Task 1). Standard shop defaults,
+      correctable by the shop after seeding (noupdate="1" — a later `-u`
+      never clobbers a hand-edited `panel_role_ids`).
+
+      Box materials (mat_mdf_34, mat_particle_34, mat_melamine_34,
+      mat_mel_58, mat_ply_34) all get side_L/side_R/top/bottom — every
+      one of them is a live carcass-box substrate. On top of that, per
+      shop convention, mat_ply_34 (plywood) and mat_melamine_34
+      (melamine) ALSO get the `shelf` role: shelves are the two sheet
+      goods the shop actually cuts adjustable/fixed shelves from
+      (plywood boxes get plywood shelves; melamine boxes get melamine
+      shelves) — MDF/particleboard/5-8" melamine are not used as shelf
+      stock today, so `shelf` is deliberately withheld from them.
+
+      Back sheet goods (mat_ply_14_back, mat_hardboard_14) get `back`
+      only — a cabinet back is never also a side/top/bottom/shelf.
+
+      No seeded door-stock material exists yet, so `panel_role_door` is
+      not assigned anywhere in this file; it will be added to whichever
+      material the shop designates when door-stock is first seeded.
+  -->
+
+  <record id="mat_mdf_34" model="southbrook.kitchen.material">
+    <field name="name">MDF 3/4"</field>
+    <field name="code">MDF34</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">19.05</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom')])]"/>
+  </record>
+
+  <record id="mat_mdf_12" model="southbrook.kitchen.material">
+    <field name="name">MDF 1/2"</field>
+    <field name="code">MDF12</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">12.70</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_ply_34" model="southbrook.kitchen.material">
+    <field name="name">Plywood 3/4"</field>
+    <field name="code">PLY34</field>
+    <field name="family_id" ref="fam_ewood_ply"/>
+    <field name="thickness_mm">19.05</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom'),ref('panel_role_shelf')])]"/>
+  </record>
+
+  <record id="mat_ply_12" model="southbrook.kitchen.material">
+    <field name="name">Plywood 1/2"</field>
+    <field name="code">PLY12</field>
+    <field name="family_id" ref="fam_ewood_ply"/>
+    <field name="thickness_mm">12.70</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_ply_14_back" model="southbrook.kitchen.material">
+    <field name="name">Plywood 1/4" (back)</field>
+    <field name="code">PLY14BACK</field>
+    <field name="family_id" ref="fam_ewood_ply"/>
+    <field name="thickness_mm">6.35</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_back')])]"/>
+  </record>
+
+  <record id="mat_particle_34" model="southbrook.kitchen.material">
+    <field name="name">Particleboard 3/4"</field>
+    <field name="code">PART34</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">19.05</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom')])]"/>
+  </record>
+
+  <record id="mat_melamine_34" model="southbrook.kitchen.material">
+    <field name="name">Melamine 3/4"</field>
+    <field name="code">MEL34</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">19.05</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom'),ref('panel_role_shelf')])]"/>
+  </record>
+
+  <!--
+      Hygiene A2 (2026-07-26): thickness-specific materials for the 2
+      live legacy sheet components that currently resolve to the
+      GENERIC `melamine`/`mdf` materials (southbrook_mrp_kitchen_
+      workcenters seed, code='melamine'/'mdf') — those generic records
+      carry NO thickness_mm (family-default-only, used at MULTIPLE
+      thicknesses across the catalog), so `material_demand_qty`'s
+      area calc falls back to the 3/4"=19.05mm cut constant even
+      though the live components are 5/8" and 1/4" respectively,
+      under-stating the true panel area for the thinner sheets.
+
+      Setting thickness_mm on the shared generic material would be
+      WRONG (it would wrongly apply to every OTHER product still
+      correctly resolving to the generic 3/4" default). Correct fix:
+      dedicated thickness-specific materials, relinked by the
+      migration below (mirrors the mat_ply_14_back / mat_melamine_34
+      pattern already in this file).
+
+      Family kept as `fam_ewood` (density 0.68) to match the current
+      estimation-grade density these components already resolve to —
+      thickness_mm is what fixes the demand AREA calc; density
+      refinement (e.g. a dedicated hardboard/fiberboard density) is a
+      separate follow-up, not solved here.
+  -->
+  <record id="mat_mel_58" model="southbrook.kitchen.material">
+    <field name="name">Melamine 5/8"</field>
+    <field name="code">MEL58</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">15.875</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom')])]"/>
+  </record>
+
+  <record id="mat_hardboard_14" model="southbrook.kitchen.material">
+    <field name="name">Hardboard 1/4"</field>
+    <field name="code">HB14</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">6.35</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_back')])]"/>
+  </record>
+
+    </data>
+</odoo>

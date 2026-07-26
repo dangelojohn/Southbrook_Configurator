@@ -258,3 +258,106 @@ class TestM2ReconcileRoomIdempotency(TransactionCase):
         self.assertTrue(design.room_id)
         self.assertEqual(stats["created_rooms"], 1)
         self.assertEqual(len(order.room_ids), 1)
+
+
+@tagged("post_install", "-at_install", "southbrook",
+        "southbrook_kitchen_3d_configurator", "sb_geo")
+class TestFixAReconcileClearsStaleDimsOverride(TransactionCase):
+    """FIX-A (repair wave 1, findings #1/#4) — `_reconcile_one` must
+    reset a SO line's sb_line_width_mm/height_mm/depth_mm to 0 the
+    moment the mirrored design line's dims go from complete to partial/
+    cleared, instead of leaving the previous run's non-zero values in
+    place. Before the fix, `**dline._sb_dims_mm()` silently omitted
+    those three keys from `line_vals` when `_sb_dims_mm()` returned
+    `{}`, and `write()` never touches keys absent from its dict, so the
+    stale mm values from the FIRST (complete-dims) reconcile run
+    survived a second (cleared-dims) run untouched.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.Design = cls.env["southbrook.kitchen.design"]
+        cls.Line = cls.env["southbrook.kitchen.design.line"]
+        cls.Template = cls.env["product.template"]
+        cls.Partner = cls.env["res.partner"]
+        cls.Reconcile = cls.env["southbrook.design.reconcile"]
+
+        cls.partner = cls.Partner.create({
+            "name": "FixA Test Customer",
+            "email": "fixa.customer@southbrook.test",
+        })
+        cls.tmpl = cls.Template.create({
+            "name": "FixA Reconcile Base Cabinet",
+            "type": "consu",
+            "sale_ok": True,
+            "list_price": 500.0,
+        })
+        cls.tmpl.write({
+            "southbrook_is_cabinet": True,
+            "southbrook_cabinet_type": "base",
+            "southbrook_width_in": 24.0,
+            "southbrook_height_in": 34.5,
+            "southbrook_depth_in": 24.0,
+        })
+        cls.variant = cls.tmpl.product_variant_id
+
+    def _reconcile(self, design):
+        stats = {"mirrored": 0, "created_orders": 0, "created_rooms": 0,
+                  "created_lines": 0, "divergence": 0, "errors": 0}
+        self.Reconcile._reconcile_one(design, stats)
+        return stats
+
+    def test_clearing_a_dim_resets_all_three_so_line_overrides_to_zero(self):
+        design = self.Design.create({
+            "name": "FixA Test Design",
+            "partner_id": self.partner.id,
+            "room_width_in": 120,
+            "room_depth_in": 96,
+            "room_height_in": 96,
+        })
+        line = self.Line.create({
+            "design_id":    design.id,
+            "product_id":   self.variant.id,
+            "quantity":     1,
+            "price_unit":   500.0,
+            "cabinet_type": "base",
+            "origin":       "configurator",
+            "width_in":     24.0,
+            "height_in":    34.5,
+            "depth_in":     24.0,
+        })
+
+        # Run 1: complete dims -> SO line gets a real, non-zero override.
+        self._reconcile(design)
+        so_line = line.sale_order_line_id
+        self.assertTrue(so_line, "reconcile must have created/linked a SO line")
+        self.assertEqual(so_line.sb_line_width_mm, round(24.0 * 25.4))
+        self.assertEqual(so_line.sb_line_height_mm, round(34.5 * 25.4))
+        self.assertEqual(so_line.sb_line_depth_mm, round(24.0 * 25.4))
+
+        # Designer clears one dimension -> _sb_dims_mm() now returns {}
+        # (all-or-nothing contract).
+        line.write({"width_in": 0.0})
+        self.assertEqual(line._sb_dims_mm(), {})
+
+        # Run 2 (update path, same SO line reused via sale_order_line_id):
+        # the stale 610/876/610 override must be reset to 0, not left in
+        # place.
+        self._reconcile(design)
+        so_line.invalidate_recordset()
+        self.assertEqual(
+            so_line.sb_line_width_mm, 0,
+            "stale width override must be cleared once the design line's "
+            "dims become partial",
+        )
+        self.assertEqual(
+            so_line.sb_line_height_mm, 0,
+            "stale height override must be cleared once the design "
+            "line's dims become partial (all-or-nothing contract)",
+        )
+        self.assertEqual(
+            so_line.sb_line_depth_mm, 0,
+            "stale depth override must be cleared once the design line's "
+            "dims become partial (all-or-nothing contract)",
+        )

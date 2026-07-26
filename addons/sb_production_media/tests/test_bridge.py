@@ -1,0 +1,153 @@
+from odoo.tests import TransactionCase, tagged
+
+
+@tagged("post_install", "-at_install", "sb_media")
+class TestBridge(TransactionCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # dms_field's create() gates its auto-directory creation off during
+        # --test-enable runs (to avoid noise in unrelated module tests)
+        # unless this context flag is set. See dms_field/models/dms_field_mixin.py.
+        cls.env = cls.env(context=dict(cls.env.context, test_dms_field=True))
+
+    def test_storage_and_roots_exist(self):
+        """Test that storage and root directories are created correctly."""
+        st = self.env.ref("sb_production_media.storage_production_media")
+        self.assertEqual(st.save_type, "file")
+        self.assertTrue(self.env.ref("sb_production_media.dir_root_products"))
+        self.assertTrue(self.env.ref("sb_production_media.dir_root_shipping"))
+
+    def test_auto_directory_per_record(self):
+        """Creating a product.template / mrp.production auto-creates a DMS directory."""
+        p = self.env["product.template"].create({"name": "Widget"})
+        # dms_field's One2many is keyed on a plain (res_model, res_id) domain rather
+        # than a true inverse Many2one, so the ORM doesn't auto-invalidate it when
+        # dms_field_mixin.create() creates the linked dms.directory after the record
+        # insert. dms_field's own test suite invalidates for the same reason
+        # (see dms_field/tests/test_dms_field.py).
+        p.invalidate_recordset()
+        self.assertTrue(p.dms_directory_ids, "product should auto-create a DMS directory")
+        mo = self.env["mrp.production"].create({"product_id": p.product_variant_id.id})
+        mo.invalidate_recordset()
+        self.assertTrue(mo.dms_directory_ids, "MO should auto-create a DMS directory")
+
+    def test_mo_dir_nested_under_product(self):
+        """MO directory is classified sb_dir_kind='mo' and re-parented under a
+        get-or-created "Orders" subdirectory of its product's directory."""
+        p = self.env["product.template"].create({"name": "Cab"})
+        mo = self.env["mrp.production"].create({"product_id": p.product_variant_id.id})
+        # invalidate: dms_directory_ids is a plain-Integer-keyed One2many that
+        # the ORM doesn't auto-invalidate after the mixin's post-create directory
+        # insert (see class docstring / dms_field_bridge.py landmine notes).
+        p.invalidate_recordset()
+        mo.invalidate_recordset()
+        product_dir = p.dms_directory_ids[:1]
+        mo_dir = mo.dms_directory_ids[:1]
+        self.assertEqual(mo_dir.sb_dir_kind, "mo")
+        # nested: MO dir's parent is an "Orders" subdir, whose parent is the
+        # product's own directory.
+        orders_dir = mo_dir.parent_id
+        self.assertEqual(orders_dir.name, "Orders")
+        self.assertEqual(orders_dir.sb_dir_kind, "structural")
+        self.assertEqual(orders_dir.parent_id, product_dir)
+
+    def test_picking_dir_classified_shipping(self):
+        """Picking directory is classified sb_dir_kind='shipping' and sits
+        under the Shipping root (closes the C3 picking-coverage gap)."""
+        partner = self.env["res.partner"].create({"name": "Cab Customer"})
+        picking_type = self.env.ref("stock.picking_type_out")
+        picking = self.env["stock.picking"].create(
+            {
+                "partner_id": partner.id,
+                "picking_type_id": picking_type.id,
+                "location_id": picking_type.default_location_src_id.id,
+                "location_dest_id": picking_type.default_location_dest_id.id,
+            }
+        )
+        picking.invalidate_recordset()
+        picking_dir = picking.dms_directory_ids[:1]
+        self.assertTrue(picking_dir, "picking should auto-create a DMS directory")
+        self.assertEqual(picking_dir.sb_dir_kind, "shipping")
+        shipping_root = self.env.ref("sb_production_media.dir_root_shipping")
+        self.assertEqual(picking_dir.parent_id, shipping_root)
+
+    def test_flat_listings(self):
+        """Test that flat MO and Shipping QC listings are exposed via actions."""
+        # Test Manufacturing Orders Media action
+        mo_action = self.env.ref("sb_production_media.action_mo_media")
+        self.assertEqual(eval(mo_action.domain), [("sb_dir_kind", "=", "mo")])
+        self.assertEqual(mo_action.res_model, "dms.directory")
+        self.assertEqual(mo_action.view_mode, "list,form")
+
+        # Test Shipping QC action
+        shipping_action = self.env.ref("sb_production_media.action_shipping_media")
+        self.assertEqual(eval(shipping_action.domain), [("sb_dir_kind", "=", "shipping")])
+        self.assertEqual(shipping_action.res_model, "dms.directory")
+        self.assertEqual(shipping_action.view_mode, "list,form")
+
+    def test_forms_load(self):
+        """Product/MO/Picking forms carry the inline Media tab (C6)."""
+        for model, xmlid in [
+            ("product.template", "product.product_template_form_view"),
+            ("mrp.production", "mrp.mrp_production_form_view"),
+            ("stock.picking", "stock.view_picking_form"),
+        ]:
+            view = self.env.ref(xmlid)
+            arch = self.env[model].get_view(view.id, "form")["arch"]
+            self.assertIn("dms_directory_ids", arch)
+
+    def test_media_smart_button_count(self):
+        """The smart-button count field is 0 before any file exists and is
+        robust to the dms_directory_ids cache-invalidation landmine."""
+        p = self.env["product.template"].create({"name": "Widget"})
+        self.assertEqual(p.sb_media_file_count, 0)
+        mo = self.env["mrp.production"].create({"product_id": p.product_variant_id.id})
+        self.assertEqual(mo.sb_media_file_count, 0)
+
+    def test_action_sb_open_media(self):
+        """action_sb_open_media returns a dms.file action scoped to the
+        record's own directory subtree."""
+        p = self.env["product.template"].create({"name": "Widget"})
+        p.invalidate_recordset(["dms_directory_ids"])
+        directory = p.dms_directory_ids[:1]
+        action = p.action_sb_open_media()
+        self.assertEqual(action["res_model"], "dms.file")
+        self.assertEqual(action["domain"], [("directory_id", "child_of", directory.ids)])
+
+    def test_product_product_delegates_to_template(self):
+        """The product.template button-box + Media tab compose into the
+        primary product.product variant form (id 688: product.product.form),
+        so the three members the arch references must resolve on
+        product.product too. They must delegate to product_tmpl_id rather
+        than create their own per-variant DMS directory (Option A)."""
+        p = self.env["product.template"].create({"name": "Widget With Variant"})
+        variant = p.product_variant_id
+        p.invalidate_recordset(["dms_directory_ids"])
+
+        # sb_media_file_count and dms_directory_ids mirror the template's.
+        self.assertEqual(variant.sb_media_file_count, p.sb_media_file_count)
+        self.assertEqual(variant.dms_directory_ids, p.dms_directory_ids)
+
+        # action_sb_open_media on the variant delegates to the template's
+        # action (same dms.file action, scoped to the template's directory).
+        template_action = p.action_sb_open_media()
+        variant_action = variant.action_sb_open_media()
+        self.assertEqual(variant_action, template_action)
+
+        # No second DMS directory was created for the variant itself.
+        self.assertEqual(
+            self.env["dms.directory"].search_count(
+                [("res_model", "=", "product.product"), ("res_id", "=", variant.id)]
+            ),
+            0,
+        )
+
+    def test_product_product_form_view_loads(self):
+        """The primary product.product variant form (id 688) composes the
+        product.template button-box + Media tab and must validate/load
+        without a ParseError (this is the bug's actual failure surface)."""
+        view = self.env.ref("product.product_normal_form_view")
+        arch = self.env["product.product"].get_view(view.id, "form")["arch"]
+        self.assertIn("action_sb_open_media", arch)
+        self.assertIn("dms_directory_ids", arch)

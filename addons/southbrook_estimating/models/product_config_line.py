@@ -173,6 +173,42 @@ class ProductConfigSession(models.Model):
         "SB-VANITY":        ("vanity",    2,    0,      762, 800,  533),
         "SB-ACCESSORY":     ("accessory", 0,    0,      600, 762,   18),
         "SB-WORKTOP":       ("worktop",   0,    0,     1200,  25,  600),
+        # ------------------------------------------------------------
+        # Repair Wave 2, Upgrade 2 — live shorthand `default_code`s found
+        # on live BoM'd templates that don't match any row above, so
+        # `_sb_backfill_geometry()` honestly left them at 0/0/0. Each
+        # row below REUSES the exact H/D/family/door/drawer values of
+        # its mapped existing row (never invented); only width is
+        # overridden where the live product name states a specific
+        # width, using this table's own 24"/30" convention (609/762,
+        # same values as attr_width's value_mm for 24in/30in above —
+        # see product_product.py's "24-36in (~609-914mm)" door-count
+        # comment for the same 24in=609mm anchor).
+        # ------------------------------------------------------------
+        # B24 "B24 Base Cabinet" -> SB-BASE-2DR, width=24in.
+        "B24":              ("base",      2,    0,      609, 762,  609),
+        # DB24 "DB24 3-Drawer Base" -> SB-DRAWER, width=24in (already
+        # SB-DRAWER's own width; kept explicit per the live mapping).
+        "DB24":             ("drawer",    0,    3,      609, 762,  609),
+        # SB-BASE-3DRW "Base Cabinet - 3-Drawer Stack" -> SB-DRAWER,
+        # width left at SB-DRAWER's own table width (no width override
+        # given for this code).
+        "SB-BASE-3DRW":     ("drawer",    0,    3,      609, 762,  609),
+        # SB30 "SB30 Sink Base 30in" -> SB-SINK-BASE, width=30in
+        # (already SB-SINK-BASE's own width; kept explicit).
+        "SB30":             ("sink",      2,    0,      762, 762,  609),
+        # T24 "T24 Tall Pantry Cabinet" -> SB-TALL-PANTRY, width=24in.
+        "T24":              ("tall",      2,    0,      609, 2100, 609),
+        # W24 "W24 Wall Cabinet" -> SB-WALL-2DR, width=24in.
+        "W24":              ("wall",      2,    0,      609, 762,  350),
+        # W24-2 "W24-2 Wall Cabinet 2 Door" -> SB-WALL-2DR, width=24in.
+        "W24-2":            ("wall",      2,    0,      609, 762,  350),
+        # FP3 "FP3 Filler Panel 3in" -- DELIBERATELY EXCLUDED. A filler
+        # panel has no carcass (no family/door/drawer/H/D to honestly
+        # assign); per the honesty contract this code is left OUT of
+        # the table so `_sb_backfill_geometry()` continues to leave it
+        # at 0/0/0 rather than fabricate carcass dimensions for a part
+        # that isn't a cabinet.
     }
 
     def _extract_cabinet_inputs(self):
@@ -185,8 +221,32 @@ class ProductConfigSession(models.Model):
              count + plausible dimensions for the locked Q8 templates.
           3. Per-attribute picks on session.value_ids — these override
              whatever the SKU seeded as the user makes choices.
+
+        Finding I-1 (materials geometry-writeback final review, 2026-07-24):
+        this method ALWAYS returns non-zero width/height/depth (the hard
+        defaults at step 1 guarantee that), so callers cannot distinguish
+        "the viewport needs SOME geometry to render, even if guessed" (the
+        3D-payload use case this method was originally built for) from "we
+        genuinely resolved real geometry for this variant" (what A2's
+        variant-materialisation write needs, per the honesty contract).
+
+        The returned dict now carries an extra `"_geo_resolved"` bool
+        signal (additive — every existing key + the return type are
+        unchanged, so `get_3d_payload()` / `_cut_list_to_3d_payload()` and
+        any other existing caller keep working with zero changes). It is
+        True when EITHER:
+          - the SKU lookup (step 2) hit a real `_SKU_DEFAULTS` row, OR
+          - a real `attr_width` pick with a non-zero `value_mm` was found
+            on `session.value_ids` (step 3).
+        It is False when the dict is built ENTIRELY from the hard
+        defaults at step 1 — i.e. an unknown/non-cabinet template with no
+        width pick. Callers that need to render *something* (the 3D
+        viewport) can ignore the flag and keep using the guessed hard
+        defaults; callers that must never fabricate stored data (A2's
+        `get_variant_vals` writeback) gate on it.
         """
         ref = self.env.ref
+        resolved = False
         # 1. Hard defaults.
         out = {
             "width_mm": 609,
@@ -229,6 +289,7 @@ class ProductConfigSession(models.Model):
             out["width_mm"] = w
             out["height_mm"] = h
             out["depth_mm"] = d
+            resolved = True
 
         def attr_xml(name):
             return ref(f"southbrook_estimating.{name}", raise_if_not_found=False)
@@ -249,6 +310,10 @@ class ProductConfigSession(models.Model):
             attr = val.attribute_id
             if attr_width and attr == attr_width and val.value_mm:
                 out["width_mm"] = val.value_mm
+                # I-1: a real attr_width pick with a real value_mm is a
+                # genuine geometry signal on its own, independent of
+                # whether the SKU table also matched.
+                resolved = True
             elif attr_height and attr == attr_height and val.value_mm:
                 out["height_mm"] = val.value_mm
             elif attr_depth and attr == attr_depth and val.value_mm:
@@ -340,6 +405,7 @@ class ProductConfigSession(models.Model):
                 )
                 slug = "_".join(slug.split())
                 out["pull_finish"] = slug
+        out["_geo_resolved"] = resolved
         return out
 
     @api.model

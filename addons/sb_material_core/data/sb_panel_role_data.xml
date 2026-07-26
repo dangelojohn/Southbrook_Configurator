@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- I-3 (final review, 2026-07-26): these seven role codes match the
+       panel-dict keys `mrp.bom._compute_panel_dimensions` returns
+       (side_L/side_R/top/bottom/back/shelf/door), which the exact-volume
+       code in sb_material_mrp consumes directly — do not rename. They are
+       NOT identical to `sb.cutlist.PANEL_NAMES` (southbrook_kitchen_mrp):
+       that vocabulary uses `adjustable_shelf`, not `shelf` (door label also
+       differs). A future sb.cutlist convergence needs an explicit
+       shelf<->adjustable_shelf mapping, not a bare code match. -->
+  <data noupdate="1">
+    <record id="panel_role_side_l" model="sb.panel.role"><field name="name">Side (Left)</field><field name="code">side_L</field><field name="sequence">1</field></record>
+    <record id="panel_role_side_r" model="sb.panel.role"><field name="name">Side (Right)</field><field name="code">side_R</field><field name="sequence">2</field></record>
+    <record id="panel_role_top" model="sb.panel.role"><field name="name">Top</field><field name="code">top</field><field name="sequence">3</field></record>
+    <record id="panel_role_bottom" model="sb.panel.role"><field name="name">Bottom</field><field name="code">bottom</field><field name="sequence">4</field></record>
+    <record id="panel_role_back" model="sb.panel.role"><field name="name">Back</field><field name="code">back</field><field name="sequence">5</field></record>
+    <record id="panel_role_shelf" model="sb.panel.role"><field name="name">Shelf</field><field name="code">shelf</field><field name="sequence">6</field></record>
+    <record id="panel_role_door" model="sb.panel.role"><field name="name">Door</field><field name="code">door</field><field name="sequence">7</field></record>
+  </data>
+</odoo>

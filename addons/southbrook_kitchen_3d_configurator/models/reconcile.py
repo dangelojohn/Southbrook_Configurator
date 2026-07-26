@@ -212,6 +212,20 @@ class SouthbrookDesignReconcile(models.AbstractModel):
                 # backend form and reconciled Sprint 2. Skip in Sprint 1.
                 continue
             sol = dline.sale_order_line_id
+            # FIX-A (repair wave 1, finding #1/#4) — `_sb_dims_mm()`
+            # returns {} (all-or-nothing) when the design line's dims
+            # are partial/cleared. Unpacking that {} via **kwargs used
+            # to OMIT the three sb_line_*_mm keys entirely, so a later
+            # sol.write(line_vals) — which only touches keys present in
+            # the dict — left stale non-zero overrides from a prior
+            # complete-dims state on the SO line. Material weight calc
+            # then read those stale mm values as a live override.
+            # Always include all three keys (defaulting to 0) so both
+            # the create AND update paths below reset the override to
+            # 0 — "no override" — the moment the design line loses a
+            # complete dims set. Honesty contract: 0 here means
+            # "nothing to report", never a fabricated measurement.
+            dims = dline._sb_dims_mm()
             line_vals = {
                 "order_id":              design.sale_order_id.id,
                 "product_id":            dline.product_id.id,
@@ -227,6 +241,9 @@ class SouthbrookDesignReconcile(models.AbstractModel):
                 "sb_layout_key":         dline.layout_key or f"design-{design.id}-line-{dline.id}",
                 "sb_layout_origin":      "configurator",
                 "zone":                  dline.zone or False,
+                "sb_line_width_mm":      dims.get("sb_line_width_mm", 0),
+                "sb_line_height_mm":     dims.get("sb_line_height_mm", 0),
+                "sb_line_depth_mm":      dims.get("sb_line_depth_mm", 0),
             }
             if not sol:
                 # A design line regenerated with the same layout_key (e.g. a

@@ -181,6 +181,10 @@ look on a missed run, recovery procedure.</strong></p>
   once the upstream is fixed.</li>
 </ul>
 <h3 id="cron-4-weekly-planning-baseline">Cron 4 — Weekly Planning Baseline</h3>
+<p style="border-left:4px solid #b45309;background:#fffbeb;padding:8px 12px;margin:0 0 12px;">
+<strong>NOT ACTIVE (verified 2026-07-26).</strong> No <code>ir.cron</code>
+record for this exists in the running system, so none of the identifiers below
+will be found in Scheduled Actions. Retained as specification only.</p>
 <ul>
 <li><strong>Cron name</strong> (verbatim): <code>Southbrook: Weekly Planning Baseline</code></li>
 <li><strong>XML id</strong>: <code>cron_weekly_planning_baseline</code></li>

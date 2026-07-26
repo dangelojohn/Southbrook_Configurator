@@ -44,3 +44,7 @@ from . import test_action_confirm_hard_validation
 from . import test_layout_engine
 # Phase-1 hardening — topology-agnostic invariants + capacity enforcement.
 from . import test_layout_invariants
+# Task A1 — Materials geometry-writeback.
+from . import test_geometry_writeback
+# Repair Wave 2, Upgrade 2 — live shorthand SKUs added to _SKU_DEFAULTS.
+from . import test_sku_defaults_wave2

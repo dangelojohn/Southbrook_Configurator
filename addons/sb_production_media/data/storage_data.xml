@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Production Media Storage -->
+        <record id="storage_production_media" model="dms.storage">
+            <field name="name">Southbrook Production Media</field>
+            <field name="save_type">file</field>
+        </record>
+
+        <!-- Products Root Directory -->
+        <record id="dir_root_products" model="dms.directory">
+            <field name="name">Products</field>
+            <field name="is_root_directory">True</field>
+            <field name="storage_id" ref="storage_production_media"/>
+        </record>
+
+        <!-- Shipping Root Directory -->
+        <record id="dir_root_shipping" model="dms.directory">
+            <field name="name">Shipping</field>
+            <field name="is_root_directory">True</field>
+            <field name="storage_id" ref="storage_production_media"/>
+        </record>
+    </data>
+</odoo>
