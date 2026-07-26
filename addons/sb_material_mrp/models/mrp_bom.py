@@ -61,19 +61,35 @@ Investigated and ruled out, in order:
    name-parse hit is found. Mirroring it here would violate the "never
    fabricate dimensions" constraint of this task.
 
-Conclusion: height_mm/depth_mm are not reliably obtainable at the
-`mrp.bom.line` level today. Per the task brief's explicit fallback branch,
-`_panel_volume_mm3` returns 0.0 and logs a debug note rather than fabricate.
-`component_weight_kg` for `density_volume` materials is therefore honestly
-"unavailable" (0.0) until a later phase adds a stored, config-time-populated
-width_mm/height_mm/depth_mm field on the cabinet's product.template (the
-natural home, since `_compute_panel_dimensions` is already invoked from
-`product_config_line.py` at that exact moment — it would just need to also
-write W/H/D back onto the template/variant it configures).
+Conclusion (AS OF THIS TASK — historical, gap now CLOSED, see below):
+height_mm/depth_mm were not reliably obtainable at the `mrp.bom.line` level.
+Per the task brief's explicit fallback branch, `_panel_volume_mm3` returned
+0.0 and logged a debug note rather than fabricate. `component_weight_kg` for
+`density_volume` materials was therefore honestly "unavailable" (0.0) until
+a later phase added a stored, config-time-populated width_mm/height_mm/
+depth_mm field on the cabinet's product.template/product.product.
+
+--------------------------------------------------------------------------
+UPDATE — Task A4 (Materials geometry-writeback plan): gap CLOSED
+--------------------------------------------------------------------------
+Exactly the "later phase" anticipated above has landed: Task A1 added
+`product.product.sb_width_mm/sb_height_mm/sb_depth_mm/sb_panel_family/
+sb_door_count/sb_drawer_count/sb_finished_sides` plus a reader,
+`_sb_geometry_inputs()`, returning a dict of the exact kwargs
+`_compute_panel_dimensions()` expects (or `{}` when the variant has no real
+geometry). Tasks A2/A3 populate those fields at OCA variant-creation time
+and via a one-off backfill. `_panel_volume_mm3` (below) now reads the
+CABINET variant off `line.bom_id` (not the component `line.product_id`),
+calls `_sb_geometry_inputs()`, and — when non-empty — calls
+`_compute_panel_dimensions(**geo)` and sums the CARCASS panels (side_L,
+side_R, top, bottom, back, shelf x shelf_count). Doors are excluded (a door
+is normally a different material than the carcass sheet good this
+`density_volume` component represents); a later precision pass can map
+panel-type -> material explicitly. The honesty contract is unchanged: 0.0,
+never fabricated, whenever geometry is genuinely absent.
 
 The pure helpers (`_weight_from_volume`, `_weight_for_qty`) and the
-weight_source dispatch are fully implemented and unit-tested independent of
-this cutlist-wiring gap.
+weight_source dispatch remain independent of this wiring and unaffected.
 """
 import logging
 
@@ -164,19 +180,34 @@ class MrpBomLine(models.Model):
     # depth cannot be read from real, stored data.
     # ----------------------------------------------------------------
     def _panel_volume_mm3(self, line):
-        """Total cut-panel volume (mm3) for the CABINET `line` belongs to.
+        """Total CARCASS panel volume (mm3) for the cabinet `line` belongs to.
 
-        Reliably available only when:
-        1. `mrp.bom._compute_panel_dimensions` exists (southbrook_estimating
-           installed), AND
-        2. the cabinet's width_mm/height_mm/depth_mm are readable as real
-           stored data (not fabricated defaults).
+        Task A4 (Materials geometry-writeback plan): the gap documented in
+        the module docstring above is closed — `product.product`
+        (southbrook_estimating, Task A1) now carries stored
+        sb_width_mm/sb_height_mm/sb_depth_mm/sb_panel_family/sb_door_count/
+        sb_drawer_count/sb_finished_sides, populated at variant-creation and
+        backfill time (Tasks A2/A3). `_sb_geometry_inputs()` exposes them as
+        the exact kwargs `mrp.bom._compute_panel_dimensions()` expects, or
+        `{}` when the variant has no real (non-fabricated) geometry — the
+        honesty contract is unchanged, just the source of truth moved from
+        "nothing" to "the stored variant fields".
 
-        As of this commit, (2) never holds — see the module docstring for
-        the investigated reasons (no stored W/H/D field on
-        product.template/product.product; height/depth have no backing
-        product.attribute at all in shipped data). Returns 0.0 and logs a
-        debug note documenting the exact gap, rather than guess.
+        Sums l*w*th over the CARCASS-only panel keys returned by
+        `_compute_panel_dimensions`: side_L, side_R, top, bottom, back, and
+        shelf (multiplied by shelf_count). Doors are deliberately EXCLUDED —
+        a door is typically a different material (e.g. 5-piece MDF vs.
+        carcass melamine) than the density_volume component this method is
+        computing volume for; a later precision pass should map
+        panel-type -> material explicitly instead of lumping doors into the
+        carcass sheet-good total.
+
+        Returns 0.0 (never fabricated) when either:
+        1. `mrp.bom._compute_panel_dimensions` doesn't exist
+           (southbrook_estimating not installed — soft-guard, even though
+           it's a hard manifest dependency of this module today), or
+        2. the cabinet variant has no stored geometry
+           (`_sb_geometry_inputs()` returns `{}`).
         """
         Bom = self.env["mrp.bom"]
         if not hasattr(Bom, "_compute_panel_dimensions"):
@@ -187,21 +218,25 @@ class MrpBomLine(models.Model):
             )
             return 0.0
 
-        cab = line.bom_id.product_tmpl_id
-        # See module docstring: no reliable, non-fabricated source for
-        # width_mm/height_mm/depth_mm exists yet at the mrp.bom.line level.
-        # A future phase should have product.config.line write these back
-        # onto the configured product.template/product.product at the same
-        # moment it calls _compute_panel_dimensions() for the cutlist, so
-        # this method can read them as plain stored fields.
-        _logger.debug(
-            "_panel_volume_mm3: no reliable width_mm/height_mm/depth_mm "
-            "source for cabinet template %s (bom line %s) — see "
-            "sb_material_mrp/models/mrp_bom.py module docstring for the "
-            "investigated integration gap. Returning 0.0 (not fabricated).",
-            cab.id, line.id,
-        )
-        return 0.0
+        cab = line.bom_id.product_id or line.bom_id.product_tmpl_id.product_variant_id
+        geo = cab._sb_geometry_inputs() if hasattr(cab, "_sb_geometry_inputs") else {}
+        if not geo:
+            _logger.debug(
+                "_panel_volume_mm3: no geometry on variant %s (line %s) -> "
+                "0.0 (not fabricated).", cab.id, line.id,
+            )
+            return 0.0
+
+        dims = Bom._compute_panel_dimensions(**geo)
+        total = 0.0
+        for key in ("side_L", "side_R", "top", "bottom", "back"):
+            p = dims.get(key)
+            if p:
+                total += p[0] * p[1] * p[2]
+        shelf = dims.get("shelf")
+        if shelf:
+            total += shelf[0] * shelf[1] * shelf[2] * (dims.get("shelf_count") or 0)
+        return total
 
     @api.depends(
         "material_id",
