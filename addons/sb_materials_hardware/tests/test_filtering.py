@@ -25,24 +25,30 @@ class TestFiltering(TransactionCase):
             "x_southbrook_screw_length_mm": 40.0,
         })
 
-    def _names(self, facets):
-        payload = self.Provider.get_catalog(
-            scope="tools", category_id=self.cat.id, facets=facets)
-        return {r["name"] for r in payload["rows"]}
+    def _matching(self, facets):
+        """Apply the facet domain directly to product.template.
+
+        This task is tested against the DOMAIN BUILDER, not against rows —
+        rows arrive in Task 8. Keeping the test at this level is what makes
+        Task 7 independently green.
+        """
+        domain = self.env["tools.catalog.provider"]._facet_domain(facets)
+        base = [("x_southbrook_tool_category_id", "child_of", self.cat.id)]
+        return set(self.env["product.template"].search(base + domain).mapped("name"))
 
     def test_single_value_filters(self):
-        names = self._names({"x_southbrook_thread_type": ["confirmat"]})
+        names = self._matching({"x_southbrook_thread_type": ["confirmat"]})
         self.assertIn("TEST Confirmat 7x50", names)
         self.assertNotIn("TEST Euro 6.3x13", names)
 
     def test_multi_select_within_facet_is_or(self):
-        names = self._names({"x_southbrook_thread_type": ["confirmat", "euro"]})
+        names = self._matching({"x_southbrook_thread_type": ["confirmat", "euro"]})
         self.assertIn("TEST Confirmat 7x50", names)
         self.assertIn("TEST Euro 6.3x13", names)
         self.assertNotIn("TEST Coarse 4x40", names)
 
     def test_across_facets_is_and(self):
-        names = self._names({
+        names = self._matching({
             "x_southbrook_thread_type": ["confirmat", "euro"],
             "x_southbrook_screw_length_mm": {"min": 40.0, "max": 60.0},
         })
@@ -50,6 +56,10 @@ class TestFiltering(TransactionCase):
         self.assertNotIn("TEST Euro 6.3x13", names)
 
     def test_empty_facets_returns_everything_in_category(self):
-        names = self._names({})
+        names = self._matching({})
         self.assertTrue({"TEST Confirmat 7x50", "TEST Euro 6.3x13",
                          "TEST Coarse 4x40"}.issubset(names))
+
+    def test_unknown_field_is_ignored_not_crashed(self):
+        names = self._matching({"x_southbrook_not_a_field": ["anything"]})
+        self.assertIn("TEST Confirmat 7x50", names)
