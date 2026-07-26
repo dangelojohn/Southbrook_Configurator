@@ -142,7 +142,14 @@ class MrpBomLine(models.Model):
         help="Per-line geometry override: depth in mm. 0 = use variant geometry.",
     )
 
-    @api.depends("product_id")
+    # NOTE: product_id.product_tmpl_id.material_id is the Wave-3 product-level
+    # fallback (sb_material_core) — without this dotted dep, linking a material
+    # on an existing component's template never retriggers this stored compute
+    # (observed live: 6 components linked by migration, all line material_id
+    # stale-empty). The attribute-value path (PTAV material_id edits) still
+    # doesn't retrigger — pre-existing, rare, and fixable by editing the line's
+    # product; documented here for honesty.
+    @api.depends("product_id", "product_id.product_tmpl_id.material_id")
     def _compute_material_id(self):
         for line in self:
             line.material_id = (
