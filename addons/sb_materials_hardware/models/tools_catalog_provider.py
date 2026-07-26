@@ -17,6 +17,46 @@ GENERIC_COLUMNS = [
      "sortable": True},
 ]
 
+# Numeric and boolean values are never absence — 0 and False are real data
+# for these types and must survive verbatim. Everything else's falsy value
+# ("never set") normalizes to None. Shared by _rows (table) and _build_detail
+# (spec grid + engineering rail) so there is exactly one absence rule.
+VALUE_IS_NEVER_ABSENT = {"float", "integer", "monetary", "boolean"}
+
+
+def _normalize_value(value, field):
+    """Apply the catalog's absence convention to one raw field value.
+
+    `field` is the product.template field object (or None if the key isn't
+    a real field on the model) — its `.type` decides whether a falsy raw
+    value means "never set" (-> None) or is genuine data to keep as-is.
+    """
+    ftype = field.type if field else None
+    if ftype in VALUE_IS_NEVER_ABSENT:
+        return value
+    return None if not value else value
+
+
+BADGE_FIELDS = [
+    ("x_southbrook_hazardous", "Hazardous"),
+    ("x_southbrook_flammable", "Flammable"),
+    ("x_southbrook_msds_required", "MSDS required"),
+    ("x_southbrook_requires_ventilation", "Ventilation required"),
+    ("x_southbrook_expiry_required", "Expiry tracked"),
+]
+
+ENGINEERING_FIELDS = [
+    ("x_southbrook_preferred_vendor_id", "Preferred vendor"),
+    ("x_southbrook_vendor_sku", "Vendor SKU"),
+    ("x_southbrook_issue_uom_id", "Issue UoM"),
+    ("x_southbrook_min_stock_qty", "Min stock"),
+    ("x_southbrook_max_stock_qty", "Max stock"),
+    ("x_southbrook_reorder_multiple", "Reorder multiple"),
+    ("x_southbrook_estimated_life_qty", "Estimated life"),
+    ("x_southbrook_estimated_life_unit", "Life unit"),
+    ("x_southbrook_tool_lifecycle_state", "Lifecycle"),
+]
+
 
 class ToolsCatalogProvider(models.AbstractModel):
     _name = "tools.catalog.provider"
@@ -321,10 +361,6 @@ class ToolsCatalogProvider(models.AbstractModel):
             for rec in products.mapped("product_tmpl_id").read(spec_keys):
                 tmpl_data[rec["id"]] = rec
 
-        # Numeric and boolean values are never absence — 0 and False are
-        # real data for these types and must survive verbatim.
-        VALUE_IS_NEVER_ABSENT = {"float", "integer", "monetary", "boolean"}
-
         rows = []
         for product in products:
             row = {
@@ -334,13 +370,72 @@ class ToolsCatalogProvider(models.AbstractModel):
             }
             specs = tmpl_data.get(product.product_tmpl_id.id, {})
             for key in spec_keys:
-                value = specs.get(key)
-                field = Tmpl._fields.get(key)
-                ftype = field.type if field else None
-                if ftype in VALUE_IS_NEVER_ABSENT:
-                    row[key] = value
-                else:
-                    # False, "" or an empty relation all mean "never set".
-                    row[key] = None if not value else value
+                row[key] = _normalize_value(specs.get(key), Tmpl._fields.get(key))
             rows.append(row)
         return rows, total
+
+    @api.model
+    def _build_detail(self, product_id):
+        """Detail payload for one variant: spec grid, engineering rail,
+        safety badges.
+
+        The spec grid reuses the selected category's declared columns
+        (same `_columns()` as the table), so the detail panel and the row
+        it was opened from never disagree about which specs exist.
+
+        Values share the absence rule with _rows() via _normalize_value —
+        one read() batches both the spec keys and the engineering fields
+        so a many2one comes back as Odoo's (id, display_name) tuple, from
+        which we take the display name: the detail panel must never show
+        a raw database id.
+        """
+        product = self.env["product.product"].browse(product_id)
+        if not product.exists():
+            return self._degrade_detail("Unknown product")
+        tmpl = product.product_tmpl_id
+        category = tmpl.x_southbrook_tool_category_id
+        columns = self._columns(category)
+
+        spec_keys = [c["key"] for c in columns
+                     if c["key"] not in ("name", "default_code")]
+        engineering_keys = [f for f, _label in ENGINEERING_FIELDS
+                            if f in tmpl._fields]
+        read_keys = list(dict.fromkeys(
+            k for k in spec_keys + engineering_keys if k in tmpl._fields))
+        data = tmpl.read(read_keys)[0] if read_keys else {}
+
+        specs = [{"label": col["label"],
+                  "value": self._detail_value(tmpl, data, col["key"])}
+                 for col in columns if col["key"] not in ("name", "default_code")]
+
+        engineering = [{"label": label,
+                        "value": self._detail_value(tmpl, data, field_name)}
+                       for field_name, label in ENGINEERING_FIELDS
+                       if field_name in tmpl._fields]
+
+        badges = [label for field_name, label in BADGE_FIELDS
+                  if field_name in tmpl._fields and tmpl[field_name]]
+
+        return {
+            "ok": True,
+            "reason": None,
+            "title": product.display_name,
+            "subtitle": category.complete_name if category else "",
+            "specs": specs,
+            "engineering": engineering,
+            "badges": badges,
+        }
+
+    @api.model
+    def _detail_value(self, tmpl, data, key):
+        """One field's value, read()-shaped, normalized, relation-resolved.
+
+        `data` came from a batched tmpl.read(); a many2one there is Odoo's
+        (id, display_name) tuple — collapse it to the name so the detail
+        panel renders "ACME Supply", never a bare id.
+        """
+        field = tmpl._fields.get(key)
+        raw = data.get(key) if field else False
+        if isinstance(raw, tuple):
+            raw = raw[1]
+        return _normalize_value(raw, field)
