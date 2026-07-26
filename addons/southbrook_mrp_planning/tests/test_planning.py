@@ -147,6 +147,54 @@ class TestSouthbrookPlanning(TransactionCase):
             "Computing requirements must be side-effect free; MOs appear only "
             "on explicit release.")
 
+    def test_recompute_preserves_released_lines(self):
+        """Recomputing must not delete a released line.
+
+        A released line is the audit record of work actually put into the
+        system, and it is pointed at by a live MO. Wiping it on recompute
+        loses that trail.
+        """
+        self._confirmed_order(self.cabinet, 3.0)
+        run = self._run()
+        line = run.line_ids.filtered(lambda l: l.product_id == self.cabinet)
+        line.action_release()
+        released_id = line.id
+        mo = line.generated_ref
+        run.action_compute()
+        surviving = run.line_ids.filtered(lambda l: l.id == released_id)
+        self.assertTrue(
+            surviving,
+            "A released line must survive recompute — it is the record that "
+            "this requirement was actioned.")
+        self.assertEqual(surviving.generated_ref, mo)
+
+    def test_released_production_is_not_planned_twice(self):
+        """The over-production guard.
+
+        Release 3 cabinets, then let a further order for 2 arrive. Gross
+        demand becomes 5, but 3 are already being built, so only 2 more
+        should be proposed. Without netting against open MOs this proposed 5
+        again and released 8 units of work for 5 units of demand.
+        """
+        self._confirmed_order(self.cabinet, 3.0)
+        run = self._run()
+        run.line_ids.filtered(
+            lambda l: l.product_id == self.cabinet).action_release()
+
+        self._confirmed_order(self.cabinet, 2.0)
+        run2 = self._run()
+        proposal = run2.line_ids.filtered(
+            lambda l: l.product_id == self.cabinet and not l.released)
+        self.assertTrue(proposal, "The 2 extra units should be proposed.")
+        self.assertEqual(
+            proposal.net_qty, 2.0,
+            "3 of the 5 required cabinets are already on an open MO, so only "
+            "2 more may be proposed.")
+        self.assertEqual(
+            proposal.supply_qty, 3.0,
+            "Open manufacturing orders are the supply signal for a "
+            "non-storable product.")
+
     def test_release_creates_manufacturing_order(self):
         """Releasing a manufacture line creates exactly one MO, once."""
         self._confirmed_order(self.cabinet, 2.0)

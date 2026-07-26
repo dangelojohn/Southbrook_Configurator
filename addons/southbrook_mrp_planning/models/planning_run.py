@@ -116,19 +116,49 @@ class SouthbrookPlanningRun(models.Model):
     # ------------------------------------------------------------------
     # Supply netting
     # ------------------------------------------------------------------
-    def _available_supply(self, product):
-        """On-hand + inbound for *product*, or 0.0 when it carries no stock.
+    def _open_production_qty(self, product):
+        """Quantity still to be produced on open manufacturing orders.
 
-        A non-storable product has no meaningful ``qty_available``; Odoo
-        reports 0.0 but the figure is not a balance, it is an absence of
-        the concept. Returning 0.0 explicitly documents that a made-to-order
-        cabinet built for a previous order can never satisfy this one.
+        This is the only supply signal available for a non-storable product:
+        it never enters stock, so ``qty_available``/``incoming_qty`` are
+        structurally blind to an MO that is already running for it. Without
+        this, releasing a requirement and then recomputing would propose the
+        same work a second time.
+        """
+        self.ensure_one()
+        mos = self.env["mrp.production"].search([
+            ("product_id", "=", product.id),
+            ("company_id", "=", self.company_id.id),
+            ("state", "not in", ("done", "cancel")),
+        ])
+        outstanding = 0.0
+        for mo in mos:
+            outstanding += max(mo.product_qty - mo.qty_produced, 0.0)
+        return outstanding
+
+    def _available_supply(self, product):
+        """Supply already committed to satisfying demand for *product*.
+
+        Storable: free stock plus inbound. ``free_qty`` rather than
+        ``qty_available`` deliberately — on-hand that is already reserved
+        against another operation is not available to this plan, and using
+        the gross figure lets two demands net against the same physical
+        units.
+
+        Non-storable: stock quantities are meaningless (the product never
+        enters stock), so supply is whatever open manufacturing orders will
+        deliver. A cabinet built for a previous order cannot satisfy this
+        one, but a cabinet currently *being* built for this demand can.
         """
         self.ensure_one()
         if not product.is_storable:
-            return 0.0
-        scoped = product.with_context(warehouse=self.warehouse_id.id)
-        return scoped.qty_available + scoped.incoming_qty
+            return self._open_production_qty(product)
+        # v19 stock reads the 'warehouse_id' context key (see
+        # product._get_domain_locations); a plain 'warehouse' key is silently
+        # ignored and the figures fall back to every warehouse in
+        # env.companies, overstating supply in a multi-warehouse company.
+        scoped = product.with_context(warehouse_id=self.warehouse_id.id)
+        return scoped.free_qty + scoped.incoming_qty
 
     # ------------------------------------------------------------------
     # BoM explosion
@@ -159,6 +189,16 @@ class SouthbrookPlanningRun(models.Model):
             needed = line_vals.get("qty", 0.0)
             if needed <= 0:
                 continue
+            # bom.explode reports the quantity in the BoM LINE's UoM, which is
+            # not necessarily the component's own UoM. Netting compares against
+            # stock figures expressed in component.uom_id, and the recursive
+            # factor divides by the sub-BoM's product_qty (also component UoM),
+            # so convert once here rather than mixing units downstream.
+            line_uom = bom_line.product_uom_id
+            if line_uom and line_uom != component.uom_id:
+                needed = line_uom._compute_quantity(needed, component.uom_id)
+                if needed <= 0:
+                    continue
             requirements[component] = requirements.get(component, 0.0) + needed
             if component.id in seen:
                 _logger.warning(
@@ -174,7 +214,13 @@ class SouthbrookPlanningRun(models.Model):
     # ------------------------------------------------------------------
     def action_compute(self):
         self.ensure_one()
-        self.line_ids.unlink()
+        # Released lines are an audit record of work that was actually put
+        # into the system, and they are pointed at by a live MO or PO. Only
+        # the unreleased proposals are recomputed. Wiping released lines here
+        # would both lose that trail and — because supply for a non-storable
+        # product is derived from open MOs — let the same demand be released
+        # twice, over-producing.
+        self.line_ids.filtered(lambda l: not l.released).unlink()
         Line = self.env["southbrook.planning.line"]
         Bom = self.env["mrp.bom"]
 
@@ -255,7 +301,21 @@ class SouthbrookPlanningLine(models.Model):
         string="Created Document", copy=False, readonly=True)
 
     def action_release(self):
-        """Create the real supply document for each unreleased line."""
+        """Create the real supply document for each unreleased line.
+
+        The rows are locked before the released flag is re-read. Without the
+        lock, two concurrent callers — two users, a double-clicked button, or
+        a user racing a scheduled job — can both pass the ``released`` check
+        before either commits, and each creates a document. A duplicate
+        purchase order is real money, so this is a lock rather than a
+        best-effort check.
+        """
+        if not self:
+            return True
+        self.env.cr.execute(
+            "SELECT id FROM southbrook_planning_line WHERE id IN %s FOR UPDATE",
+            (tuple(self.ids),))
+        self.invalidate_recordset(["released", "generated_ref"])
         for line in self:
             if line.released:
                 continue
@@ -272,14 +332,22 @@ class SouthbrookPlanningLine(models.Model):
             raise UserError(_(
                 "%s has no bill of materials, so it cannot be manufactured. "
                 "Change the line to Buy.", self.product_id.display_name))
-        mo = self.env["mrp.production"].create({
+        vals = {
             "product_id": self.product_id.id,
             "product_qty": self.net_qty,
             "product_uom_id": self.product_id.uom_id.id,
             "bom_id": bom.id,
             "company_id": self.company_id.id,
             "origin": self.run_id.name,
-        })
+        }
+        # Pin the MO to the warehouse the plan was netted against. Left to
+        # its own devices the precomputed picking type resolves by a
+        # limit=1 search, which in a multi-warehouse company can land the
+        # order somewhere other than where the requirement was calculated.
+        manu_type = self.run_id.warehouse_id.manu_type_id
+        if manu_type:
+            vals["picking_type_id"] = manu_type.id
+        mo = self.env["mrp.production"].create(vals)
         self.write({"released": True, "generated_ref": f"mrp.production,{mo.id}"})
 
     def _release_buy(self):
