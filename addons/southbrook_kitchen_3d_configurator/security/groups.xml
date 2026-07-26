@@ -55,9 +55,16 @@
              module, and every module that depends on it, on a fresh database. -->
         <function model="res.groups" name="write">
             <value eval="[ref('group_kitchen_manager')]"/>
+            <!-- all_group_ids, NOT group_ids. Odoo 19 split the concept:
+                 group_ids is "Groups explicitly assigned to the user", while
+                 implied groups (base.group_user comes via group_system, etc.)
+                 live in all_group_ids, which carries search='_search_all_group_ids'
+                 so it is queryable. Searching group_ids here matched nobody —
+                 no user holds base.group_user explicitly — so this migration
+                 silently granted nothing until this was corrected. -->
             <value model="res.users" eval="{'user_ids': [(4, u.id) for u in
                 obj().search([
-                    ('group_ids', 'in', [ref('base.group_user')]),
+                    ('all_group_ids', 'in', [ref('base.group_user')]),
                     ('share', '=', False),
                 ])]}"/>
         </function>
