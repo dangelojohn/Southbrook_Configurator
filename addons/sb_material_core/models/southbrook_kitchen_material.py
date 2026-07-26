@@ -8,6 +8,26 @@ FAMILY_DEFAULT_DENSITY = {
     "plastic": 1.20, "glass": 2.50, "stone": 2.60, "concrete": 2.30,
 }
 
+# Task C2: dual-unit (metric + Imperial) dimensions. Canonical unit is always
+# mm; the Imperial fields are computed-with-inverse companions so a Canadian
+# shop can enter/read either unit on any record without losing precision.
+MM_PER_IN = 25.4
+
+# Standard sheet-good thicknesses (quick-pick), in canonical mm.
+STANDARD_THICKNESS_MM = {
+    "quarter": 6.35, "half": 12.70, "five_eighth": 15.875, "three_quarter": 19.05,
+}
+
+
+def _mm_to_in(mm):
+    """mm -> in, rounded to 3dp to avoid float drift (e.g. 0.7499999...)."""
+    return round(mm / MM_PER_IN, 3) if mm else 0.0
+
+
+def _in_to_mm(inch):
+    """in -> mm, rounded to 2dp (canonical mm precision)."""
+    return round(inch * MM_PER_IN, 2) if inch else 0.0
+
 
 class KitchenMaterial(models.Model):
     _inherit = "southbrook.kitchen.material"
@@ -32,6 +52,68 @@ class KitchenMaterial(models.Model):
         help="Sheet thickness; e.g. 1/2\"=12.70, 5/8\"=15.875, 3/4\"=19.05. "
              "Overrides the cut-constant thickness in the weight calc when "
              "set.")
+    # Task C2: canonical mm sheet-size fields.
+    sheet_width_mm = fields.Float("Sheet Width (mm)", digits=(8, 2), default=0.0)
+    sheet_height_mm = fields.Float("Sheet Height (mm)", digits=(8, 2), default=0.0)
+
+    # Task C2: Imperial companions — computed-with-inverse. The compute reads
+    # the canonical mm field (one-directional dependency); the inverse writes
+    # the mm field when the Imperial field is assigned. There is no in<->in
+    # dependency, so a write can never re-trigger its own inverse (no loop).
+    thickness_in = fields.Float(
+        "Thickness (in)", digits=(8, 3), store=True,
+        compute="_compute_thickness_in", inverse="_inverse_thickness_in",
+        help="Imperial companion of thickness_mm. Editing either field "
+             "updates the other; thickness_mm remains canonical.")
+    sheet_width_in = fields.Float(
+        "Sheet Width (in)", digits=(8, 3), store=True,
+        compute="_compute_sheet_width_in", inverse="_inverse_sheet_width_in",
+        help="Imperial companion of sheet_width_mm.")
+    sheet_height_in = fields.Float(
+        "Sheet Height (in)", digits=(8, 3), store=True,
+        compute="_compute_sheet_height_in", inverse="_inverse_sheet_height_in",
+        help="Imperial companion of sheet_height_mm.")
+
+    standard_thickness = fields.Selection(
+        [("quarter", '1/4" (6.35mm)'), ("half", '1/2" (12.70mm)'),
+         ("five_eighth", '5/8" (15.875mm)'), ("three_quarter", '3/4" (19.05mm)')],
+        string="Standard Thickness",
+        help="Quick-pick; selecting a value sets thickness_mm to the exact "
+             "standard equivalent. Purely a convenience — thickness_mm/in "
+             "remain the source of truth and can still be hand-edited.")
+
+    @api.depends("thickness_mm")
+    def _compute_thickness_in(self):
+        for m in self:
+            m.thickness_in = _mm_to_in(m.thickness_mm)
+
+    def _inverse_thickness_in(self):
+        for m in self:
+            m.thickness_mm = _in_to_mm(m.thickness_in)
+
+    @api.depends("sheet_width_mm")
+    def _compute_sheet_width_in(self):
+        for m in self:
+            m.sheet_width_in = _mm_to_in(m.sheet_width_mm)
+
+    def _inverse_sheet_width_in(self):
+        for m in self:
+            m.sheet_width_mm = _in_to_mm(m.sheet_width_in)
+
+    @api.depends("sheet_height_mm")
+    def _compute_sheet_height_in(self):
+        for m in self:
+            m.sheet_height_in = _mm_to_in(m.sheet_height_mm)
+
+    def _inverse_sheet_height_in(self):
+        for m in self:
+            m.sheet_height_mm = _in_to_mm(m.sheet_height_in)
+
+    @api.onchange("standard_thickness")
+    def _onchange_standard_thickness(self):
+        if self.standard_thickness:
+            self.thickness_mm = STANDARD_THICKNESS_MM[self.standard_thickness]
+
     # Cost cascade Tier-2 (manual) inputs — consumed by material.cost.source (Task 8).
     currency_id = fields.Many2one(
         "res.currency", default=lambda self: self.env.company.currency_id)

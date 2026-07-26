@@ -2,3 +2,4 @@
 from . import test_family
 from . import test_material_fields
 from . import test_attribute_link
+from . import test_material_geometry_dualunit
