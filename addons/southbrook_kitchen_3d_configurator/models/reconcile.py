@@ -227,6 +227,14 @@ class SouthbrookDesignReconcile(models.AbstractModel):
                 "sb_layout_key":         dline.layout_key or f"design-{design.id}-line-{dline.id}",
                 "sb_layout_origin":      "configurator",
                 "zone":                  dline.zone or False,
+                # Task B3 (Materials geometry-writeback plan, Increment
+                # B) — mirror this design line's real per-instance
+                # cabinet dims (drag-resize/filler overrides included)
+                # the same way action_create_quotation does, so the
+                # ongoing Rec D sync doesn't regress dims that the
+                # one-shot quote path already carries. {} when the
+                # line has no real dims (never fabricated).
+                **dline._sb_dims_mm(),
             }
             if not sol:
                 # A design line regenerated with the same layout_key (e.g. a

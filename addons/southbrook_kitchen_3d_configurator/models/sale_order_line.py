@@ -96,3 +96,82 @@ class SaleOrderLine(models.Model):
         "sale_order_line_id",
         string="Bridged Design Lines",
     )
+
+    # ── Task B3 (Materials geometry-writeback plan, Increment B) ────────
+    # Per-instance cabinet dims (mm), carried over from the 3D
+    # configurator's southbrook.kitchen.design.line.width_in/height_in/
+    # depth_in (see kitchen_design.py's SouthbrookKitchenDesignLine.
+    # _sb_dims_mm, ×25.4, rounded) — including any drag-resize or filler
+    # override. 0 = no per-instance override captured on this line
+    # (manual/backend line, or the design line's dims were incomplete);
+    # downstream weight computation falls back to the variant's nominal
+    # geometry. Named to match mrp.bom.line.sb_line_width_mm/height_mm/
+    # depth_mm (sb_material_mrp, Task B1) for cross-model grep parity —
+    # this module does NOT depend on sb_material_mrp, so consumers must
+    # soft-guard (see _sb_apply_dims_to_bom_line below).
+    sb_line_width_mm = fields.Integer(
+        string="Cabinet Width Override (mm)",
+        default=0,
+        help="Per-instance cabinet width (mm) from the 3D configurator's "
+             "design line, incl. drag-resize/filler overrides. 0 = none "
+             "captured.",
+    )
+    sb_line_height_mm = fields.Integer(
+        string="Cabinet Height Override (mm)",
+        default=0,
+        help="Per-instance cabinet height (mm) from the 3D configurator's "
+             "design line, incl. drag-resize/filler overrides. 0 = none "
+             "captured.",
+    )
+    sb_line_depth_mm = fields.Integer(
+        string="Cabinet Depth Override (mm)",
+        default=0,
+        help="Per-instance cabinet depth (mm) from the 3D configurator's "
+             "design line, incl. drag-resize/filler overrides. 0 = none "
+             "captured.",
+    )
+
+    def _sb_apply_dims_to_bom_line(self, bom_line):
+        """Task B3 — copy this SO line's per-instance dims (mm) onto a
+        SPECIFIC `mrp.bom.line` recordset's sb_line_width_mm/height_mm/
+        depth_mm (sb_material_mrp Task B1 fields, consumed by
+        `_panel_volume_mm3`, Task B2).
+
+        This is the narrow, direct mapping seam — it does NOT resolve
+        or search for "the" bom.line to update; the caller must supply
+        one it already knows is safe to write (see the caveat below).
+
+        Soft-guards (both no-ops, never raise):
+          * `sb_material_mrp` not installed -> `sb_line_width_mm` isn't
+            a field on `mrp.bom.line` -> returns without writing.
+          * this SO line carries no real per-instance override (any of
+            the three mm fields is 0) -> returns without writing,
+            mirroring the same all-or-nothing contract everywhere else
+            in the geometry-writeback chain.
+
+        CAVEAT (see docs/sdd-briefs/geo-B3-report.md "BoM-build path"
+        finding): `southbrook_kitchen_3d_configurator`'s own BoM-autoseed
+        path (`kitchen_design._ensure_kitchen_bom`) resolves ONE
+        `mrp.bom` per `product.template`, shared by every design/order
+        that uses that template/product — most visibly the filler-panel
+        SKU, which is deliberately reused across many rooms with a
+        DIFFERENT remainder width each time. Calling this method with a
+        bom.line drawn from that shared, autoseeded BOM would silently
+        make the last-quoted room's cut width win for every other
+        room's filler too. This method is intentionally NOT wired into
+        `_ensure_kitchen_bom` for that reason; it is exposed and tested
+        as the correct, narrow mapping primitive for a future per-order/
+        per-placement BoM (or any other caller that owns a bom.line
+        genuinely scoped to this one SO line).
+        """
+        self.ensure_one()
+        if "sb_line_width_mm" not in bom_line._fields:
+            return
+        if not (self.sb_line_width_mm and self.sb_line_height_mm
+                and self.sb_line_depth_mm):
+            return
+        bom_line.write({
+            "sb_line_width_mm":  self.sb_line_width_mm,
+            "sb_line_height_mm": self.sb_line_height_mm,
+            "sb_line_depth_mm":  self.sb_line_depth_mm,
+        })

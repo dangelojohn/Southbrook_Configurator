@@ -41,3 +41,9 @@ from . import test_yz_semantics_migration
 # (southbrook.kitchen.design._place_lines_on_wall); back-wall lines are
 # left exactly as the client sent them.
 from . import test_wall_placement_engine
+
+# Task B3 (Materials geometry-writeback plan, Increment B) — thread
+# per-instance cabinet dims (drag-resize/filler overrides) from
+# design.line through action_create_quotation onto sale.order.line, plus
+# the narrow sale.order.line -> mrp.bom.line mapping seam.
+from . import test_geo_b3_line_dims

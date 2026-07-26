@@ -1493,6 +1493,15 @@ class SouthbrookKitchenDesign(models.Model):
                         "name":            self._quote_line_name(line),
                         "product_uom_qty": line.quantity,
                         "price_unit":      line.price_unit,
+                        # Task B3 (Materials geometry-writeback plan,
+                        # Increment B) — carry this line's real per-
+                        # instance cabinet dims (drag-resize/filler
+                        # overrides included) onto the SO line so the
+                        # material BoM can weigh the actual cut, not
+                        # just the template's nominal size. {} (no-op)
+                        # when the line has no real dims — never
+                        # fabricated.
+                        **line._sb_dims_mm(),
                     })
                     for line in design.cabinet_line_ids
                 ],
@@ -1897,6 +1906,34 @@ class SouthbrookKitchenDesignLine(models.Model):
         string="Position",
         compute="_compute_position_label",
     )
+
+    # ── Task B3 (Materials geometry-writeback plan, Increment B) ────────
+    # This line's own width_in/height_in/depth_in ARE the real per-
+    # instance cabinet geometry — including any drag-resize or filler
+    # override (_create_line's override_width, the room-depth drag
+    # handle) — as opposed to product_tmpl_id.southbrook_width_in/etc,
+    # which is only ever the template's nominal/default size. See
+    # docs/geometry-writeback-investigation.md §4/§8 Fork A.
+    def _sb_dims_mm(self):
+        """This line's per-instance dims in mm (×25.4, rounded to the
+        nearest int), keyed to match sale.order.line's sb_line_width_mm/
+        sb_line_height_mm/sb_line_depth_mm (southbrook_kitchen_3d_
+        configurator/models/sale_order_line.py).
+
+        All-or-nothing soft-guard: returns {} unless width_in, height_in,
+        AND depth_in are all truthy (>0) — mirrors the same all-or-
+        nothing contract sb_material_mrp's `_panel_volume_mm3` already
+        enforces on the read side (Task B2), so a partial/garbage record
+        never produces a partial override downstream.
+        """
+        self.ensure_one()
+        if not (self.width_in and self.height_in and self.depth_in):
+            return {}
+        return {
+            "sb_line_width_mm":  round(self.width_in * 25.4),
+            "sb_line_height_mm": round(self.height_in * 25.4),
+            "sb_line_depth_mm":  round(self.depth_in * 25.4),
+        }
 
     @api.depends("cabinet_type")
     def _compute_zone(self):
