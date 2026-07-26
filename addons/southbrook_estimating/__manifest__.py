@@ -292,8 +292,13 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
     # REG-C1 (2026-06-18) — heal companies missing a default Sales journal.
     # See _ensure_sales_journal in __init__.py for the why; runs on
     # -i AND -u so live DBs upgrade-heal automatically.
-    # Combined hook (chains _ensure_sales_journal + _configure_southbrook_report_branding).
-    # See __init__.py for the why; both steps are independent and idempotent.
+    # Combined hook (chains _ensure_sales_journal + _configure_southbrook_report_branding
+    # + _backfill_single_value_attribute_defaults + Task A3's
+    # post_init_backfill_geometry). Odoo only dispatches ONE
+    # post_init_hook function name per module, so all idempotent
+    # post-install steps chain through this single entry point instead
+    # of each claiming their own manifest key.
+    # See __init__.py for the why; each step is independent and idempotent.
     "post_init_hook": "_southbrook_estimating_post_init",
     "installable": True,
     "application": True,

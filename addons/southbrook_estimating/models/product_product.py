@@ -183,6 +183,77 @@ class ProductProduct(models.Model):
             return 2
         return 1
 
+    def _sb_backfill_geometry(self):
+        """Task A3 — backfill sb_width_mm/height_mm/depth_mm on variants
+        that existed BEFORE Task A2's write-at-config-time hook, or that
+        were otherwise created outside `product.config.session.get_variant_vals`
+        (e.g. direct `create()`, imports, demo data).
+
+        Idempotent: only ever touches variants where all three of
+        sb_width_mm / sb_height_mm / sb_depth_mm are currently 0. A
+        variant that already carries real (or previously-backfilled, or
+        manually-corrected) dimensions is never overwritten — running
+        this on every `-u` is always safe.
+
+        Resolution per candidate variant, keyed by `default_code`:
+          1. Look up `default_code` in `_SKU_DEFAULTS` (the SAME table
+             A2 uses — sourced from `product.config.session`, never
+             duplicated here) for family/door_count/drawer_count and
+             the SKU's baked H/D/W.
+          2. If the variant carries an `attr_width` attribute-value pick
+             with a `value_mm`, that ACTUAL configured width overrides
+             the SKU table's baked width (it reflects what the variant
+             really is, not just its template's default).
+          3. A variant resolves only when width_mm, height_mm AND
+             depth_mm all end up non-zero. Height/depth have no source
+             other than the SKU table, so a variant with an unknown/
+             absent default_code (no SKU-table hit) is left untouched
+             at 0/0/0 — writing a guessed height or depth would be
+             dishonest. This also covers "no default_code and no
+             attr_width": nothing resolves, nothing is written.
+
+        Returns the count of variants updated (informational; callers
+        don't need to act on it).
+        """
+        sku_defaults = self.env["product.config.session"]._SKU_DEFAULTS
+        attr_width = self.env.ref(
+            "southbrook_estimating.attr_width", raise_if_not_found=False,
+        )
+
+        candidates = self.search([
+            ("sb_width_mm", "=", 0),
+            ("sb_height_mm", "=", 0),
+            ("sb_depth_mm", "=", 0),
+        ])
+        updated = 0
+        for variant in candidates:
+            sku = variant.default_code or ""
+            sku_row = sku_defaults.get(sku)
+            if not sku_row:
+                # No H/D signal available at all — leave honestly at 0.
+                continue
+            family, door_count, drawer_count, width_mm, height_mm, depth_mm = (
+                sku_row
+            )
+
+            if attr_width:
+                for ptav in variant.product_template_attribute_value_ids:
+                    pav = ptav.product_attribute_value_id
+                    if pav.attribute_id == attr_width and pav.value_mm:
+                        width_mm = pav.value_mm
+                        break
+
+            variant.write({
+                "sb_width_mm": width_mm,
+                "sb_height_mm": height_mm,
+                "sb_depth_mm": depth_mm,
+                "sb_panel_family": family,
+                "sb_door_count": door_count,
+                "sb_drawer_count": drawer_count,
+            })
+            updated += 1
+        return updated
+
     def _sb_geometry_inputs(self):
         """Task A1 — Return geometry inputs dict for Materials calc.
 

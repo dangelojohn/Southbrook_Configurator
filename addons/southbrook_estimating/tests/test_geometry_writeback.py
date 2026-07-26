@@ -207,3 +207,92 @@ class TestGeometryWritebackVariantCreation(TransactionCase):
         # locked Q8 cabinet SKUs.
         variant = session.create_get_variant(value_ids=val.ids)
         self.assertTrue(variant)
+
+
+@tagged("post_install", "-at_install", "sb_geo")
+class TestGeometryBackfill(TransactionCase):
+    """Task A3 — post_init backfill of geometry on pre-existing variants.
+
+    A2 only stamps geometry on variants materialised through the OCA
+    configurator wizard going forward. `_sb_backfill_geometry()` is the
+    catch-up pass for variants that already existed before A2 landed
+    (or that were created by any other path that bypasses
+    `get_variant_vals`, e.g. direct `product.product.create()`).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.Product = cls.env["product.product"]
+
+    def test_backfill_sets_geometry_on_existing_variant(self):
+        p = self.Product.create({
+            "name": "Legacy", "default_code": "SB-BASE-1DR",
+        })
+        self.assertFalse(p.sb_width_mm)
+        self.env["product.product"]._sb_backfill_geometry()
+        p.invalidate_recordset()
+        self.assertTrue(p.sb_width_mm and p.sb_height_mm and p.sb_depth_mm)
+        self.assertEqual(p.sb_width_mm, 609)
+        self.assertEqual(p.sb_height_mm, 762)
+        self.assertEqual(p.sb_depth_mm, 609)
+        self.assertEqual(p.sb_panel_family, "base")
+        self.assertEqual(p.sb_door_count, 1)
+        self.assertEqual(p.sb_drawer_count, 0)
+
+    def test_backfill_is_idempotent_never_overwrites_set_dims(self):
+        """A variant that already has (possibly manually-corrected)
+        dims must never be clobbered by the backfill, even if its
+        default_code maps to a different SKU-table row."""
+        p = self.Product.create({
+            "name": "Already Sized",
+            "default_code": "SB-BASE-1DR",
+            "sb_width_mm": 700,
+            "sb_height_mm": 800,
+            "sb_depth_mm": 650,
+        })
+        self.env["product.product"]._sb_backfill_geometry()
+        p.invalidate_recordset()
+        self.assertEqual(p.sb_width_mm, 700)
+        self.assertEqual(p.sb_height_mm, 800)
+        self.assertEqual(p.sb_depth_mm, 650)
+
+    def test_backfill_skips_variant_with_no_default_code_and_no_width_pick(self):
+        """No default_code hit and no attr_width pick -> nothing
+        resolvable; dims are honestly left at 0, never guessed."""
+        p = self.Product.create({"name": "No Signal"})
+        self.env["product.product"]._sb_backfill_geometry()
+        p.invalidate_recordset()
+        self.assertEqual(p.sb_width_mm, 0)
+        self.assertEqual(p.sb_height_mm, 0)
+        self.assertEqual(p.sb_depth_mm, 0)
+
+    def test_backfill_unknown_sku_code_left_at_zero(self):
+        """A default_code that doesn't match any _SKU_DEFAULTS row and
+        carries no attr_width pick can't resolve height/depth — must
+        not be partially written."""
+        p = self.Product.create({
+            "name": "Unknown SKU", "default_code": "SB-NOT-A-REAL-SKU",
+        })
+        self.env["product.product"]._sb_backfill_geometry()
+        p.invalidate_recordset()
+        self.assertEqual(p.sb_width_mm, 0)
+        self.assertEqual(p.sb_height_mm, 0)
+        self.assertEqual(p.sb_depth_mm, 0)
+
+    def test_backfill_reuses_sku_defaults_table_from_config_session(self):
+        """The backfill must read the SAME _SKU_DEFAULTS table A2 uses
+        (no forked copy) — verified here via a second SKU row."""
+        p = self.Product.create({
+            "name": "Legacy Wall", "default_code": "SB-WALL-2DR",
+        })
+        self.env["product.product"]._sb_backfill_geometry()
+        p.invalidate_recordset()
+        expected = self.env["product.config.session"]._SKU_DEFAULTS["SB-WALL-2DR"]
+        fam, doors, drawers, w, h, d = expected
+        self.assertEqual(p.sb_width_mm, w)
+        self.assertEqual(p.sb_height_mm, h)
+        self.assertEqual(p.sb_depth_mm, d)
+        self.assertEqual(p.sb_panel_family, fam)
+        self.assertEqual(p.sb_door_count, doors)
+        self.assertEqual(p.sb_drawer_count, drawers)
