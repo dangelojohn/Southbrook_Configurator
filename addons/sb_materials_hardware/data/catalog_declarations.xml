@@ -45,6 +45,27 @@
       <field name="field_name">x_southbrook_compatible_material_ids</field>
       <field name="facet_type">m2m</field>
     </record>
+    <record id="facet_screws_family" model="materials.catalog.facet">
+      <field name="name">Tool Family</field>
+      <field name="sequence">70</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_screws"/>
+      <field name="field_name">x_southbrook_tool_family</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_screws_directness" model="materials.catalog.facet">
+      <field name="name">Directness</field>
+      <field name="sequence">80</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_screws"/>
+      <field name="field_name">x_southbrook_directness</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_screws_vendor" model="materials.catalog.facet">
+      <field name="name">Preferred Vendor</field>
+      <field name="sequence">90</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_screws"/>
+      <field name="field_name">x_southbrook_preferred_vendor_id</field>
+      <field name="facet_type">m2m</field>
+    </record>
 
     <record id="col_screws_size" model="materials.catalog.column">
       <field name="name">Size</field>
@@ -107,6 +128,55 @@
       <field name="field_name">x_southbrook_hazardous</field>
       <field name="facet_type">flag</field>
     </record>
+    <record id="facet_adh_shelf" model="materials.catalog.facet">
+      <field name="name">Shelf Life (days)</field>
+      <field name="sequence">50</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_adhesives"/>
+      <field name="field_name">x_southbrook_shelf_life_days</field>
+      <field name="facet_type">range</field>
+    </record>
+    <record id="facet_adh_flammable" model="materials.catalog.facet">
+      <field name="name">Flammable</field>
+      <field name="sequence">60</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_adhesives"/>
+      <field name="field_name">x_southbrook_flammable</field>
+      <field name="facet_type">flag</field>
+    </record>
+    <record id="facet_adh_ventilation" model="materials.catalog.facet">
+      <field name="name">Requires Ventilation</field>
+      <field name="sequence">70</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_adhesives"/>
+      <field name="field_name">x_southbrook_requires_ventilation</field>
+      <field name="facet_type">flag</field>
+    </record>
+    <record id="facet_adh_substrate" model="materials.catalog.facet">
+      <field name="name">Substrate</field>
+      <field name="sequence">80</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_adhesives"/>
+      <field name="field_name">x_southbrook_compatible_material_ids</field>
+      <field name="facet_type">m2m</field>
+    </record>
+    <record id="facet_adh_family" model="materials.catalog.facet">
+      <field name="name">Tool Family</field>
+      <field name="sequence">90</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_adhesives"/>
+      <field name="field_name">x_southbrook_tool_family</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_adh_directness" model="materials.catalog.facet">
+      <field name="name">Directness</field>
+      <field name="sequence">100</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_adhesives"/>
+      <field name="field_name">x_southbrook_directness</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_adh_vendor" model="materials.catalog.facet">
+      <field name="name">Preferred Vendor</field>
+      <field name="sequence">110</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_adhesives"/>
+      <field name="field_name">x_southbrook_preferred_vendor_id</field>
+      <field name="facet_type">m2m</field>
+    </record>
 
     <record id="col_adh_type" model="materials.catalog.column">
       <field name="name">Glue type</field>
@@ -150,6 +220,27 @@
       <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_fasteners"/>
       <field name="field_name">x_southbrook_screw_length_mm</field>
       <field name="facet_type">range</field>
+    </record>
+    <record id="facet_fast_family" model="materials.catalog.facet">
+      <field name="name">Tool Family</field>
+      <field name="sequence">30</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_fasteners"/>
+      <field name="field_name">x_southbrook_tool_family</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_fast_directness" model="materials.catalog.facet">
+      <field name="name">Directness</field>
+      <field name="sequence">40</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_fasteners"/>
+      <field name="field_name">x_southbrook_directness</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_fast_vendor" model="materials.catalog.facet">
+      <field name="name">Preferred Vendor</field>
+      <field name="sequence">50</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_fasteners"/>
+      <field name="field_name">x_southbrook_preferred_vendor_id</field>
+      <field name="facet_type">m2m</field>
     </record>
 
     <record id="col_fast_size" model="materials.catalog.column">
@@ -209,6 +300,27 @@
       <field name="field_name">x_southbrook_compatible_material_ids</field>
       <field name="facet_type">m2m</field>
     </record>
+    <record id="facet_saw_family" model="materials.catalog.facet">
+      <field name="name">Tool Family</field>
+      <field name="sequence">70</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_saw_blades"/>
+      <field name="field_name">x_southbrook_tool_family</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_saw_directness" model="materials.catalog.facet">
+      <field name="name">Directness</field>
+      <field name="sequence">80</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_saw_blades"/>
+      <field name="field_name">x_southbrook_directness</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_saw_vendor" model="materials.catalog.facet">
+      <field name="name">Preferred Vendor</field>
+      <field name="sequence">90</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_saw_blades"/>
+      <field name="field_name">x_southbrook_preferred_vendor_id</field>
+      <field name="facet_type">m2m</field>
+    </record>
 
     <record id="col_saw_diameter" model="materials.catalog.column">
       <field name="name">Diameter (mm)</field>
@@ -243,6 +355,12 @@
       <field name="sequence">50</field>
       <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_saw_blades"/>
       <field name="field_name">x_southbrook_material_grade</field>
+    </record>
+    <record id="col_saw_coating" model="materials.catalog.column">
+      <field name="name">Coating</field>
+      <field name="sequence">60</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_saw_blades"/>
+      <field name="field_name">x_southbrook_coating</field>
     </record>
 
     <!-- ============ CNC ROUTER BITS ============ -->
@@ -281,6 +399,27 @@
       <field name="field_name">x_southbrook_compatible_material_ids</field>
       <field name="facet_type">m2m</field>
     </record>
+    <record id="facet_cnc_family" model="materials.catalog.facet">
+      <field name="name">Tool Family</field>
+      <field name="sequence">60</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_cnc_bits"/>
+      <field name="field_name">x_southbrook_tool_family</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_cnc_directness" model="materials.catalog.facet">
+      <field name="name">Directness</field>
+      <field name="sequence">70</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_cnc_bits"/>
+      <field name="field_name">x_southbrook_directness</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_cnc_vendor" model="materials.catalog.facet">
+      <field name="name">Preferred Vendor</field>
+      <field name="sequence">80</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_cnc_bits"/>
+      <field name="field_name">x_southbrook_preferred_vendor_id</field>
+      <field name="facet_type">m2m</field>
+    </record>
 
     <record id="col_cnc_diameter" model="materials.catalog.column">
       <field name="name">Cutting Ø (mm)</field>
@@ -316,6 +455,20 @@
       <field name="field_name">x_southbrook_rotation_speed_max</field>
       <field name="align">right</field>
     </record>
+    <record id="col_cnc_overall_length" model="materials.catalog.column">
+      <field name="name">Overall Length (mm)</field>
+      <field name="sequence">55</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_cnc_bits"/>
+      <field name="field_name">x_southbrook_overall_length_mm</field>
+      <field name="align">right</field>
+    </record>
+    <record id="col_cnc_feed_rate" model="materials.catalog.column">
+      <field name="name">Max Feed Rate (mm/min)</field>
+      <field name="sequence">60</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_cnc_bits"/>
+      <field name="field_name">x_southbrook_feed_rate_max</field>
+      <field name="align">right</field>
+    </record>
 
     <!-- ============ DRILL AND BORING BITS ============ -->
     <record id="facet_drill_diameter" model="materials.catalog.facet">
@@ -346,6 +499,27 @@
       <field name="field_name">x_southbrook_material_grade</field>
       <field name="facet_type">enum_distinct</field>
     </record>
+    <record id="facet_drill_family" model="materials.catalog.facet">
+      <field name="name">Tool Family</field>
+      <field name="sequence">50</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_drill_bits"/>
+      <field name="field_name">x_southbrook_tool_family</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_drill_directness" model="materials.catalog.facet">
+      <field name="name">Directness</field>
+      <field name="sequence">60</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_drill_bits"/>
+      <field name="field_name">x_southbrook_directness</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_drill_vendor" model="materials.catalog.facet">
+      <field name="name">Preferred Vendor</field>
+      <field name="sequence">70</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_drill_bits"/>
+      <field name="field_name">x_southbrook_preferred_vendor_id</field>
+      <field name="facet_type">m2m</field>
+    </record>
 
     <record id="col_drill_diameter" model="materials.catalog.column">
       <field name="name">Diameter (mm)</field>
@@ -368,6 +542,12 @@
       <field name="field_name">x_southbrook_overall_length_mm</field>
       <field name="align">right</field>
     </record>
+    <record id="col_drill_grade" model="materials.catalog.column">
+      <field name="name">Grade</field>
+      <field name="sequence">40</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_drill_bits"/>
+      <field name="field_name">x_southbrook_material_grade</field>
+    </record>
 
     <!-- ============ ABRASIVES ============ -->
     <record id="facet_abr_grit" model="materials.catalog.facet">
@@ -382,6 +562,27 @@
       <field name="sequence">20</field>
       <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_abrasives"/>
       <field name="field_name">x_southbrook_compatible_material_ids</field>
+      <field name="facet_type">m2m</field>
+    </record>
+    <record id="facet_abr_family" model="materials.catalog.facet">
+      <field name="name">Tool Family</field>
+      <field name="sequence">30</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_abrasives"/>
+      <field name="field_name">x_southbrook_tool_family</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_abr_directness" model="materials.catalog.facet">
+      <field name="name">Directness</field>
+      <field name="sequence">40</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_abrasives"/>
+      <field name="field_name">x_southbrook_directness</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_abr_vendor" model="materials.catalog.facet">
+      <field name="name">Preferred Vendor</field>
+      <field name="sequence">50</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_abrasives"/>
+      <field name="field_name">x_southbrook_preferred_vendor_id</field>
       <field name="facet_type">m2m</field>
     </record>
 
@@ -420,6 +621,34 @@
       <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_finishing"/>
       <field name="field_name">x_southbrook_shelf_life_days</field>
       <field name="facet_type">range</field>
+    </record>
+    <record id="facet_fin_msds" model="materials.catalog.facet">
+      <field name="name">MSDS Required</field>
+      <field name="sequence">50</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_finishing"/>
+      <field name="field_name">x_southbrook_msds_required</field>
+      <field name="facet_type">flag</field>
+    </record>
+    <record id="facet_fin_family" model="materials.catalog.facet">
+      <field name="name">Tool Family</field>
+      <field name="sequence">60</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_finishing"/>
+      <field name="field_name">x_southbrook_tool_family</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_fin_directness" model="materials.catalog.facet">
+      <field name="name">Directness</field>
+      <field name="sequence">70</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_finishing"/>
+      <field name="field_name">x_southbrook_directness</field>
+      <field name="facet_type">enum</field>
+    </record>
+    <record id="facet_fin_vendor" model="materials.catalog.facet">
+      <field name="name">Preferred Vendor</field>
+      <field name="sequence">80</field>
+      <field name="category_id" ref="southbrook_mrp_kitchen_tools.cat_finishing"/>
+      <field name="field_name">x_southbrook_preferred_vendor_id</field>
+      <field name="facet_type">m2m</field>
     </record>
 
     <record id="col_fin_shelf" model="materials.catalog.column">
