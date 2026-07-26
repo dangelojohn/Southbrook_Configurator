@@ -169,6 +169,24 @@ class KitchenMaterial(models.Model):
             fam = fam.parent_id
         return 0.0
 
+    _SB_CANONICAL_DEMAND_UOM_XMLID = {
+        "density_volume": "uom.product_uom_square_meter",
+        "density_area": "uom.product_uom_square_meter",
+        "linear_density": "uom.product_uom_meter",
+        "per_unit": "uom.product_uom_unit",
+        "none": "uom.product_uom_unit",
+    }
+
+    def _sb_canonical_demand_uom(self):
+        """The uom.uom record representing this material's canonical
+        material_demand_qty unit (Phase-2b Task 1): m² for area families,
+        m for linear, Units for per_unit/none. Empty recordset (never a
+        crash) if the xml_id is somehow missing."""
+        self.ensure_one()
+        xmlid = self._SB_CANONICAL_DEMAND_UOM_XMLID.get(
+            self.weight_source, "uom.product_uom_unit")
+        return self.env.ref(xmlid, raise_if_not_found=False) or self.env["uom.uom"]
+
     # ------------------------------------------------------------------
     # Repair Wave 2, Upgrade 1 — live data upgrade for the 10 pre-existing
     # `southbrook.kitchen.material` records seeded by

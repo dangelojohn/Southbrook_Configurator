@@ -18,3 +18,5 @@ from . import test_effective_waste
 from . import test_thickness_specific_materials
 # Cutlist Precision Task 1 — sb.panel.role tag model + material.panel_role_ids.
 from . import test_panel_role
+# Phase-2b Task 1 — uom.uom.sb_convert_demand_qty + material canonical UoM.
+from . import test_uom_conversion

@@ -17,3 +17,5 @@ from . import test_cutlist_exact
 # Final whole-branch review (2026-07-26), M-3 — N-same-material split, door
 # role, weight/demand agreement, I-2 rollup-equals-sum.
 from . import test_cutlist_precision_review_fixes
+# Phase-2b Task 1 — mrp.bom.line._sb_demand_qty_in_uom wrapper.
+from . import test_demand_qty_uom_conversion

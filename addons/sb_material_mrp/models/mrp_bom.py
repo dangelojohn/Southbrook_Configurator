@@ -977,6 +977,21 @@ class MrpBomLine(models.Model):
                 line.material_demand_is_exact = False
                 line.material_demand_qty = line.product_qty
 
+    def _sb_demand_qty_in_uom(self, to_uom):
+        """material_demand_qty converted into `to_uom` via native uom.uom
+        conversion (Phase-2b Task 1) when the material's canonical demand
+        unit and `to_uom` share a reference. Returns (qty, is_exact);
+        honest fallback (unchanged qty, is_exact=False) when no common
+        reference -- e.g. a vendor 'Sheet'/'Roll' pack unit, which is
+        uom_yield_qty's job (Phase-2a), not this helper's."""
+        self.ensure_one()
+        if not self.material_id or not to_uom:
+            return self.material_demand_qty, False
+        from_uom = self.material_id._sb_canonical_demand_uom()
+        if not from_uom:
+            return self.material_demand_qty, False
+        return from_uom.sb_convert_demand_qty(self.material_demand_qty, to_uom)
+
 
 class MrpBom(models.Model):
     _inherit = "mrp.bom"
