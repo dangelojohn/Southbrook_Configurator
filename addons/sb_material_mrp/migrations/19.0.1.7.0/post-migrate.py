@@ -31,11 +31,17 @@ def migrate(cr, version):
         )
         return
 
+    # suggested_purchase_qty @api.depends on material_demand_qty, so it must
+    # recompute too when demand values flip exact<->fallback — mirroring the
+    # 19.0.1.6.0 migration's precedent (migration-context depend cascades are
+    # unreliable, so recompute it explicitly rather than trusting the cascade).
     for fname in ("material_demand_qty", "material_demand_is_exact",
-                  "component_weight_kg", "component_volume_mm3"):
+                  "component_weight_kg", "component_volume_mm3",
+                  "suggested_purchase_qty"):
         env.add_to_compute(lines._fields[fname], lines)
     lines.flush_recordset(["material_demand_qty", "material_demand_is_exact",
-                           "component_weight_kg", "component_volume_mm3"])
+                           "component_weight_kg", "component_volume_mm3",
+                           "suggested_purchase_qty"])
 
     exact_count = len([line for line in lines if line.material_demand_is_exact])
     _logger.info(
