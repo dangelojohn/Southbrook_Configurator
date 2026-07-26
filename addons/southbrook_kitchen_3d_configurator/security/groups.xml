@@ -44,10 +44,19 @@
         <!-- Migration: assign every existing non-share internal user
              to Manager so a -u upgrade preserves the pre-taxonomy
              full-access default. Runs on -i and -u; idempotent. -->
+        <!-- NOTE: the model="res.users" attribute below is load-bearing, not
+             decoration. Odoo's _eval_xml() injects `obj` into the eval context
+             only when the node itself declares a model (tools/convert.py:
+             _get_eval_context sets context['obj'] = env[model_str].browse, and
+             _eval_xml reads f_model = node.get('model') per node). A bare
+             <value eval="..."> inherits nothing from the enclosing <function>,
+             so without it `obj` is undefined and the whole file dies with
+             "Could not eval(...) for None" — which blocks installing this
+             module, and every module that depends on it, on a fresh database. -->
         <function model="res.groups" name="write">
             <value eval="[ref('group_kitchen_manager')]"/>
-            <value eval="{'user_ids': [(4, u.id) for u in
-                obj().env['res.users'].search([
+            <value model="res.users" eval="{'user_ids': [(4, u.id) for u in
+                obj().search([
                     ('group_ids', 'in', [ref('base.group_user')]),
                     ('share', '=', False),
                 ])]}"/>
