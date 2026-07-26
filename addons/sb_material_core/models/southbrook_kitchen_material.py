@@ -141,3 +141,71 @@ class KitchenMaterial(models.Model):
                     val = FAMILY_DEFAULT_DENSITY.get(fam.code, 0.0)
                     fam = fam.parent_id
                 m.effective_density = val
+
+    # ------------------------------------------------------------------
+    # Repair Wave 2, Upgrade 1 — live data upgrade for the 10 pre-existing
+    # `southbrook.kitchen.material` records seeded by
+    # southbrook_mrp_kitchen_workcenters (mdf, plywood, particle_board,
+    # melamine, solid_wood, quartz, stone, laminate, veneer,
+    # solid_surface). Those records predate `family_id` (added by this
+    # module) so on the live DB they all sit at family_id=False ->
+    # effective_density=0 -> every downstream weight calc multiplies to
+    # zero. CONFIRMED mapping (see repair-wave2 brief): code -> family
+    # xml_id (+ a material-level density override only for the three
+    # families whose code-table default doesn't already cover them).
+    #
+    # Keyed by `code` because these codes are stable across installs
+    # (unique constraint), unlike xml_ids which live in a module this
+    # one doesn't own.
+    # ------------------------------------------------------------------
+    _FAMILY_DENSITY_MAP = {
+        # code                family xml_id     density (g/cm3) or None
+        "mdf":             ("fam_ewood",       None),
+        "plywood":         ("fam_ewood_ply",   None),
+        "particle_board":  ("fam_ewood",       None),
+        "melamine":        ("fam_ewood",       None),
+        "solid_wood":      ("fam_swood",       None),
+        "quartz":          ("fam_stone",       None),
+        "stone":           ("fam_stone",       None),
+        "laminate":        ("fam_lam",         1.35),  # HPL
+        "veneer":          ("fam_veneer",      0.60),
+        "solid_surface":   ("fam_plastic",     1.70),  # acrylic solid surface
+    }
+
+    def _sb_backfill_family_density(self):
+        """Repair Wave 2, Upgrade 1 — assign family_id (+ density where
+        the CONFIRMED mapping table carries one) to materials matched by
+        `code`.
+
+        Idempotent + non-destructive:
+          - Only ever matches `code=<mapped code>` AND `family_id=False`,
+            so a material whose family a user has since set (or that was
+            already backfilled) is never touched again.
+          - `density`/`density_source` are only written when the mapping
+            table carries a density AND the record's current density is
+            0 — never overwrites a real value.
+          - `env.ref(..., raise_if_not_found=False)` on the family xml_id:
+            a fresh install of this module (without
+            southbrook_mrp_kitchen_workcenters' hand-made records, or a
+            family that hasn't loaded yet) skips that row gracefully
+            instead of raising. Fresh installs are already covered by
+            the seed data — this method exists for the live/upgraded DB.
+
+        Returns the count of materials updated (informational).
+        """
+        updated = 0
+        for code, (family_xmlid, density) in self._FAMILY_DENSITY_MAP.items():
+            family = self.env.ref(
+                f"sb_material_core.{family_xmlid}", raise_if_not_found=False,
+            )
+            if not family:
+                continue
+            materials = self.search([("code", "=", code), ("family_id", "=", False)])
+            for m in materials:
+                vals = {"family_id": family.id}
+                if density and not m.density:
+                    vals["density"] = density
+                    vals["density_source"] = "material"
+                m.write(vals)
+                updated += 1
+        return updated

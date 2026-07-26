@@ -4,3 +4,5 @@ from . import test_material_fields
 from . import test_attribute_link
 from . import test_material_geometry_dualunit
 from . import test_material_seed_data
+# Repair Wave 2, Upgrade 1 — family/density backfill for pre-existing materials.
+from . import test_family_density_backfill
