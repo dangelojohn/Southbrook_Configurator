@@ -23,3 +23,5 @@ from . import test_demand_qty_uom_conversion
 from . import test_orderpoint_sync
 # Phase-2b Task 3 — native scheduler drafts RFQ off Buy route + orderpoint.
 from . import test_scheduler_draft_rfq
+# Phase-2b Task 4 — material-aware suggestion note on native PO line.
+from . import test_purchase_line_material_note

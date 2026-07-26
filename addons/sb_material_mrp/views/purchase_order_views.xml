@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+    <record id="purchase_order_form_sb_material" model="ir.ui.view">
+        <field name="name">purchase.order.form.sb.material</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']/list/field[@name='product_uom_id']" position="after">
+                <field name="sb_material_suggested_note" optional="show" readonly="1"/>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/form//page[@name='notes']" position="after">
+                <page string="Materials" name="sb_materials">
+                    <field name="sb_material_demand_qty" readonly="1"/>
+                    <field name="sb_material_suggested_note" readonly="1"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
