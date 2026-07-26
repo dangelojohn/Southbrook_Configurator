@@ -14,3 +14,6 @@ from . import test_suggested_purchase_qty
 from . import test_route_buy_helper
 # Cutlist Precision Task 2 — exact per-line panel-role volume helpers.
 from . import test_cutlist_exact
+# Final whole-branch review (2026-07-26), M-3 — N-same-material split, door
+# role, weight/demand agreement, I-2 rollup-equals-sum.
+from . import test_cutlist_precision_review_fixes

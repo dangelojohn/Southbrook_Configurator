@@ -56,8 +56,13 @@ Per-BoM-line material demand/weight is now **exact per panel** where resolvable,
 falling back to the estimation-grade carcass share otherwise.
 
 - `sb.panel.role` (in `sb_material_core`) — the seven cabinet panel roles
-  (`side_L, side_R, top, bottom, back, shelf, door`), vocabulary shared with
-  `sb.cutlist.PANEL_NAMES`.
+  (`side_L, side_R, top, bottom, back, shelf, door`). These codes match the
+  panel-dict keys `mrp.bom._compute_panel_dimensions` returns, which the
+  exact-volume code consumes directly — **not** identical to
+  `sb.cutlist.PANEL_NAMES` (southbrook_kitchen_mrp), which uses
+  `adjustable_shelf`, not `shelf` (I-3, final review, 2026-07-26).
+  Converging with `sb.cutlist` later requires an explicit
+  `shelf`<->`adjustable_shelf` mapping, not a bare code match.
 - `southbrook.kitchen.material.panel_role_ids` — the roles a material makes
   (curated once per material). Seeded on the standard materials (carcass sheet
   goods → box roles; ¼″ ply / hardboard → back).

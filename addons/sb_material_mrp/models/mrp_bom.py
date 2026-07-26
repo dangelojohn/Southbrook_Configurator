@@ -119,6 +119,23 @@ fix guarantees for Phase 1 is: **the BoM's total material weight counts
 the carcass exactly once**, however many sibling lines happen to
 reference it. A single density_volume line is its own only sibling, so
 its share is 100% and its stored weight is unchanged.
+
+--------------------------------------------------------------------------
+UPDATE — I-2, rollup exact-first parity (final review, 2026-07-26)
+--------------------------------------------------------------------------
+The paragraph above describes `_compute_material_weight_total`'s explode
+loop as routing every `density_volume` leaf through
+`_sb_component_share_volume_mm3` unconditionally — that was true when
+written, but Cutlist Precision Task 3 (below) later added an exact-first
+selection (`_sb_line_exact_volume_mm3`) to the two PER-LINE computes
+(`_compute_component_weight` / `_compute_material_demand_qty`) without
+updating this rollup to match, so the total silently diverged from the sum
+of the exact per-line weights and never counted door materials (the
+estimate's carcass excludes doors). `_compute_material_weight_total`'s
+explode loop now applies the identical exact-first-then-share selection,
+so the total equals the sum of the exact per-line weights whenever the
+BoM has curated panel roles, falling back to the prior share-based
+behavior line-by-line otherwise.
 """
 import logging
 import math
@@ -768,6 +785,14 @@ class MrpBomLine(models.Model):
         # sibling's, since ownership/ambiguity is BoM-wide); the sibling
         # material link itself is already covered above
         # ("bom_id.bom_line_ids.material_id").
+        # I-4 (final review, 2026-07-26, doc-only) — this dep and the sibling
+        # material-LINK dep above do NOT cover "a sibling's EXISTING material
+        # gained/lost a role" (can't express "sibling's material's M2M" in a
+        # static depends) — see the matching, fuller note on
+        # _compute_material_demand_qty's depends for the concrete staleness
+        # scenario. Same inherent ORM limitation applies to this compute's
+        # is_exact/exact weight. Mitigated by the deploy migration's full
+        # recompute; no recompute hook added (deferred).
         "material_id.panel_role_ids",
     )
     def _compute_component_weight(self):
@@ -807,6 +832,19 @@ class MrpBomLine(models.Model):
         "bom_id.product_id.sb_width_mm",
         "bom_id.product_id.sb_height_mm",
         "bom_id.product_id.sb_depth_mm",
+        # I-1 (final review, 2026-07-26) — the exact-first path
+        # (_sb_line_exact_volume_mm3) reads door_count (door role) and
+        # shelf_count/family (shelf role, edge-banding) off
+        # _compute_panel_dimensions, exactly like _compute_component_weight
+        # already declares below. Without these, editing a cabinet's
+        # sb_door_count (e.g. 1->2 on a door-stock material's BoM) updates
+        # component_weight_kg (has the dep) but leaves material_demand_qty/
+        # material_demand_is_exact stale at the old count — weight and
+        # demand silently diverge until an unrelated recompute. Mirrors
+        # _compute_component_weight's depends verbatim.
+        "bom_id.product_id.sb_panel_family",
+        "bom_id.product_id.sb_door_count",
+        "bom_id.product_id.sb_drawer_count",
         # T3 review fix: edge_banding_length_mm (linear_density branch)
         # varies with finished_sides; and the density_volume/area branch's
         # _sb_component_share_volume_mm3 is sibling-qty-weighted, so it must
@@ -819,6 +857,23 @@ class MrpBomLine(models.Model):
         # _compute_component_weight above; ownership is BoM-wide, so a
         # role claimed/dropped on ANY line's material can flip this line's
         # exact-vs-estimate outcome.
+        # I-4 (final review, 2026-07-26, doc-only) — this and
+        # "bom_id.bom_line_ids.material_id" above cover THIS line's own
+        # material gaining/losing a role, and a SIBLING line's material
+        # LINK changing. Neither expresses "a sibling line's EXISTING
+        # material had a role added/removed elsewhere" — Odoo's @api.depends
+        # can't walk "sibling's material's M2M" from this line. Concretely:
+        # line A (material MelA) uniquely owns `shelf` and is exact; an
+        # admin later adds `shelf` to sibling line B's material MelB ->
+        # `shelf` becomes ambiguous BoM-wide, but only line B's own
+        # material_id.panel_role_ids dep fires — line A keeps its stale
+        # is_exact=True/exact value until some other trigger recomputes it.
+        # Inherent ORM limitation (same class as the geometry/family-walk
+        # notes above), not a bug to silently patch here. Mitigated by the
+        # deploy migration's full recompute and by role assignments being
+        # curated once per material and rarely edited on live BoMs. No
+        # recompute hook added (deferred, not deploy-blocking — see final
+        # review I-4).
         "material_id.panel_role_ids",
     )
     def _compute_material_demand_qty(self):
@@ -957,11 +1012,26 @@ class MrpBom(models.Model):
                 if not m:
                     continue
                 qty = data.get("qty", line.product_qty)
-                vol = (
-                    line._sb_component_share_volume_mm3(line, _dims_cache=dims_cache)
-                    if m.weight_source == "density_volume"
-                    else 0.0
-                )
+                if m.weight_source == "density_volume":
+                    # I-2 (final review, 2026-07-26) — route through the SAME
+                    # exact-first selection the two per-line computes use
+                    # (_compute_component_weight / _compute_material_demand_
+                    # qty), instead of always falling through to the
+                    # estimate-only share. Without this, the rollup total
+                    # diverged from the sum of the exact per-line weights
+                    # (BoM 280-style box+back split) and silently excluded
+                    # door materials (the estimate's _panel_volume_mm3
+                    # excludes doors; a door-owning line's exact weight
+                    # includes them, but the rollup never counted it).
+                    exact = line._sb_line_exact_volume_mm3(line, _dims_cache=dims_cache)
+                    vol = (
+                        exact if exact is not None
+                        else line._sb_component_share_volume_mm3(
+                            line, _dims_cache=dims_cache
+                        )
+                    )
+                else:
+                    vol = 0.0
                 total += line._weight_for_qty(m, vol, qty)
             bom.material_weight_total = float_round(
                 total, precision_digits=2, rounding_method="HALF-UP"

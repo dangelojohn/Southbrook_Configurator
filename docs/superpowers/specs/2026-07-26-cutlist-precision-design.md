@@ -20,12 +20,16 @@ Live BoMs have two shapes (verified on prod 2026-07-26):
 
 The one-line-per-material shape is the key insight: a line already means "all panels of this material." So the precision primitive is **assign panel roles to materials**, then a line's exact demand = the summed area of the panels its material owns.
 
-The codebase already holds three disconnected panel-aware structures (carcass math in `sb_material_mrp`; a per-panel 3D-render payload with a rendering-slug "material" in `product_config_line.py`; and the post-MO `sb.cutlist.line` with `panel_name` + `substrate` in `southbrook_kitchen_mrp`). This design introduces the first *real* material↔panel-role link and deliberately reuses `sb.cutlist.PANEL_NAMES`' vocabulary so the post-MO cutlist can converge later at no cost now.
+The codebase already holds three disconnected panel-aware structures (carcass math in `sb_material_mrp`; a per-panel 3D-render payload with a rendering-slug "material" in `product_config_line.py`; and the post-MO `sb.cutlist.line` with `panel_name` + `substrate` in `southbrook_kitchen_mrp`). This design introduces the first *real* material↔panel-role link, intended to reuse `sb.cutlist.PANEL_NAMES`' vocabulary so the post-MO cutlist could converge later at no cost.
+
+**I-3 correction (final review, 2026-07-26):** that intent did not land byte-for-byte. The shipped `sb.panel.role` codes (`side_L, side_R, top, bottom, back, shelf, door`) match `_compute_panel_dimensions`' panel-dict keys — which is what the exact-volume code actually needs — but `sb.cutlist.PANEL_NAMES` (`southbrook_kitchen_mrp/models/sb_cutlist.py`) uses `adjustable_shelf`, not `shelf` (door label also differs). No functional impact on this feature — see below — but the "no cost later" convergence claim is false as written: a future `sb.cutlist` convergence needs an explicit `shelf`<->`adjustable_shelf` (and door-label) mapping, not a bare code match. The role codes themselves are correct and should NOT be renamed.
 
 ## Design
 
 ### 1. Panel-role vocabulary
 Reuse the roles already defined in `sb.cutlist.PANEL_NAMES` (`southbrook_kitchen_mrp/models/sb_cutlist.py`): `side_L`, `side_R`, `top`, `bottom`, `back`, `shelf`, `door`. Define them as a shared constant in `sb_material_core` (single source), and have the two modules reference the same list so the vocabularies can never drift.
+
+**I-3 correction (final review, 2026-07-26):** as shipped, `sb_material_core` defines its own independent `PANEL_ROLE_KEYS` matching `_compute_panel_dimensions`' panel-dict keys (`shelf`, not `adjustable_shelf`) rather than referencing `sb.cutlist.PANEL_NAMES` as a shared constant — the two vocabularies were NOT wired together and have in fact already drifted (`shelf` vs `adjustable_shelf`). The role codes are correct for their actual consumer (`_compute_panel_dimensions`); this note documents that the "single source, never drift" design intent from this paragraph did not ship, not a defect in the shipped codes.
 
 ### 2. Material → panel-role assignment
 Add `panel_role_ids` to `southbrook.kitchen.material` — the set of panel roles this material can serve, expressed as a small tag model `sb.panel.role` (Many2many) whose records are the seven role names above (seeded, `noupdate`). Examples: a carcass melamine → {side_L, side_R, top, bottom}; a back material → {back}; shelf material → {shelf}; door stock → {door}. Low-cardinality: curated once per material, not per BoM line.
@@ -73,7 +77,7 @@ Where the configurator materializes a BoM (`kitchen_design._ensure_kitchen_bom` 
 ## Delivered (cutlist precision, 2026-07-26)
 
 Branch `feat/cutlist-precision`, built subagent-driven, each task reviewed:
-- **T1** `sb.panel.role` model (7 seeded roles, vocabulary = `sb.cutlist.PANEL_NAMES`) + `material.panel_role_ids`. (`sb_material_core` → 19.0.1.6.0)
+- **T1** `sb.panel.role` model (7 seeded roles matching `_compute_panel_dimensions`' panel keys — NOT identical to `sb.cutlist.PANEL_NAMES`, see I-3 correction above) + `material.panel_role_ids`. (`sb_material_core` → 19.0.1.6.0)
 - **T2** exact-volume helpers `_sb_line_owned_roles` / `_sb_line_exact_volume_mm3` — a role is owned only when exactly one distinct material on the BoM claims it; owned panels summed; material-scoped qty-share; returns `None` (fall back) when unresolvable.
 - **T3** wired exact-first / estimate-fallback into `_compute_material_demand_qty` + `_compute_component_weight`; `material_demand_is_exact` flag; recompute migration (incl. `suggested_purchase_qty`, T3-review fix). (`sb_material_mrp` → 19.0.1.7.0)
 - **T4** seeded `panel_role_ids` on standard materials + legacy/seeded-material role backfill migration (noupdate seed does NOT re-apply on `-u`, so the migration backfills) + `is_exact` on the BoM line. (`sb_material_core` → 19.0.1.7.0)

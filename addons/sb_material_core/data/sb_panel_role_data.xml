@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+  <!-- I-3 (final review, 2026-07-26): these seven role codes match the
+       panel-dict keys `mrp.bom._compute_panel_dimensions` returns
+       (side_L/side_R/top/bottom/back/shelf/door), which the exact-volume
+       code in sb_material_mrp consumes directly — do not rename. They are
+       NOT identical to `sb.cutlist.PANEL_NAMES` (southbrook_kitchen_mrp):
+       that vocabulary uses `adjustable_shelf`, not `shelf` (door label also
+       differs). A future sb.cutlist convergence needs an explicit
+       shelf<->adjustable_shelf mapping, not a bare code match. -->
   <data noupdate="1">
     <record id="panel_role_side_l" model="sb.panel.role"><field name="name">Side (Left)</field><field name="code">side_L</field><field name="sequence">1</field></record>
     <record id="panel_role_side_r" model="sb.panel.role"><field name="name">Side (Right)</field><field name="code">side_R</field><field name="sequence">2</field></record>
