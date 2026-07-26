@@ -112,7 +112,7 @@ export class MaterialsHardwareCatalog extends Component {
 
     cell(row, key) {
         const value = row[key];
-        return value === null || value === undefined || value === false
+        return value === null || value === undefined
             ? "—"
             : value;
     }
