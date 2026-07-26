@@ -59,3 +59,28 @@ class MaterialsCatalogProvider(models.AbstractModel):
     def _build_payload(self, scope, category_id, facets, search, offset, limit):
         raise NotImplementedError(
             "%s must implement _build_payload" % self._name)
+
+    @api.model
+    def _numeric_prefix(self, value):
+        """Leading number in a string, or None.
+
+        Grit '120' must sort before '220' and after '80'. Values that carry
+        no leading number ('assorted', 'coarse') return None, sort LAST, and
+        keep their label — a chip that silently vanishes is worse than one
+        that sorts oddly.
+        """
+        if value is None or value is False:
+            return None
+        text = str(value).strip()
+        digits = ""
+        for ch in text:
+            if ch.isdigit() or (ch == "." and "." not in digits):
+                digits += ch
+            else:
+                break
+        if not digits or digits == ".":
+            return None
+        try:
+            return float(digits)
+        except ValueError:
+            return None

@@ -34,7 +34,7 @@ class ToolsCatalogProvider(models.AbstractModel):
             "reason": None,
             "scope": scope,
             "categories": self._categories(),
-            "facets": [],
+            "facets": self._facets(category),
             "columns": self._columns(category),
             "rows": [],
             "detail": {},
@@ -136,3 +136,78 @@ class ToolsCatalogProvider(models.AbstractModel):
                 "sortable": dec.sortable,
             }
         return cols + list(by_field.values())
+
+    @api.model
+    def _facets(self, category):
+        """Facet chips for the category, declared via materials.catalog.facet.
+
+        Declarations from the selected category and all its ancestors apply,
+        same rule as _columns. Each facet's values are built with ONE grouped
+        query (or one search_read for range), never a query per value.
+        """
+        if not category:
+            return []
+        ids = self._ancestor_ids(category)
+        declared = self.env["materials.catalog.facet"].search(
+            [("category_id", "in", ids)])
+        if not declared:
+            return []
+
+        Tmpl = self.env["product.template"]
+        tmpl_domain = [("x_southbrook_tool_category_id", "child_of", category.id)]
+        out = []
+        for dec in declared:
+            field = Tmpl._fields.get(dec.field_name)
+            if not field:
+                continue
+            entry = {"key": dec.field_name, "label": dec.name,
+                     "type": dec.facet_type, "values": []}
+            if dec.facet_type == "range":
+                rows = Tmpl.search_read(
+                    tmpl_domain + [(dec.field_name, "!=", False)],
+                    [dec.field_name])
+                nums = [r[dec.field_name] for r in rows
+                        if isinstance(r[dec.field_name], (int, float))]
+                entry["min"] = min(nums) if nums else 0.0
+                entry["max"] = max(nums) if nums else 0.0
+            elif dec.facet_type == "flag":
+                entry["values"] = [{"value": True, "label": dec.name,
+                                    "count": Tmpl.search_count(
+                                        tmpl_domain + [(dec.field_name, "=", True)])}]
+            else:
+                # Odoo 17+ API: list of (group_value, count) tuples.
+                grouped = Tmpl._read_group(
+                    tmpl_domain + [(dec.field_name, "!=", False)],
+                    groupby=[dec.field_name],
+                    aggregates=["__count"],
+                )
+                raw = []
+                for val, count in grouped:
+                    if val is False or val is None:
+                        continue
+                    if hasattr(val, "id"):                 # m2o / m2m recordset
+                        raw.append({"value": val.id, "label": val.display_name,
+                                    "count": count})
+                    else:
+                        label = val
+                        if field.type == "selection":
+                            label = dict(
+                                field._description_selection(self.env)
+                            ).get(val, val)
+                        raw.append({"value": val, "label": label,
+                                    "count": count})
+                entry["values"] = self._order_values(raw)
+            out.append(entry)
+        return out
+
+    @api.model
+    def _order_values(self, raw):
+        """Numeric-aware ordering; unparseable values keep their label and
+        sort last."""
+        numbered, unnumbered = [], []
+        for item in raw:
+            n = self._numeric_prefix(item["value"])
+            (numbered if n is not None else unnumbered).append((n, item))
+        numbered.sort(key=lambda pair: pair[0])
+        unnumbered.sort(key=lambda pair: str(pair[1]["label"]))
+        return [item for _n, item in numbered] + [item for _n, item in unnumbered]
