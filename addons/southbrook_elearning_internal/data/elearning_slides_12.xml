@@ -2381,8 +2381,10 @@ the cron whose telemetry the singleton stores.</p>
   <code>readiness_last_recomputed_at</code> stamp on each <code>project.task</code>.</li>
 <li>Cron 3 (Backfill Order Analytics) — telemetry is in
   <code>ir.logging</code>.</li>
-<li>Cron 4 (Weekly Planning Baseline) — telemetry is the new
-  <code>mrp.planning.run</code> record's <code>create_date</code> + state.</li>
+<li>Cron 4 (Weekly Planning Baseline) — <strong>not active (verified
+  2026-07-26)</strong>, so there is no telemetry to check. Were it running,
+  the signal would be the new <code>mrp.planning.run</code> record's
+  <code>create_date</code> + state.</li>
 <li>Cron 5 (Quality Dry-Run Nightly) — telemetry is one
   <code>southbrook.project.data.quality.report</code> per project per night.</li>
 <li>Cron 6 (Propose ECOs for High-Frequency Cut-Spec Overrides) —
