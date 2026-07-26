@@ -14,6 +14,9 @@
     `invisible="not material_id"` gates the button to material-linked
     products only (material_id is the Wave-3 field added by sb_material_core
     on product.template).
+
+    Phase-2b Task 2: the "Sync Orderpoint Max" button reuses the same
+    button_box xpath and the same material_id visibility gate.
 -->
 <odoo>
     <record id="product_template_form_sb_route_buy" model="ir.ui.view">
@@ -27,6 +30,13 @@
                         invisible="not material_id">
                     <div class="o_stat_info">
                         <span class="o_stat_text">Set Buy Route</span>
+                    </div>
+                </button>
+                <button name="action_sb_sync_orderpoint_max" type="object"
+                        class="oe_stat_button" icon="fa-refresh"
+                        invisible="not material_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Sync Orderpoint Max</span>
                     </div>
                 </button>
             </xpath>

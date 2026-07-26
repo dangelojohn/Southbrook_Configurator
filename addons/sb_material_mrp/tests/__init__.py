@@ -19,3 +19,5 @@ from . import test_cutlist_exact
 from . import test_cutlist_precision_review_fixes
 # Phase-2b Task 1 — mrp.bom.line._sb_demand_qty_in_uom wrapper.
 from . import test_demand_qty_uom_conversion
+# Phase-2b Task 2 — orderpoint MAX sync from open-MO demand rollup.
+from . import test_orderpoint_sync

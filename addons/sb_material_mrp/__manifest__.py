@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 {
     "name": "Southbrook Materials — MRP",
-    "version": "19.0.1.8.0",
+    "version": "19.0.1.9.0",
     "category": "Manufacturing",
     "summary": "Density->weight + tiered cost sourcing on native MRP BoM/MO.",
     "license": "LGPL-3",
