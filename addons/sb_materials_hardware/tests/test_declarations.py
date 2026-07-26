@@ -9,7 +9,8 @@ from odoo.tools import mute_logger
 class TestDeclarations(TransactionCase):
     def setUp(self):
         super().setUp()
-        self.cat = self.env.ref("southbrook_mrp_kitchen_tools.cat_screws")
+        # Use cat_screw_wood (not seeded) to avoid conflicts with seeded cat_screws data
+        self.cat = self.env.ref("southbrook_mrp_kitchen_tools.cat_screw_wood")
 
     def test_facet_created(self):
         facet = self.env["materials.catalog.facet"].create({
