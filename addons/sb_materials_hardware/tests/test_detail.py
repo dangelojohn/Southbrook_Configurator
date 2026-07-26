@@ -61,6 +61,31 @@ class TestDetail(TransactionCase):
         detail = self.Provider.get_detail(-1)
         self.assertFalse(detail["ok"])
 
+    def test_null_vs_zero_and_unset_char_via_get_detail(self):
+        """Same three absence states as test_rows's
+        test_null_vs_zero_and_unset_char_via_get_catalog, proven through
+        get_detail() instead — the row and the detail panel must never
+        disagree about NULL vs. a genuine stored 0 (they share the same
+        normalization path).
+        """
+        zero_tmpl = self.env["product.template"].create({
+            "name": "TEST Zero open-time adhesive",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_open_time_min": 0.0,
+        })
+        unset_tmpl = self.env["product.template"].create({
+            "name": "TEST Unset open-time adhesive",
+            "x_southbrook_tool_category_id": self.cat.id,
+        })
+        zero_detail = self.Provider.get_detail(
+            zero_tmpl.product_variant_ids[0].id)
+        unset_detail = self.Provider.get_detail(
+            unset_tmpl.product_variant_ids[0].id)
+        zero_specs = {s["label"]: s["value"] for s in zero_detail["specs"]}
+        unset_specs = {s["label"]: s["value"] for s in unset_detail["specs"]}
+        self.assertEqual(zero_specs["Open time (min)"], 0.0)
+        self.assertIsNone(unset_specs["Open time (min)"])
+
     def test_engineering_relation_fields_show_display_name(self):
         """A many2one engineering field (vendor, issue UoM) must render its
         display name string in the payload — never a raw id, and never the

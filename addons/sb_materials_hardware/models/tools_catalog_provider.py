@@ -25,8 +25,16 @@ GENERIC_COLUMNS = [
 # (spec grid + engineering rail) so there is exactly one absence rule.
 VALUE_IS_NEVER_ABSENT = {"float", "integer", "monetary", "boolean"}
 
+# Of the types above, only these three are genuinely ambiguous at the ORM
+# level: read() returns 0/0.0 for both "never entered" and "entered as
+# zero" on a Float/Integer/Monetary column, because Odoo has no Python-side
+# NULL for them. Boolean is deliberately excluded — a Boolean column reads
+# back as an honest True/False either way, so False never needs the SQL
+# null-mask to mean what it says.
+NUMERIC_AMBIGUOUS_TYPES = {"float", "integer", "monetary"}
 
-def _normalize_value(value, field):
+
+def _normalize_value(value, field, is_null=False):
     """Apply the catalog's absence convention to one raw field value.
 
     Shared by _rows() (table cells) and _detail_value() (spec grid +
@@ -42,10 +50,19 @@ def _normalize_value(value, field):
     `field` is the product.template field object (or None if the key isn't
     a real field on the model) — its `.type` decides whether a falsy raw
     value means "never set" (-> None) or is genuine data to keep as-is.
+
+    `is_null` is the answer — determined at the SQL layer, see
+    ToolsCatalogProvider._null_mask() — to the one question read() itself
+    cannot answer: was this NUMERIC column actually NULL in Postgres, as
+    opposed to holding a genuine stored 0? It is only consulted for the
+    three ambiguous numeric types; for every other type read()'s own
+    falsy-value check below is already authoritative.
     """
     if isinstance(value, tuple):
         value = value[1] if len(value) > 1 else (value[0] if value else False)
     ftype = field.type if field else None
+    if ftype in NUMERIC_AMBIGUOUS_TYPES:
+        return None if is_null else value
     if ftype in VALUE_IS_NEVER_ABSENT:
         return value
     return None if not value else value
@@ -416,6 +433,53 @@ class ToolsCatalogProvider(models.AbstractModel):
         return domain
 
     @api.model
+    def _null_mask(self, tmpl_ids, keys):
+        """Which (template id, key) pairs are SQL NULL, for numeric keys.
+
+        read() cannot distinguish a NULL Float/Integer/Monetary column from
+        a genuinely stored 0 — both come back as 0.0/0 (see
+        NUMERIC_AMBIGUOUS_TYPES). Postgres CAN tell the difference, so this
+        asks it directly, once per page (one query), never once per row.
+
+        Returns {tmpl_id: {key: True-if-NULL}}. A key absent from the inner
+        dict (or the whole tmpl_id absent) means "not null" — callers treat
+        a missing entry as False, so this degrades safely to the old
+        behaviour if ever called with nothing to check.
+
+        `keys` is filtered down to fields that are real, stored, non-related,
+        NUMERIC_AMBIGUOUS_TYPES columns on product.template before anything
+        reaches SQL — every declared field name is validated against
+        product.template._fields here, never trusted as-is, and the
+        surviving names are still only ever used via SQL.identifier(), never
+        interpolated into the query string. `tmpl_ids` are passed as a bound
+        parameter (`= ANY(%s)`), never formatted into the SQL text.
+        """
+        if not tmpl_ids or not keys:
+            return {}
+        Tmpl = self.env["product.template"]
+        safe_keys = [
+            key for key in dict.fromkeys(keys)
+            if (field := Tmpl._fields.get(key))
+            and field.type in NUMERIC_AMBIGUOUS_TYPES
+            and field.store
+            and not field.related
+        ]
+        if not safe_keys:
+            return {}
+        null_columns = SQL(", ").join(
+            SQL("%s IS NULL", SQL.identifier(key)) for key in safe_keys)
+        query = SQL(
+            "SELECT id, %s FROM product_template WHERE id = ANY(%s)",
+            null_columns, list(tmpl_ids),
+        )
+        self.env.cr.execute(query)
+        mask = {}
+        for row in self.env.cr.fetchall():
+            tmpl_id, flags = row[0], row[1:]
+            mask[tmpl_id] = dict(zip(safe_keys, flags))
+        return mask
+
+    @api.model
     def _rows(self, category, facets, search, offset, limit, columns):
         """One row per variant.
 
@@ -428,11 +492,13 @@ class ToolsCatalogProvider(models.AbstractModel):
           Odoo's False/empty for "never set" is reported as None.
         - Boolean: False is a real value, not absence — kept as-is.
         - Date/Datetime: False means absent — reported as None.
-        - Float/Integer/Monetary: kept as-is, never folded to None. LIMIT:
-          the ORM returns 0 (or 0.0) for both "never entered" and "entered
-          as zero" on a numeric field — those two states are genuinely
-          indistinguishable at the ORM level. This catalog shows the zero
-          rather than pretending it can tell the difference.
+        - Float/Integer/Monetary: kept as-is when genuinely set, reported
+          as None when the underlying column is SQL NULL. read() itself
+          returns 0/0.0 for both "never entered" and "entered as zero" on
+          a numeric field — those two states are indistinguishable through
+          the ORM alone — so one extra batched query (_null_mask) asks
+          Postgres directly, where the distinction genuinely exists, and
+          that answer is what actually decides None vs. 0 here.
 
         No category (finding F6): an unscoped call must not fan out across
         every product on the instance. `_columns(None)` and `_facets(None)`
@@ -464,21 +530,29 @@ class ToolsCatalogProvider(models.AbstractModel):
 
         spec_keys = [c["key"] for c in columns
                      if c["key"] not in ("name", "default_code")]
+        tmpl_ids = products.mapped("product_tmpl_id").ids
         tmpl_data = {}
         if spec_keys:
             for rec in products.mapped("product_tmpl_id").read(spec_keys):
                 tmpl_data[rec["id"]] = rec
+        # One extra query for the whole page — never one per row — to learn
+        # which numeric specs are SQL NULL vs. genuinely stored as 0.
+        null_mask = self._null_mask(tmpl_ids, spec_keys)
 
         rows = []
         for product in products:
+            tmpl_id = product.product_tmpl_id.id
             row = {
                 "product_id": product.id,
                 "name": product.name,
                 "default_code": product.default_code or False,
             }
-            specs = tmpl_data.get(product.product_tmpl_id.id, {})
+            specs = tmpl_data.get(tmpl_id, {})
+            nulls = null_mask.get(tmpl_id, {})
             for key in spec_keys:
-                row[key] = _normalize_value(specs.get(key), Tmpl._fields.get(key))
+                row[key] = _normalize_value(
+                    specs.get(key), Tmpl._fields.get(key),
+                    is_null=nulls.get(key, False))
             rows.append(row)
         return rows, total
 
@@ -495,7 +569,9 @@ class ToolsCatalogProvider(models.AbstractModel):
         one read() batches both the spec keys and the engineering fields
         so a many2one comes back as Odoo's (id, display_name) tuple, from
         which we take the display name: the detail panel must never show
-        a raw database id.
+        a raw database id. They also share _rows()'s NULL-vs-zero mask
+        (one extra query, same _null_mask helper) so a numeric spec can
+        never render 0 here for a row that showed a dash, or vice versa.
 
         Access (finding F5): get_catalog's scope check is incidental — it
         only happens because _build_payload always calls _categories(),
@@ -524,13 +600,16 @@ class ToolsCatalogProvider(models.AbstractModel):
         read_keys = list(dict.fromkeys(
             k for k in spec_keys + engineering_keys if k in tmpl._fields))
         data = tmpl.read(read_keys)[0] if read_keys else {}
+        # One extra query, same helper _rows() uses — one variant, so one
+        # tmpl id, but the query shape (and cost) stays identical either way.
+        nulls = self._null_mask([tmpl.id], read_keys).get(tmpl.id, {})
 
         specs = [{"label": col["label"],
-                  "value": self._detail_value(tmpl, data, col["key"])}
+                  "value": self._detail_value(tmpl, data, col["key"], nulls)}
                  for col in columns if col["key"] not in ("name", "default_code")]
 
         engineering = [{"label": label,
-                        "value": self._detail_value(tmpl, data, field_name)}
+                        "value": self._detail_value(tmpl, data, field_name, nulls)}
                        for field_name, label in ENGINEERING_FIELDS
                        if field_name in tmpl._fields]
 
@@ -548,7 +627,7 @@ class ToolsCatalogProvider(models.AbstractModel):
         }
 
     @api.model
-    def _detail_value(self, tmpl, data, key):
+    def _detail_value(self, tmpl, data, key, nulls=None):
         """One field's value, read()-shaped, normalized, relation-resolved.
 
         `data` came from a batched tmpl.read(); a many2one there is Odoo's
@@ -556,7 +635,13 @@ class ToolsCatalogProvider(models.AbstractModel):
         both live in _normalize_value (finding F4) — the same helper
         _rows() uses for its cells — so a relation column can never render
         differently in the table than in this detail panel.
+
+        `nulls` is this template's slice of _null_mask() — {key: True} for
+        every numeric column that is genuinely SQL NULL. Defaults to {} so
+        an unfiltered caller (there is none left, but the default keeps this
+        method safe to call standalone) falls back to "nothing known null".
         """
         field = tmpl._fields.get(key)
         raw = data.get(key) if field else False
-        return _normalize_value(raw, field)
+        is_null = (nulls or {}).get(key, False)
+        return _normalize_value(raw, field, is_null=is_null)

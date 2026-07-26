@@ -65,19 +65,33 @@ class TestRows(TransactionCase):
     def test_explicit_numeric_zero_is_kept_not_folded_to_none(self):
         """An explicitly-entered 0 on a Float spec must render as 0.0, not
         a dash — the catalog must not lie about data that exists.
-
-        Note: a Float spec that was NEVER set also reads back as 0.0 at the
-        ORM level (Odoo has no NULL for an unset Float/Integer/Monetary) —
-        "never entered" and "entered as zero" are genuinely indistinguishable
-        there. This test intentionally does not assert anything about
-        self.b's (never-set) x_southbrook_screw_length_mm for that reason;
-        it only asserts the case that IS distinguishable: an explicit zero
-        must survive as zero.
         """
         rows = {r["name"]: r for r in self._payload()["rows"]}
         self.assertEqual(
             rows["TEST Zero-length spacer"]["x_southbrook_screw_length_mm"],
             0.0)
+
+    def test_null_vs_zero_and_unset_char_via_get_catalog(self):
+        """Prove all three absence states in one place, through the real
+        get_catalog() path (not private helpers):
+
+        - an explicit 0 on a Float spec (self.c) renders as 0, not a dash
+        - the SAME Float spec left unset (self.b) renders as None, not 0
+        - a Char spec left unset (self.b) still renders as None
+
+        Postgres genuinely distinguishes NULL from a stored 0 on a Float
+        column even though the ORM's read() collapses both to 0.0 — the
+        catalog now determines NULL-ness at the SQL layer instead of
+        trusting read()'s falsy value.
+        """
+        rows = {r["name"]: r for r in self._payload()["rows"]}
+        self.assertEqual(
+            rows["TEST Zero-length spacer"]["x_southbrook_screw_length_mm"],
+            0.0)
+        self.assertIsNone(
+            rows["TEST Pocket screw"]["x_southbrook_screw_length_mm"])
+        self.assertIsNone(
+            rows["TEST Pocket screw"]["x_southbrook_material_grade"])
 
     def test_search_matches_name_and_reference(self):
         self.assertIn("TEST Confirmat 7x50",
