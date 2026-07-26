@@ -68,3 +68,28 @@ class TestPanelVolume(TransactionCase):
         })
         self.assertEqual(line._panel_volume_mm3(line), 0.0)
         self.assertEqual(line.component_weight_kg, 0.0)
+
+    def test_mo_material_weight_total_nonzero_end_to_end(self):
+        """Task A5 (Increment-A gate): the geometry-driven rollup must reach
+        `mrp.production.material_weight_total` (sb_material_mrp's Task 9
+        field), not just the line-level `_panel_volume_mm3` helper (Task A4)
+        or the BoM-level `material_weight_total` (Task 7). A configured
+        cabinet's Manufacturing Order is the thing the brief asks to prove
+        non-zero.
+        """
+        bom = self._cabinet_bom(with_geometry=True)
+        component = self._density_volume_component("Melamine 5/8 (MO)")
+        self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+        })
+        bom.invalidate_recordset()
+        self.assertGreater(bom.material_weight_total, 0.0)
+
+        cab = bom.product_id
+        cab.write({"is_storable": True})  # mrp.production wants a storable product
+        mo = self.env["mrp.production"].create({
+            "product_id": cab.id,
+            "product_qty": 1.0,
+            "bom_id": bom.id,
+        })
+        self.assertGreater(mo.material_weight_total, 0.0)
