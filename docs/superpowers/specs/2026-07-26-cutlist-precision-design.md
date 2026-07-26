@@ -67,3 +67,17 @@ Where the configurator materializes a BoM (`kitchen_design._ensure_kitchen_bom` 
 - N-lines-same-material (256) split that material's panel total among themselves; the BoM total still counts each material's panels exactly once.
 - Unmapped/ambiguous lines are unchanged (today's estimate) and flagged non-exact — honesty contract intact.
 - Additive/backcompat; no live number moves until roles are assigned; recompute is explicit.
+
+---
+
+## Delivered (cutlist precision, 2026-07-26)
+
+Branch `feat/cutlist-precision`, built subagent-driven, each task reviewed:
+- **T1** `sb.panel.role` model (7 seeded roles, vocabulary = `sb.cutlist.PANEL_NAMES`) + `material.panel_role_ids`. (`sb_material_core` → 19.0.1.6.0)
+- **T2** exact-volume helpers `_sb_line_owned_roles` / `_sb_line_exact_volume_mm3` — a role is owned only when exactly one distinct material on the BoM claims it; owned panels summed; material-scoped qty-share; returns `None` (fall back) when unresolvable.
+- **T3** wired exact-first / estimate-fallback into `_compute_material_demand_qty` + `_compute_component_weight`; `material_demand_is_exact` flag; recompute migration (incl. `suggested_purchase_qty`, T3-review fix). (`sb_material_mrp` → 19.0.1.7.0)
+- **T4** seeded `panel_role_ids` on standard materials + legacy/seeded-material role backfill migration (noupdate seed does NOT re-apply on `-u`, so the migration backfills) + `is_exact` on the BoM line. (`sb_material_core` → 19.0.1.7.0)
+- **T5** this note + module README.
+
+### Still deferred
+`sb.cutlist` convergence (post-MO → pre-MO, unify the two panel-geometry engines); `density_area` role mapping; nesting/offcut optimization; multi-different-dims-on-one-line breakdown model.

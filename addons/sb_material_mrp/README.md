@@ -49,3 +49,31 @@ auto-confirm-below-threshold, `uom.uom` conversion into arbitrary purchase UoMs,
 and actual-vs-estimate variance reconciliation are **not** in this increment —
 this ships the decision numbers and the Buy-route config; a buyer drives the
 native RFQ.
+
+## Cutlist precision (2026-07-26)
+
+Per-BoM-line material demand/weight is now **exact per panel** where resolvable,
+falling back to the estimation-grade carcass share otherwise.
+
+- `sb.panel.role` (in `sb_material_core`) — the seven cabinet panel roles
+  (`side_L, side_R, top, bottom, back, shelf, door`), vocabulary shared with
+  `sb.cutlist.PANEL_NAMES`.
+- `southbrook.kitchen.material.panel_role_ids` — the roles a material makes
+  (curated once per material). Seeded on the standard materials (carcass sheet
+  goods → box roles; ¼″ ply / hardboard → back).
+- A BoM line's demand/weight is **exact** when its material *uniquely owns* a
+  role on that BoM (claimed by exactly one material): the line gets the summed
+  `L×W×th` of exactly those panels; several lines of the same material split
+  that material's panels by `product_qty`. `back` and `door` are first-class
+  (previously cut-constant / excluded).
+- `mrp.bom.line.material_demand_is_exact` (shown on the BoM line) — True when
+  the exact per-role path was used, False when it fell back to the estimate.
+- **Honesty:** when ownership is ambiguous (two materials claim a role) or the
+  material has no roles or geometry is absent, the line keeps today's
+  `_sb_component_share_volume_mm3` estimate — never fabricated.
+- Note on area vs weight: sheet **area** demand is thickness-independent (a
+  panel's face area is the same at any thickness); **weight** remains
+  thickness-driven via the locked density×volume conversion.
+
+**Deferred:** converging the post-MO `sb.cutlist` onto this role link;
+`density_area` mapping; nesting/offcut optimization.
