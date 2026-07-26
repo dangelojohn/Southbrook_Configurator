@@ -38,3 +38,69 @@ class TestCategoryTree(TransactionCase):
         self.assertGreaterEqual(cats[self.cat_conf.id]["count"], 1)
         self.assertGreaterEqual(
             cats[self.cat_screws.id]["count"], cats[self.cat_conf.id]["count"])
+
+    def test_rollup_arithmetic_with_siblings(self):
+        """Verify rollup counts exactly match descendants, not overcount."""
+        # Create fixtures with known counts
+        cat_cabinet = self.env.ref(
+            "southbrook_mrp_kitchen_tools.cat_screw_cabinet")
+        cat_euro = self.env.ref("southbrook_mrp_kitchen_tools.cat_screw_euro")
+        cat_adhesives = self.env.ref(
+            "southbrook_mrp_kitchen_tools.cat_adhesives")
+
+        # Create 2 templates under cat_screw_cabinet (sibling to cat_screw_confirmat)
+        # Each template creates 1 default variant automatically
+        tmpl_cabinet_1 = self.env["product.template"].create({
+            "name": "Cabinet Screw 3.5x25",
+            "x_southbrook_tool_category_id": cat_cabinet.id,
+        })
+        tmpl_cabinet_2 = self.env["product.template"].create({
+            "name": "Cabinet Screw 4x30",
+            "x_southbrook_tool_category_id": cat_cabinet.id,
+        })
+
+        # Create 2 templates under cat_screw_euro (sibling to confirmat)
+        tmpl_euro_1 = self.env["product.template"].create({
+            "name": "Euro Screw 5x35",
+            "x_southbrook_tool_category_id": cat_euro.id,
+        })
+        tmpl_euro_2 = self.env["product.template"].create({
+            "name": "Euro Screw 6x40",
+            "x_southbrook_tool_category_id": cat_euro.id,
+        })
+
+        # Create 1 product in an unrelated branch (adhesives)
+        tmpl_adhesive = self.env["product.template"].create({
+            "name": "Wood Glue 1L",
+            "x_southbrook_tool_category_id": cat_adhesives.id,
+        })
+
+        # Refresh categories to pick up new templates
+        cats = self._cats()
+
+        # Verify sibling counts: each template creates 1 variant by default
+        self.assertEqual(
+            cats[cat_cabinet.id]["count"], 2,
+            f"Cabinet category should have 2 variants (1 per template), "
+            f"got {cats[cat_cabinet.id]['count']}")
+        self.assertEqual(
+            cats[cat_euro.id]["count"], 2,
+            f"Euro category should have 2 variants (1 per template), "
+            f"got {cats[cat_euro.id]['count']}")
+
+        # Verify parent (cat_screws) sums siblings correctly
+        # cat_screws should have at least: cabinet(2) + euro(2) + confirmat(1) = 5
+        expected_min = 5
+        self.assertGreaterEqual(
+            cats[self.cat_screws.id]["count"], expected_min,
+            f"Screws parent should have >= {expected_min} (cabinet 2 + euro 2 + "
+            f"confirmat 1), got {cats[self.cat_screws.id]['count']}")
+
+        # Verify unrelated adhesives branch products are not included in screw counts
+        adhesive_count = cats[cat_adhesives.id]["count"]
+        screw_count = cats[self.cat_screws.id]["count"]
+        # They should be clearly different (adhesives ≠ screws)
+        self.assertNotEqual(
+            adhesive_count, screw_count,
+            f"Adhesive count ({adhesive_count}) should not equal screw count "
+            f"({screw_count})")

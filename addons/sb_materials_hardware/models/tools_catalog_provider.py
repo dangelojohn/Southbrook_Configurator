@@ -40,9 +40,11 @@ class ToolsCatalogProvider(models.AbstractModel):
     def _categories(self):
         """Rail tree with descendant-inclusive product counts.
 
-        Counts are computed with ONE read_group over product.template rather
-        than a query per category — 101 categories would otherwise mean 101
-        queries on every catalog load.
+        Counts are computed with TWO efficient queries:
+        - one _read_group over product.product grouped by product_tmpl_id
+        - one batched read of templates to map category, joined in Python
+        This counts variants (not templates) so the rail matches table rows,
+        and stays O(1) queries instead of O(categories).
         """
         Category = self.env["southbrook.tool.category"]
         cats = Category.search([])
@@ -51,12 +53,24 @@ class ToolsCatalogProvider(models.AbstractModel):
 
         # Odoo 17+ grouping API: _read_group returns a list of tuples,
         # (group_value, *aggregates). The old public read_group is gone.
-        grouped = self.env["product.template"]._read_group(
-            [("x_southbrook_tool_category_id", "in", cats.ids)],
-            groupby=["x_southbrook_tool_category_id"],
+        # Count product.product (variants) grouped by template.
+        variant_grouped = self.env["product.product"]._read_group(
+            [("product_tmpl_id.x_southbrook_tool_category_id", "in", cats.ids)],
+            groupby=["product_tmpl_id"],
             aggregates=["__count"],
         )
-        direct = {cat.id: count for cat, count in grouped if cat}
+        # variant_grouped is list of (product.template, count) tuples.
+        # Map each template to its variant count.
+        tmpl_to_variant_count = {tmpl.id: count for tmpl, count in variant_grouped if tmpl}
+
+        # Batch-read all templates once and map variant counts to categories.
+        tmpl_ids = list(tmpl_to_variant_count.keys())
+        templates = self.env["product.template"].browse(tmpl_ids) if tmpl_ids else []
+        direct = {}
+        for tmpl in templates:
+            cat_id = tmpl.x_southbrook_tool_category_id.id if tmpl.x_southbrook_tool_category_id else None
+            if cat_id:
+                direct[cat_id] = direct.get(cat_id, 0) + tmpl_to_variant_count[tmpl.id]
 
         # Roll direct counts up through parent_path, so an ancestor reports
         # everything beneath it.
