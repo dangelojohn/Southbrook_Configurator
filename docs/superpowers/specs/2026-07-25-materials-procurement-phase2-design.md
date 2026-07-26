@@ -71,3 +71,18 @@ v19 core notes discovered during the build: `product.product.uom_po_id` was cons
 
 ### Still deferred (Phase-2b)
 Orderpoint min/max automation, native scheduler end-to-end RFQ, auto-confirm-below-threshold, `uom.uom` conversion into arbitrary purchase UoMs, actual-vs-estimate variance reconciliation / waste self-tuning.
+
+
+---
+
+## Delivered (Phase-2b, 2026-07-26)
+
+Branch `feat/materials-procurement-phase2b`, subagent-driven, each task reviewed clean:
+- **T1** UoM conversion helper (native `_compute_quantity` gated by `_has_common_reference`; honest not-convertible fallback) + material canonical-demand-uom.
+- **T2** orderpoint MAX sync from open-MO `material_demand_qty` rollup (MIN untouched; idempotent; native records only).
+- **T3** proof: native `stock.rule.run_scheduler` drafts the RFQ off Buy-route + orderpoint (zero PO-creation code).
+- **T4** read-only PO-line assist note (+ Materials tab); honest when no yield data.
+- **T5** gated, default-OFF, double-gated auto-confirm-below-threshold (sole `button_confirm` site; `super()` first; only native-created draft POs; audited).
+
+### Still deferred
+Actual-vs-estimate variance reconciliation / waste self-tuning; **making the native scheduler TRIGGER itself size-aware (the Fork-1 split-brain remains)**; multi-currency vendor price conversion.

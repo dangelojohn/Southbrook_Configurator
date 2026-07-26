@@ -82,3 +82,15 @@ falling back to the estimation-grade carcass share otherwise.
 
 **Deferred:** converging the post-MO `sb.cutlist` onto this role link;
 `density_area` mapping; nesting/offcut optimization.
+
+## Procurement loop (Phase-2b, 2026-07-26)
+
+Native-procurement wiring on top of the Phase-2a assist. **Fork-1 limitation (prominent):** the native BoM-line `product_qty` is left untouched (=1 for continuous families), so the demand signal that *triggers* the native scheduler is still size-blind; the material-aware `material_demand_qty` reaches only the orderpoint **MAX** and the PO-line assist note — never the trigger. Closing that split-brain (making the trigger size-aware) is deferred.
+
+- **UoM conversion helper** (`_sb_convert_demand_qty` / `_sb_demand_qty_in_uom`) — converts canonical demand (m²/lm) into a vendor's purchase UoM via native `uom.uom._compute_quantity`, but ONLY when the units share a reference (`_has_common_reference`); otherwise returns the value unchanged with a not-convertible flag (honest, never a wrong-unit number). This is the code path for when there's no `uom_yield_qty`; when a vendor yield IS recorded, the Phase-2a `suggested_purchase_qty` (sheets/rolls) is used instead.
+- **Orderpoint MAX sync** (`action_sb_sync_orderpoint_max`) — creates/updates `stock.warehouse.orderpoint` per material component per warehouse, MAX derived from the `material_demand_qty` rollup across OPEN MOs (`confirmed/progress/to_close`). Idempotent. **MIN is never touched** (stays native/human). Native records only — no bespoke reorder engine.
+- **Native scheduler → draft RFQ** — with `route=Buy` (Phase-2a `action_sb_set_route_buy`) + orderpoints, native `stock.rule.run_scheduler` drafts the RFQ. Proven by test; **zero PO-creation code** of ours.
+- **PO-line assist note** — read-only, non-stored computed fields on `purchase.order.line` (+ a Materials tab) showing the material-aware suggestion ("needs 3.2 sheets → order 4, incl 12% waste") or an honest "no vendor yield recorded" when data is absent. Never writes qty, never confirms.
+- **Auto-confirm-below-threshold** (`res.company` toggle, **default OFF**) — the ONLY `button_confirm()` call site. Double-gated: setting ON **and** `0 < amount_total ≤ threshold`. Hooks `stock.rule._run_buy` calling `super()` first/unchanged, then optionally confirms an already-native-created draft PO; every auto-confirm is logged. When off, behavior is byte-identical to native.
+
+**Live-data dependency:** the PO-line suggestion is actionable only once vendors have `uom_yield_qty` (the yield worksheet — shop data). All behavior is testable with synthetic data.
