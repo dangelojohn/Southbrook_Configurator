@@ -135,3 +135,59 @@ class TestPanelVolume(TransactionCase):
         self.assertEqual(line.sb_line_width_mm, 500)
         self.assertEqual(line.sb_line_height_mm, 750)
         self.assertEqual(line.sb_line_depth_mm, 600)
+
+    def test_panel_volume_prefers_line_override_over_variant(self):
+        """Task B2: when all three sb_line_* overrides are set (>0) on the
+        line, `_panel_volume_mm3` must build geometry from the LINE's own
+        dims, not the variant's — proven by a bigger override (900x762x600)
+        on a variant whose own geometry is smaller (600x762x600) yielding a
+        strictly larger volume than the variant-only case.
+        """
+        bom = self._cabinet_bom(with_geometry=True)  # variant is 600x762x600
+        component = self._density_volume_component("Melamine 5/8 (B2-override)")
+        baseline_line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+        })
+        baseline_volume = baseline_line._panel_volume_mm3(baseline_line)
+        self.assertGreater(baseline_volume, 0.0)
+
+        override_line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+            "sb_line_width_mm": 900, "sb_line_height_mm": 762,
+            "sb_line_depth_mm": 600,
+        })
+        override_volume = override_line._panel_volume_mm3(override_line)
+        self.assertGreater(override_volume, baseline_volume)
+
+    def test_panel_volume_falls_back_to_variant_when_override_incomplete(self):
+        """Task B2 regression: a line with the override left at the default
+        0 (or only partially set) must still use the variant's own geometry
+        (A4 behavior) — the merge only kicks in when ALL THREE line dims are
+        set (>0).
+        """
+        bom = self._cabinet_bom(with_geometry=True)
+        component = self._density_volume_component("Melamine 5/8 (B2-fallback)")
+        baseline_line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+        })
+        baseline_volume = baseline_line._panel_volume_mm3(baseline_line)
+
+        zero_override_line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+            "sb_line_width_mm": 0, "sb_line_height_mm": 0,
+            "sb_line_depth_mm": 0,
+        })
+        self.assertEqual(
+            zero_override_line._panel_volume_mm3(zero_override_line),
+            baseline_volume,
+        )
+
+        partial_override_line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+            "sb_line_width_mm": 900, "sb_line_height_mm": 0,
+            "sb_line_depth_mm": 600,
+        })
+        self.assertEqual(
+            partial_override_line._panel_volume_mm3(partial_override_line),
+            baseline_volume,
+        )

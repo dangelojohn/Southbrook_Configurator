@@ -236,7 +236,26 @@ class MrpBomLine(models.Model):
             return 0.0
 
         cab = line.bom_id.product_id or line.bom_id.product_tmpl_id.product_variant_id
-        geo = cab._sb_geometry_inputs() if hasattr(cab, "_sb_geometry_inputs") else {}
+        base_geo = cab._sb_geometry_inputs() if hasattr(cab, "_sb_geometry_inputs") else {}
+
+        # Task B2 (Materials geometry-writeback plan, Increment B): a
+        # per-line geometry override (mrp.bom.line.sb_line_width_mm/
+        # sb_line_height_mm/sb_line_depth_mm, Task B1) wins over the
+        # variant's own geometry, but ONLY when all three are set (>0) —
+        # a partial override is not a real override and falls back to the
+        # variant (A4 behavior), preserving the honesty contract. When the
+        # override does apply, only width/height/depth are replaced; the
+        # variant's family/door_count/drawer_count/finished_sides are kept
+        # so panel-count-driven hardware/edge-banding stays correct.
+        line_geo = {}
+        if line.sb_line_width_mm and line.sb_line_height_mm and line.sb_line_depth_mm:
+            line_geo = {
+                **base_geo,
+                "width_mm": line.sb_line_width_mm,
+                "height_mm": line.sb_line_height_mm,
+                "depth_mm": line.sb_line_depth_mm,
+            }
+        geo = line_geo or base_geo
         if not geo:
             _logger.debug(
                 "_panel_volume_mm3: no geometry on variant %s (line %s) -> "
