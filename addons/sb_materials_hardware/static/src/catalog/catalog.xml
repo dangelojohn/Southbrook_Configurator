@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+
+<t t-name="sb_materials_hardware.Catalog">
+  <div class="o_matcat">
+    <div class="o_matcat_masthead">
+      <span class="o_matcat_brand">HARDWARE<span class="o_matcat_brand_sub">engineering catalog</span></span>
+      <input type="text" class="o_matcat_search"
+             placeholder="Search parts, specs, references"
+             t-att-value="state.search"
+             t-on-input="onSearchInput"/>
+      <button class="o_matcat_clear" t-on-click="clearFilters">Clear</button>
+    </div>
+
+    <t t-if="!state.ok">
+      <div class="o_matcat_empty">
+        Catalog unavailable. <t t-esc="state.reason"/>
+      </div>
+    </t>
+
+    <t t-if="state.ok">
+      <t t-if="breadcrumb">
+        <div class="o_matcat_crumbs">
+          Catalog<span class="o_matcat_crumb_sep">›</span><t t-esc="breadcrumb.top"/>
+          <t t-if="breadcrumb.sub">
+            <span class="o_matcat_crumb_sep">›</span><t t-esc="breadcrumb.sub"/>
+          </t>
+        </div>
+      </t>
+
+      <div class="o_matcat_body">
+        <aside class="o_matcat_rail">
+          <h4>Categories</h4>
+          <t t-foreach="topCategories" t-as="top" t-key="top.id">
+            <button class="o_matcat_cat"
+                    t-att-class="{ o_selected: state.categoryId === top.id }"
+                    t-on-click="() => this.selectCategory(top.id)">
+              <span t-esc="top.name"/>
+              <span class="o_matcat_count" t-esc="top.count"/>
+            </button>
+            <t t-foreach="childrenOf(top.id)" t-as="sub" t-key="sub.id">
+              <button class="o_matcat_cat o_matcat_child"
+                      t-att-class="{ o_selected: state.categoryId === sub.id }"
+                      t-on-click="() => this.selectCategory(sub.id)">
+                <span t-esc="sub.name"/>
+                <span class="o_matcat_count" t-esc="sub.count"/>
+              </button>
+            </t>
+          </t>
+
+          <t t-foreach="state.facets" t-as="facet" t-key="facet.key">
+            <div class="o_matcat_facet">
+              <div class="o_matcat_facet_title" t-esc="facet.label"/>
+              <t t-if="facet.type === 'range'">
+                <div class="o_matcat_range">
+                  <input type="number" class="o_matcat_range_input"
+                         t-att-placeholder="facet.min !== null ? facet.min : ''"
+                         t-att-value="rangeValue(facet.key, 'min')"
+                         t-on-change="(ev) => this.setRangeBound(facet.key, 'min', ev)"/>
+                  <span class="o_matcat_range_sep">–</span>
+                  <input type="number" class="o_matcat_range_input"
+                         t-att-placeholder="facet.max !== null ? facet.max : ''"
+                         t-att-value="rangeValue(facet.key, 'max')"
+                         t-on-change="(ev) => this.setRangeBound(facet.key, 'max', ev)"/>
+                </div>
+              </t>
+              <t t-if="facet.type !== 'range'">
+                <div class="o_matcat_chips">
+                  <t t-foreach="facet.values" t-as="val" t-key="val.value">
+                    <button class="o_matcat_chip"
+                            t-att-class="{ o_on: isSelected(facet.key, val.value) }"
+                            t-on-click="() => this.toggleFacet(facet.key, val.value)">
+                      <t t-esc="val.label"/>
+                    </button>
+                  </t>
+                </div>
+              </t>
+            </div>
+          </t>
+        </aside>
+
+        <section class="o_matcat_results">
+          <div class="o_matcat_resbar">
+            <span class="o_matcat_pageinfo">
+              Showing <b t-esc="pageStart"/>–<b t-esc="pageEnd"/> of <b t-esc="state.total"/> variants
+            </span>
+            <span class="o_matcat_echo" t-esc="filterEcho"/>
+            <t t-if="hasMultiplePages">
+              <div class="o_matcat_pager">
+                <button class="o_matcat_pagebtn" t-att-disabled="!hasPrevPage"
+                        t-on-click="prevPage">‹ Prev</button>
+                <button class="o_matcat_pagebtn" t-att-disabled="!hasNextPage"
+                        t-on-click="nextPage">Next ›</button>
+              </div>
+            </t>
+          </div>
+          <div class="o_matcat_tablewrap">
+            <table class="o_matcat_table">
+              <thead>
+                <tr>
+                  <t t-foreach="state.columns" t-as="col" t-key="col.key">
+                    <th t-att-class="cellClass(col)" t-esc="col.label"/>
+                  </t>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-if="!state.rows.length">
+                  <tr><td t-att-colspan="state.columns.length" class="o_matcat_empty">
+                    No matching parts. Try removing a filter or broadening your search.
+                  </td></tr>
+                </t>
+                <t t-foreach="state.rows" t-as="row" t-key="row.product_id">
+                  <tr t-att-aria-selected="isRowSelected(row.product_id) ? 'true' : 'false'"
+                      t-on-click="() => this.selectRow(row.product_id)">
+                    <t t-foreach="state.columns" t-as="col" t-key="col.key">
+                      <td t-att-class="cellClass(col)"
+                          t-esc="cell(row, col.key)"/>
+                    </t>
+                  </tr>
+                </t>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="o_matcat_detail">
+            <div class="o_matcat_dmain">
+              <div class="o_matcat_dtitle">
+                <h3 t-esc="state.detail.title"/>
+                <span class="o_matcat_sub" t-esc="state.detail.subtitle"/>
+              </div>
+              <div class="o_matcat_specgrid">
+                <t t-foreach="state.detail.specs" t-as="spec" t-key="spec.label">
+                  <div class="o_matcat_spec">
+                    <span class="o_k" t-esc="spec.label"/>
+                    <span class="o_v" t-esc="spec.value === null ? '—' : spec.value"/>
+                  </div>
+                </t>
+              </div>
+            </div>
+            <div class="o_matcat_dside">
+              <h4>Engineering record</h4>
+              <div class="o_matcat_eng">
+                <t t-foreach="state.detail.engineering" t-as="eng" t-key="eng.label">
+                  <div class="o_matcat_kv">
+                    <span class="o_k" t-esc="eng.label"/>
+                    <span class="o_v" t-esc="eng.value === null ? '—' : eng.value"/>
+                  </div>
+                </t>
+              </div>
+              <h4>Safety flags</h4>
+              <div class="o_matcat_badges">
+                <t t-foreach="state.detail.badges" t-as="badge" t-key="badge">
+                  <span class="o_matcat_badge" t-esc="badge"/>
+                </t>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="o_matcat_provenance" t-esc="state.provenance"/>
+    </t>
+  </div>
+</t>
+
+</templates>

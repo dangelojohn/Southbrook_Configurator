@@ -1,0 +1,315 @@
+// Materials & Hardware catalog — client action styles.
+//
+// Token structure and component rules are ported from the UX reference
+// simulation (UX_TEMPLATE_materials_catalog.html) that this client action
+// must reproduce. Light palette is the default; the dark variants apply
+// via `prefers-color-scheme: dark` (OS/browser signal) and are also
+// exposed as `[data-theme="dark"]` / `[data-theme="light"]` overrides in
+// case a host page (Odoo shell or otherwise) stamps that attribute on the
+// document root — see finding U10.
+//
+// SCSS note: `min()` / `max()` calls below are written Capitalised
+// (`Min(...)`) per the project-wide libsass trap — lowercase min()/max()/
+// clamp() with mixed units mis-parses. `minmax(...)` (the CSS grid
+// function) is a distinct identifier and is unaffected, so it is left
+// lowercase as normal CSS.
+.o_matcat {
+    --mc-bg: #f4f6f8;
+    --mc-surface: #ffffff;
+    --mc-surface-2: #fafbfc;
+    --mc-sunk: #f0f3f6;
+    --mc-line: #d6dde3;
+    --mc-line-soft: #e6ebef;
+    --mc-text: #111418;
+    --mc-text-soft: #4a5560;
+    --mc-text-mute: #8b97a3;
+    --mc-accent: #b8242a;
+    --mc-accent-2: #8a1a1f;
+    --mc-accent-soft: #fbeced;
+    --mc-row-hover: #fff8e1;
+    --mc-flag: #fff3d6;
+    --mc-link: #1851a8;
+    --mc-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    @media (prefers-color-scheme: dark) {
+        --mc-bg: #14161a;
+        --mc-surface: #1c1f24;
+        --mc-surface-2: #21252b;
+        --mc-sunk: #191c21;
+        --mc-line: #2f353d;
+        --mc-line-soft: #272c33;
+        --mc-text: #e6e9ed;
+        --mc-text-soft: #a8b2bd;
+        --mc-text-mute: #78828e;
+        --mc-accent: #e2686c;
+        --mc-accent-2: #f0898c;
+        --mc-accent-soft: #2e1c1e;
+        --mc-row-hover: #2a2418;
+        --mc-flag: #2e2718;
+        --mc-link: #7aa6e8;
+    }
+
+    background: var(--mc-bg);
+    color: var(--mc-text);
+    height: 100%;
+    overflow: auto;
+    font-variant-numeric: tabular-nums;
+
+    .o_matcat_masthead {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 16px; background: var(--mc-surface);
+        border-bottom: 2px solid var(--mc-accent);
+    }
+    .o_matcat_brand {
+        font-weight: 800; color: var(--mc-accent); letter-spacing: -.02em;
+        display: flex; align-items: baseline; gap: 8px;
+    }
+    .o_matcat_brand_sub {
+        font-weight: 400; color: var(--mc-text-mute); font-size: 12px;
+        letter-spacing: 0;
+    }
+    .o_matcat_search {
+        flex: 1; min-width: 180px; padding: 6px 10px;
+        border: 1px solid var(--mc-line); border-radius: 4px;
+        background: var(--mc-surface-2); color: var(--mc-text);
+    }
+    .o_matcat_clear {
+        border: 1px solid var(--mc-line); background: var(--mc-surface);
+        border-radius: 4px; padding: 4px 10px; font-size: 11.5px;
+        cursor: pointer; color: var(--mc-text-soft);
+        &:hover { border-color: var(--mc-accent); color: var(--mc-accent); }
+    }
+
+    .o_matcat_crumbs {
+        padding: 7px 16px; font-size: 12px; color: var(--mc-text-soft);
+        background: var(--mc-surface-2); border-bottom: 1px solid var(--mc-line-soft);
+    }
+    .o_matcat_crumb_sep { color: var(--mc-text-mute); margin: 0 5px; }
+
+    .o_matcat_body { display: flex; align-items: flex-start; }
+    .o_matcat_rail {
+        width: Min(260px, 30%);
+        border-right: 1px solid var(--mc-line-soft);
+        background: var(--mc-surface-2);
+        max-height: 620px;
+        overflow-y: auto;
+
+        h4 {
+            margin: 0; padding: 11px 14px 7px; font-size: 10.5px;
+            text-transform: uppercase; letter-spacing: .09em;
+            color: var(--mc-text-mute);
+        }
+    }
+    .o_matcat_cat {
+        display: flex; justify-content: space-between; width: 100%;
+        border: 0; background: none; text-align: left;
+        padding: 6px 14px; cursor: pointer; color: var(--mc-text);
+        border-left: 3px solid transparent;
+        &:hover { background: var(--mc-sunk); }
+        &.o_matcat_child { padding-left: 28px; color: var(--mc-text-soft); font-size: 12.5px; }
+        &.o_selected {
+            background: var(--mc-accent-soft); border-left-color: var(--mc-accent);
+            color: var(--mc-accent); font-weight: 700;
+        }
+    }
+    .o_matcat_count { color: var(--mc-text-mute); font-size: 11px; font-family: var(--mc-mono); }
+
+    .o_matcat_facet {
+        border-top: 1px solid var(--mc-line-soft); padding: 10px 14px 12px;
+    }
+    .o_matcat_facet_title {
+        font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em;
+        color: var(--mc-text-mute); margin-bottom: 7px;
+    }
+    .o_matcat_chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .o_matcat_chip {
+        border: 1px solid var(--mc-line); background: var(--mc-surface);
+        border-radius: 4px; padding: 3px 8px; margin: 0; cursor: pointer;
+        font-size: 11.5px; font-family: var(--mc-mono); color: var(--mc-text-soft);
+        &:hover { border-color: var(--mc-accent); }
+        &.o_on { background: var(--mc-accent); border-color: var(--mc-accent); color: #fff; font-weight: 700; }
+    }
+    .o_matcat_range {
+        display: flex; align-items: center; gap: 6px;
+    }
+    .o_matcat_range_input {
+        width: Min(72px, 40%);
+        border: 1px solid var(--mc-line); border-radius: 4px;
+        padding: 3px 6px; margin: 2px; font-size: 11.5px;
+        color: var(--mc-text); background: var(--mc-surface);
+        font-family: var(--mc-mono);
+        font-variant-numeric: tabular-nums;
+        &::placeholder { color: var(--mc-text-mute); }
+    }
+    .o_matcat_range_sep { color: var(--mc-text-mute); font-size: 11.5px; }
+
+    .o_matcat_results { flex: 1; min-width: 0; }
+    .o_matcat_resbar {
+        display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+        border-bottom: 1px solid var(--mc-line-soft); font-size: 12.5px;
+        color: var(--mc-text-soft); flex-wrap: wrap;
+        b { color: var(--mc-text); }
+    }
+    .o_matcat_echo { color: var(--mc-text-mute); }
+    .o_matcat_pageinfo {
+        font-variant-numeric: tabular-nums;
+        b { color: var(--mc-text); }
+    }
+    .o_matcat_pager {
+        display: flex; gap: 6px; margin-left: auto;
+    }
+    .o_matcat_pagebtn {
+        border: 1px solid var(--mc-line); background: var(--mc-surface);
+        border-radius: 4px; padding: 4px 10px; font-size: 11.5px;
+        cursor: pointer; color: var(--mc-text-soft);
+        &:hover:not(:disabled) { border-color: var(--mc-accent); color: var(--mc-accent); }
+        &:disabled { opacity: .4; cursor: default; }
+    }
+
+    .o_matcat_tablewrap {
+        overflow-x: auto; overflow-y: auto; max-height: 430px;
+    }
+    .o_matcat_table {
+        width: 100%; border-collapse: collapse; font-size: 12.5px;
+        min-width: 760px;
+        th {
+            position: sticky; top: 0; background: var(--mc-surface-2);
+            text-align: left; font-size: 10px; text-transform: uppercase;
+            letter-spacing: .07em; color: var(--mc-text-mute);
+            font-weight: 700;
+            padding: 8px 10px; border-bottom: 1px solid var(--mc-line);
+            white-space: nowrap; z-index: 1;
+        }
+        td {
+            padding: 7px 10px; border-bottom: 1px solid var(--mc-line-soft);
+            white-space: nowrap;
+        }
+        tbody tr { cursor: pointer; }
+        tbody tr:hover { background: var(--mc-row-hover); }
+        tbody tr[aria-selected="true"] { background: var(--mc-flag); }
+        td.o_mono { font-family: var(--mc-mono); }
+        .o_right {
+            text-align: right; font-family: var(--mc-mono);
+            font-variant-numeric: tabular-nums;
+        }
+    }
+    .o_matcat_empty { padding: 24px; text-align: center; color: var(--mc-text-mute); }
+
+    // ---------- detail: two-column engineering rail ----------
+    .o_matcat_detail {
+        border-top: 1px solid var(--mc-line);
+        background: var(--mc-surface-2);
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    }
+    .o_matcat_dmain {
+        padding: 15px 16px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .o_matcat_dside {
+        border-left: 1px solid var(--mc-line-soft);
+        padding: 15px 16px; display: flex; flex-direction: column; gap: 12px;
+
+        h4 {
+            margin: 0; font-size: 10.5px; text-transform: uppercase;
+            letter-spacing: .09em; color: var(--mc-text-mute);
+        }
+    }
+    .o_matcat_dtitle {
+        display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+        h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+    }
+    .o_matcat_sub { font-family: var(--mc-mono); font-size: 12px; color: var(--mc-text-mute); }
+
+    .o_matcat_specgrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1px;
+        background: var(--mc-line-soft);
+        border: 1px solid var(--mc-line-soft);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .o_matcat_spec {
+        background: var(--mc-surface); padding: 8px 10px;
+        display: flex; flex-direction: column; gap: 2px;
+    }
+    .o_matcat_eng {
+        display: flex; flex-direction: column;
+    }
+    .o_matcat_kv {
+        display: flex; justify-content: space-between; gap: 10px;
+        font-size: 12.5px; padding: 5px 0;
+        border-bottom: 1px solid var(--mc-line-soft);
+        &:last-child { border-bottom: 0; }
+    }
+    .o_matcat_spec .o_k, .o_matcat_kv .o_k {
+        font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em;
+        color: var(--mc-text-mute);
+    }
+    .o_matcat_spec .o_v {
+        font-size: 13px; font-weight: 600; font-family: var(--mc-mono);
+        font-variant-numeric: tabular-nums;
+    }
+    .o_matcat_kv .o_v { font-weight: 600; }
+
+    .o_matcat_badges { display: flex; flex-wrap: wrap; gap: 5px; }
+    .o_matcat_badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        border-radius: 3px; padding: 2px 7px; font-size: 10.5px;
+        font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+        border: 1px solid var(--mc-accent);
+        background: var(--mc-accent-soft); color: var(--mc-accent);
+    }
+
+    .o_matcat_provenance {
+        padding: 10px 16px; font-size: 12px; color: var(--mc-text-soft);
+    }
+
+    @media (max-width: 880px) {
+        .o_matcat_body { flex-direction: column; }
+        .o_matcat_rail {
+            width: 100%; border-right: 0; border-bottom: 1px solid var(--mc-line);
+            max-height: 320px;
+        }
+        .o_matcat_detail { grid-template-columns: 1fr; }
+        .o_matcat_dside { border-left: 0; border-top: 1px solid var(--mc-line-soft); }
+    }
+}
+
+// Theme-attribute overrides — inert unless a host page stamps data-theme
+// on the document root (see finding U10); the prefers-color-scheme block
+// above already covers OS-level dark mode with no attribute needed.
+:root[data-theme="dark"] .o_matcat {
+    --mc-bg: #14161a;
+    --mc-surface: #1c1f24;
+    --mc-surface-2: #21252b;
+    --mc-sunk: #191c21;
+    --mc-line: #2f353d;
+    --mc-line-soft: #272c33;
+    --mc-text: #e6e9ed;
+    --mc-text-soft: #a8b2bd;
+    --mc-text-mute: #78828e;
+    --mc-accent: #e2686c;
+    --mc-accent-2: #f0898c;
+    --mc-accent-soft: #2e1c1e;
+    --mc-row-hover: #2a2418;
+    --mc-flag: #2e2718;
+    --mc-link: #7aa6e8;
+}
+:root[data-theme="light"] .o_matcat {
+    --mc-bg: #f4f6f8;
+    --mc-surface: #ffffff;
+    --mc-surface-2: #fafbfc;
+    --mc-sunk: #f0f3f6;
+    --mc-line: #d6dde3;
+    --mc-line-soft: #e6ebef;
+    --mc-text: #111418;
+    --mc-text-soft: #4a5560;
+    --mc-text-mute: #8b97a3;
+    --mc-accent: #b8242a;
+    --mc-accent-2: #8a1a1f;
+    --mc-accent-soft: #fbeced;
+    --mc-row-hover: #fff8e1;
+    --mc-flag: #fff3d6;
+    --mc-link: #1851a8;
+}

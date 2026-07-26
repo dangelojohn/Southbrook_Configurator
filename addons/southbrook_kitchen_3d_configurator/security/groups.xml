@@ -61,9 +61,19 @@
              canonical_catalog_tag.xml precedent exactly. -->
         <function model="res.groups" name="write">
             <value eval="[ref('group_kitchen_manager')]"/>
+            <!-- all_group_ids, NOT group_ids. The fix above made this block
+                 PARSE; this line makes it actually DO something. Odoo 19 split
+                 the concept on res.users: group_ids is "Groups explicitly
+                 assigned to the user", while implied groups live in
+                 all_group_ids (which carries search='_search_all_group_ids',
+                 so it is queryable). base.group_user is normally held by
+                 implication, not explicitly — verified against a live database,
+                 where searching group_ids returned 0 users and all_group_ids
+                 returned the expected set. Searching group_ids here therefore
+                 granted nothing at all, silently. -->
             <value model="res.users" eval="{'user_ids': [(4, u.id) for u in
                 obj().search([
-                    ('group_ids', 'in', [ref('base.group_user')]),
+                    ('all_group_ids', 'in', [ref('base.group_user')]),
                     ('share', '=', False),
                 ])]}"/>
         </function>

@@ -1,0 +1,127 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+from odoo.tests.common import TransactionCase, tagged
+
+
+@tagged("post_install", "-at_install", "southbrook", "sbk_mathw")
+class TestDetail(TransactionCase):
+    def setUp(self):
+        super().setUp()
+        self.Provider = self.env["materials.catalog.provider"]
+        self.cat = self.env.ref("southbrook_mrp_kitchen_tools.cat_adhesives")
+        # Reuse seeded col_adh_open instead of creating a duplicate
+        # (category, field_name) pair which would violate the uniqueness constraint.
+        self.env["materials.catalog.column"].search([
+            ("category_id", "=", self.cat.id),
+            ("field_name", "=", "x_southbrook_open_time_min")
+        ]) or self.env["materials.catalog.column"].create({
+            "name": "Open time (min)", "category_id": self.cat.id,
+            "field_name": "x_southbrook_open_time_min", "align": "right",
+        })
+        self.vendor = self.env["res.partner"].create({
+            "name": "TEST Adhesive Supply Co",
+        })
+        self.uom = self.env.ref("uom.product_uom_unit")
+        self.tmpl = self.env["product.template"].create({
+            "name": "TEST PVA Type II",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_open_time_min": 8.0,
+            "x_southbrook_hazardous": True,
+            "x_southbrook_min_stock_qty": 4.0,
+            "x_southbrook_preferred_vendor_id": self.vendor.id,
+            "x_southbrook_issue_uom_id": self.uom.id,
+        })
+        self.product = self.tmpl.product_variant_ids[0]
+
+    def test_detail_has_title_and_specs(self):
+        detail = self.Provider.get_detail(self.product.id)
+        self.assertTrue(detail["ok"])
+        self.assertIn("TEST PVA Type II", detail["title"])
+        labels = {s["label"]: s["value"] for s in detail["specs"]}
+        self.assertEqual(labels["Open time (min)"], 8.0)
+
+    def test_hazard_badge_present(self):
+        """Only x_southbrook_hazardous is set on this fixture — assert the
+        other badge fields are absent too, not just that the set one shows
+        up. Without the negative assertion, a regression to
+        "show every badge whose field exists" would pass unnoticed.
+        """
+        detail = self.Provider.get_detail(self.product.id)
+        self.assertIn("Hazardous", detail["badges"])
+        self.assertNotIn("Flammable", detail["badges"])
+        self.assertNotIn("MSDS required", detail["badges"])
+        self.assertNotIn("Ventilation required", detail["badges"])
+        self.assertNotIn("Expiry tracked", detail["badges"])
+
+    def test_engineering_rail_includes_min_stock(self):
+        detail = self.Provider.get_detail(self.product.id)
+        labels = {e["label"]: e["value"] for e in detail["engineering"]}
+        self.assertEqual(labels["Min stock"], 4.0)
+
+    def test_unknown_product_degrades(self):
+        detail = self.Provider.get_detail(-1)
+        self.assertFalse(detail["ok"])
+
+    def test_product_with_no_tool_category_is_out_of_scope(self):
+        """get_detail is a TOOLS-catalog endpoint. A product with no
+        x_southbrook_tool_category_id at all must degrade rather than serve
+        its (unrelated) vendor/stock/lifecycle engineering rail — the spec
+        grid was already correctly empty for such a product (no category ->
+        no declared columns), but ENGINEERING_FIELDS was being read
+        unconditionally, so any product id on the instance, tool or not,
+        returned a fully populated engineering rail.
+        """
+        uncategorized = self.env["product.template"].create({
+            "name": "TEST No-category widget",
+        })
+        detail = self.Provider.get_detail(
+            uncategorized.product_variant_ids[0].id)
+        self.assertFalse(detail["ok"])
+        self.assertFalse(detail["engineering"])
+        self.assertFalse(detail["specs"])
+
+    def test_archived_product_degrades(self):
+        """browse()/exists() both ignore the `active` flag, so an archived
+        product still satisfies `exists()` even though get_catalog's own
+        search()-based listing would never surface it again. A stale link
+        to a discontinued item must not keep working forever.
+        """
+        self.product.write({"active": False})
+        detail = self.Provider.get_detail(self.product.id)
+        self.assertFalse(detail["ok"])
+
+    def test_null_vs_zero_and_unset_char_via_get_detail(self):
+        """Same three absence states as test_rows's
+        test_null_vs_zero_and_unset_char_via_get_catalog, proven through
+        get_detail() instead — the row and the detail panel must never
+        disagree about NULL vs. a genuine stored 0 (they share the same
+        normalization path).
+        """
+        zero_tmpl = self.env["product.template"].create({
+            "name": "TEST Zero open-time adhesive",
+            "x_southbrook_tool_category_id": self.cat.id,
+            "x_southbrook_open_time_min": 0.0,
+        })
+        unset_tmpl = self.env["product.template"].create({
+            "name": "TEST Unset open-time adhesive",
+            "x_southbrook_tool_category_id": self.cat.id,
+        })
+        zero_detail = self.Provider.get_detail(
+            zero_tmpl.product_variant_ids[0].id)
+        unset_detail = self.Provider.get_detail(
+            unset_tmpl.product_variant_ids[0].id)
+        zero_specs = {s["label"]: s["value"] for s in zero_detail["specs"]}
+        unset_specs = {s["label"]: s["value"] for s in unset_detail["specs"]}
+        self.assertEqual(zero_specs["Open time (min)"], 0.0)
+        self.assertIsNone(unset_specs["Open time (min)"])
+
+    def test_engineering_relation_fields_show_display_name(self):
+        """A many2one engineering field (vendor, issue UoM) must render its
+        display name string in the payload — never a raw id, and never the
+        (id, display_name) tuple Odoo's read() returns internally.
+        """
+        detail = self.Provider.get_detail(self.product.id)
+        labels = {e["label"]: e["value"] for e in detail["engineering"]}
+        self.assertEqual(labels["Preferred vendor"], self.vendor.display_name)
+        self.assertEqual(labels["Issue UoM"], self.uom.display_name)
+        self.assertNotIsInstance(labels["Preferred vendor"], tuple)
+        self.assertNotIsInstance(labels["Preferred vendor"], int)
