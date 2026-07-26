@@ -54,3 +54,20 @@ A multi-agent blindspot + ReAct pass scored 93 candidates; only **2 cleared ≥7
 ## Notes
 - Everything stays generic on the material master / `res_model`/`res_id`; no kitchen-specific procurement logic.
 - The `product_configurator_mrp` `product_qty=1` stub is intentionally **left in place** (Fork 1); the new field drives procurement while Manufacturing's native BoM line is untouched. A later, deliberately-migrated pass could reconcile the two if desired (documented split-brain).
+
+---
+
+## Delivered (Phase-2a, 2026-07-26)
+
+Branch `feat/materials-procurement-phase2`. Built subagent-driven, each task reviewed:
+- **T1** `product.supplierinfo.uom_yield_qty` (net-new vendor yield data).
+- **T2** `southbrook.kitchen.material._effective_waste_pct()` (material→family fallback; turns on the dormant waste fields).
+- **T3** `mrp.bom.line.material_demand_qty` — consumption in canonical units (m²/lm/units), continuous families reuse the geometry→volume pipeline; native `product_qty` untouched (Fork 1); honesty 0.0. (+ `_sb_resolve_geo` refactor of `_panel_volume_mm3`, behavior-preserving; depends completed per review.)
+- **T4** `mrp.bom.line.suggested_purchase_qty` / `suggested_purchase_uom_id` — `CEIL(demand × (1+waste) ÷ yield)` in the vendor UoM (Fork 2 ceiling; Fork 3 assist-only, zero PO-creation code).
+- **T5** BoM-line UI surfacing + `product.template.action_sb_set_route_buy()` (native Buy route, idempotent).
+- **T6** this note + module README.
+
+v19 core notes discovered during the build: `product.product.uom_po_id` was consolidated to `uom_id`; `product.supplierinfo` purchase UoM is `product_uom_id`; the Buy route xml_id is `purchase_stock.route_warehouse0_buy`.
+
+### Still deferred (Phase-2b)
+Orderpoint min/max automation, native scheduler end-to-end RFQ, auto-confirm-below-threshold, `uom.uom` conversion into arbitrary purchase UoMs, actual-vs-estimate variance reconciliation / waste self-tuning.
