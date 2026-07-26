@@ -81,8 +81,18 @@
 
         <section class="o_matcat_results">
           <div class="o_matcat_resbar">
-            <span><b t-esc="state.total"/> variants</span>
+            <span class="o_matcat_pageinfo">
+              Showing <b t-esc="pageStart"/>–<b t-esc="pageEnd"/> of <b t-esc="state.total"/> variants
+            </span>
             <span class="o_matcat_echo" t-esc="filterEcho"/>
+            <t t-if="hasMultiplePages">
+              <div class="o_matcat_pager">
+                <button class="o_matcat_pagebtn" t-att-disabled="!hasPrevPage"
+                        t-on-click="prevPage">‹ Prev</button>
+                <button class="o_matcat_pagebtn" t-att-disabled="!hasNextPage"
+                        t-on-click="nextPage">Next ›</button>
+              </div>
+            </t>
           </div>
           <div class="o_matcat_tablewrap">
             <table class="o_matcat_table">
