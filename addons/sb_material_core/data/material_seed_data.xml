@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Task C3: standard starter catalog of southbrook.kitchen.material
+        records so a fresh install has real (non-zero) family/thickness data
+        for the geometry-writeback weight calc, instead of an empty catalog.
+
+        noupdate="1": seeded once, then user-editable (a shop may correct
+        thicknesses/sheet size/family on their own copy without a later
+        `-u` clobbering their edits).
+
+        Canonical unit is mm — only thickness_mm / sheet_width_mm /
+        sheet_height_mm are set here. thickness_in / sheet_width_in /
+        sheet_height_in are computed-with-inverse from the mm fields and
+        derive automatically. effective_density is computed from family_id
+        (FAMILY_DEFAULT_DENSITY walk-up) — do NOT set density directly.
+
+        Prices are intentionally deferred to Phase-2 vendor data.
+    -->
+    <data noupdate="1">
+
+  <record id="mat_mdf_34" model="southbrook.kitchen.material">
+    <field name="name">MDF 3/4"</field>
+    <field name="code">MDF34</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">19.05</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_mdf_12" model="southbrook.kitchen.material">
+    <field name="name">MDF 1/2"</field>
+    <field name="code">MDF12</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">12.70</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_ply_34" model="southbrook.kitchen.material">
+    <field name="name">Plywood 3/4"</field>
+    <field name="code">PLY34</field>
+    <field name="family_id" ref="fam_ewood_ply"/>
+    <field name="thickness_mm">19.05</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_ply_12" model="southbrook.kitchen.material">
+    <field name="name">Plywood 1/2"</field>
+    <field name="code">PLY12</field>
+    <field name="family_id" ref="fam_ewood_ply"/>
+    <field name="thickness_mm">12.70</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_ply_14_back" model="southbrook.kitchen.material">
+    <field name="name">Plywood 1/4" (back)</field>
+    <field name="code">PLY14BACK</field>
+    <field name="family_id" ref="fam_ewood_ply"/>
+    <field name="thickness_mm">6.35</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_particle_34" model="southbrook.kitchen.material">
+    <field name="name">Particleboard 3/4"</field>
+    <field name="code">PART34</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">19.05</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+  <record id="mat_melamine_34" model="southbrook.kitchen.material">
+    <field name="name">Melamine 3/4"</field>
+    <field name="code">MEL34</field>
+    <field name="family_id" ref="fam_ewood"/>
+    <field name="thickness_mm">19.05</field>
+    <field name="sheet_width_mm">1219.2</field>
+    <field name="sheet_height_mm">2438.4</field>
+  </record>
+
+    </data>
+</odoo>

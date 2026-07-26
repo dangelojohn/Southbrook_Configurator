@@ -11,6 +11,7 @@
     "data": [
         "security/ir.model.access.csv",
         "data/material_family_data.xml",
+        "data/material_seed_data.xml",
         "views/material_family_views.xml",
         "views/southbrook_kitchen_material_views.xml",
     ],
