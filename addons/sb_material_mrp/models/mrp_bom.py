@@ -595,6 +595,117 @@ class MrpBomLine(models.Model):
         total_qty = self._sb_density_volume_sibling_total_qty(line)
         return carcass_vol / total_qty
 
+    # ----------------------------------------------------------------
+    # Cutlist Precision Task 2 — exact per-line panel-role volume helpers.
+    #
+    # PURE helpers only (no field/compute wiring here — that's Task 3).
+    # `material.panel_role_ids` (sb_material_core, Task 1) lets a material
+    # declare which cabinet panel roles it physically makes (side_L, side_R,
+    # top, bottom, back, shelf, door). When a role is claimed by EXACTLY ONE
+    # distinct material across a BoM's lines, that material's line can be
+    # given the EXACT panel volume for that role instead of the Phase-1
+    # qty-weighted estimate (`_sb_component_share_volume_mm3` above).
+    # Ambiguous roles (claimed by >1 material on the same BoM — e.g. two
+    # different "shelf" materials) are excluded from ownership entirely; the
+    # caller then falls back to the estimate rather than guess which line
+    # gets the panel.
+    # ----------------------------------------------------------------
+    def _sb_line_owned_roles(self):
+        """Role codes this line's material UNIQUELY owns on its BoM.
+
+        A role is "owned" only when exactly one distinct material across
+        every line of `self.bom_id` claims it (via `material.panel_role_ids`)
+        AND that material is this line's own `material_id`. A role claimed
+        by two or more distinct materials on the same BoM is ambiguous and
+        is excluded for every line — including this one — even if this
+        line's material is one of the claimants; the caller falls back to
+        the estimate rather than pick a winner.
+        """
+        self.ensure_one()
+        mat = self.material_id
+        if not mat or not mat.panel_role_ids:
+            return set()
+        # role_code -> set of distinct material ids claiming it on this BoM
+        claim = {}
+        for line in self.bom_id.bom_line_ids:
+            m = line.material_id
+            if not m:
+                continue
+            for role in m.panel_role_ids:
+                claim.setdefault(role.code, set()).add(m.id)
+        return {
+            r.code for r in mat.panel_role_ids
+            if len(claim.get(r.code, ())) == 1
+        }
+
+    def _sb_line_exact_volume_mm3(self, line, _dims_cache=None):
+        """Exact panel volume (mm3), PER UNIT of `line.product_qty`, for the
+        panels whose role `line`'s material uniquely owns on its BoM.
+
+        Returns `None` (never 0.0) when nothing is unambiguously owned, or
+        when the cabinet geometry can't be resolved — the caller must treat
+        `None` as "fall back to the estimate", not as a real zero volume.
+
+        Thickness per owned panel: `material_id.thickness_mm` when > 0,
+        else the panel tuple's own returned thickness (`p[2]`) — mirrors
+        `_panel_volume_mm3`'s existing box-panel override rule, but applied
+        uniformly to every owned role here (including back/shelf/door),
+        since ownership already ties the panel to a specific material.
+
+        `shelf` and `door` are multiplied by their BoM-level counts
+        (`shelf_count`, `door_count`) before summing.
+
+        Material-scoped qty-share: the summed owned-panel volume is a
+        BoM-level total for this material, so it is divided by the summed
+        `product_qty` of every line on this BoM sharing the same
+        `material_id` (this line included) to produce a PER-UNIT result —
+        matching the contract `_sb_component_share_volume_mm3` already
+        established (its caller, `_weight_for_qty`, multiplies back by
+        `line.product_qty`). A lone line for a material divides by its own
+        `product_qty`, collapsing to the plain per-unit volume.
+        """
+        owned = line._sb_line_owned_roles()
+        if not owned:
+            return None
+        geo = line._sb_resolve_geo()
+        if not geo:
+            return None
+        Bom = self.env["mrp.bom"]
+        if _dims_cache is None:
+            dims = Bom._compute_panel_dimensions(**geo)
+        else:
+            key = tuple(sorted(geo.items()))
+            dims = _dims_cache.get(key)
+            if dims is None:
+                dims = Bom._compute_panel_dimensions(**geo)
+                _dims_cache[key] = dims
+        mat_th = line.material_id.thickness_mm or 0.0
+
+        def _vol(p, count=1):
+            if not p:
+                return 0.0
+            th = mat_th if mat_th > 0 else p[2]
+            return p[0] * p[1] * th * count
+
+        total = 0.0
+        for role in owned:
+            if role in ("side_L", "side_R", "top", "bottom", "back"):
+                total += _vol(dims.get(role))
+            elif role == "shelf":
+                total += _vol(dims.get("shelf"), dims.get("shelf_count") or 0)
+            elif role == "door":
+                total += _vol(dims.get("door"), dims.get("door_count") or 0)
+
+        # Material-scoped share: split this material's owned-panel total
+        # across sibling lines of the SAME material by product_qty
+        # (per-unit result, since `_weight_for_qty` multiplies by
+        # product_qty downstream).
+        same = self.bom_id.bom_line_ids.filtered(
+            lambda l: l.material_id == line.material_id
+        )
+        tot_qty = sum(same.mapped("product_qty")) or line.product_qty or 1.0
+        return total / tot_qty
+
     @api.depends(
         "material_id",
         "product_qty",

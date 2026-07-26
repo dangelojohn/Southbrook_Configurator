@@ -12,3 +12,5 @@ from . import test_component_material_fallback_e2e
 from . import test_suggested_purchase_qty
 # Phase-2 Task 5 — Buy-route helper button.
 from . import test_route_buy_helper
+# Cutlist Precision Task 2 — exact per-line panel-role volume helpers.
+from . import test_cutlist_exact
