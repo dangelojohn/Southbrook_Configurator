@@ -51,3 +51,26 @@ class TestDeclarations(TransactionCase):
                 "field_name": "x_southbrook_not_a_real_field",
                 "facet_type": "enum",
             })
+
+    def test_seeded_declarations_exist_for_screws(self):
+        facets = self.env["materials.catalog.facet"].search([
+            ("category_id", "=",
+             self.env.ref("southbrook_mrp_kitchen_tools.cat_screws").id)])
+        fields_declared = set(facets.mapped("field_name"))
+        self.assertIn("x_southbrook_thread_type", fields_declared)
+        self.assertIn("x_southbrook_head_type", fields_declared)
+        self.assertIn("x_southbrook_drive_type", fields_declared)
+        self.assertIn("x_southbrook_compatible_material_ids", fields_declared)
+
+    def test_seeded_declarations_exist_for_adhesives(self):
+        facets = self.env["materials.catalog.facet"].search([
+            ("category_id", "=",
+             self.env.ref("southbrook_mrp_kitchen_tools.cat_adhesives").id)])
+        self.assertIn("x_southbrook_glue_type", set(facets.mapped("field_name")))
+
+    def test_every_seeded_declaration_names_a_real_field(self):
+        tmpl_fields = self.env["product.template"]._fields
+        for model in ("materials.catalog.facet", "materials.catalog.column"):
+            for rec in self.env[model].search([]):
+                self.assertIn(rec.field_name, tmpl_fields,
+                              "%s declares missing field %s" % (model, rec.field_name))

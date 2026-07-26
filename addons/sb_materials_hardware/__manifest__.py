@@ -12,6 +12,7 @@
     "data": [
         "security/ir.model.access.csv",
         "data/catalog_action.xml",
+        "data/catalog_declarations.xml",
     ],
     "assets": {
         "web.assets_backend": [
