@@ -207,6 +207,21 @@ class TestGeometryWritebackVariantCreation(TransactionCase):
         # locked Q8 cabinet SKUs.
         variant = session.create_get_variant(value_ids=val.ids)
         self.assertTrue(variant)
+        # FIX-E (repair wave 1, finding #13) — creation succeeding is not
+        # enough; the honesty contract requires the geometry itself to
+        # stay at 0/0/0 for a template with no cabinet-geometry signal
+        # (mirrors the companion assertions in
+        # test_variant_for_unknown_template_leaves_geometry_honestly_at_
+        # zero below, applied here too so a regression that fabricates
+        # geometry on this specific non-cabinet path is also caught).
+        self.assertEqual(variant.sb_width_mm, 0)
+        self.assertEqual(variant.sb_height_mm, 0)
+        self.assertEqual(variant.sb_depth_mm, 0)
+        self.assertEqual(
+            variant._sb_geometry_inputs(), {},
+            "a plain non-cabinet template must never receive fabricated "
+            "geometry from create_get_variant",
+        )
 
     def test_variant_for_unknown_template_leaves_geometry_honestly_at_zero(self):
         """Finding I-1 (final review, 2026-07-24): `get_variant_vals` must
