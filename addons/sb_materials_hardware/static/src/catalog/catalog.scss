@@ -43,6 +43,18 @@
         padding: 3px 8px; margin: 2px; cursor: pointer; font-size: 11.5px;
         &.o_on { background: var(--mc-accent); color: #fff; }
     }
+    .o_matcat_range {
+        display: flex; align-items: center; gap: 6px;
+    }
+    .o_matcat_range_input {
+        width: Min(72px, 40%);
+        border: 1px solid var(--mc-line); border-radius: 4px;
+        padding: 3px 6px; margin: 2px; font-size: 11.5px;
+        color: var(--mc-text); background: var(--mc-surface);
+        font-variant-numeric: tabular-nums;
+        &::placeholder { color: var(--mc-text-mute); }
+    }
+    .o_matcat_range_sep { color: var(--mc-text-mute); font-size: 11.5px; }
     .o_matcat_results { flex: 1; min-width: 0; }
     .o_matcat_tablewrap { overflow-x: auto; }
     .o_matcat_table {

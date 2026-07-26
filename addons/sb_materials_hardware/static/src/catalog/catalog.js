@@ -54,6 +54,11 @@ export class MaterialsHardwareCatalog extends Component {
         return chosen.includes(value);
     }
 
+    rangeValue(key, bound) {
+        const chosen = this.state.selectedFacets[key];
+        return chosen && chosen[bound] !== undefined ? chosen[bound] : "";
+    }
+
     async selectCategory(categoryId) {
         this.state.categoryId = categoryId;
         this.state.selectedFacets = {};
@@ -69,6 +74,22 @@ export class MaterialsHardwareCatalog extends Component {
             this.state.selectedFacets[key] = next;
         } else {
             delete this.state.selectedFacets[key];
+        }
+        await this.load();
+    }
+
+    async setRangeBound(key, bound, ev) {
+        const raw = ev.target.value;
+        const current = Object.assign({}, this.state.selectedFacets[key]);
+        if (raw === "") {
+            delete current[bound];
+        } else {
+            current[bound] = Number(raw);
+        }
+        if (current.min === undefined && current.max === undefined) {
+            delete this.state.selectedFacets[key];
+        } else {
+            this.state.selectedFacets[key] = current;
         }
         await this.load();
     }

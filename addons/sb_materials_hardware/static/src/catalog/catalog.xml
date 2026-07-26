@@ -42,15 +42,30 @@
           <t t-foreach="state.facets" t-as="facet" t-key="facet.key">
             <div class="o_matcat_facet">
               <div class="o_matcat_facet_title" t-esc="facet.label"/>
-              <div class="o_matcat_chips">
-                <t t-foreach="facet.values" t-as="val" t-key="val.value">
-                  <button class="o_matcat_chip"
-                          t-att-class="{ o_on: isSelected(facet.key, val.value) }"
-                          t-on-click="() => this.toggleFacet(facet.key, val.value)">
-                    <t t-esc="val.label"/>
-                  </button>
-                </t>
-              </div>
+              <t t-if="facet.type === 'range'">
+                <div class="o_matcat_range">
+                  <input type="number" class="o_matcat_range_input"
+                         t-att-placeholder="facet.min !== null ? facet.min : ''"
+                         t-att-value="rangeValue(facet.key, 'min')"
+                         t-on-change="(ev) => this.setRangeBound(facet.key, 'min', ev)"/>
+                  <span class="o_matcat_range_sep">–</span>
+                  <input type="number" class="o_matcat_range_input"
+                         t-att-placeholder="facet.max !== null ? facet.max : ''"
+                         t-att-value="rangeValue(facet.key, 'max')"
+                         t-on-change="(ev) => this.setRangeBound(facet.key, 'max', ev)"/>
+                </div>
+              </t>
+              <t t-if="facet.type !== 'range'">
+                <div class="o_matcat_chips">
+                  <t t-foreach="facet.values" t-as="val" t-key="val.value">
+                    <button class="o_matcat_chip"
+                            t-att-class="{ o_on: isSelected(facet.key, val.value) }"
+                            t-on-click="() => this.toggleFacet(facet.key, val.value)">
+                      <t t-esc="val.label"/>
+                    </button>
+                  </t>
+                </div>
+              </t>
             </div>
           </t>
         </aside>
