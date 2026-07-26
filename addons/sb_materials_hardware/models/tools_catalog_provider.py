@@ -246,3 +246,31 @@ class ToolsCatalogProvider(models.AbstractModel):
         numbered.sort(key=lambda pair: pair[0])
         unnumbered.sort(key=lambda pair: str(pair[1]["label"]))
         return [item for _n, item in numbered] + [item for _n, item in unnumbered]
+
+    @api.model
+    def _facet_domain(self, facets):
+        """Domain fragment for the selected facet values.
+
+        Within one facet, selected values are OR'ed. Across facets, the
+        fragments are AND'ed (Odoo domains are implicitly AND).
+        """
+        domain = []
+        for field_name, selection in (facets or {}).items():
+            if field_name not in self.env["product.template"]._fields:
+                continue
+            if isinstance(selection, dict):          # range
+                low, high = selection.get("min"), selection.get("max")
+                if low is not None:
+                    domain.append((field_name, ">=", low))
+                if high is not None:
+                    domain.append((field_name, "<=", high))
+                continue
+            values = [v for v in (selection or []) if v not in (None, "")]
+            if not values:
+                continue
+            if len(values) == 1:
+                domain.append((field_name, "=", values[0]))
+            else:
+                domain += ["|"] * (len(values) - 1)
+                domain += [(field_name, "=", v) for v in values]
+        return domain
