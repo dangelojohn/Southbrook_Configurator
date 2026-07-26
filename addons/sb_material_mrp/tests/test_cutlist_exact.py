@@ -81,3 +81,24 @@ class TestCutlistExact(TransactionCase):
         line = self.env["mrp.bom.line"].create(
             {"bom_id": bom.id, "product_id": p.id, "product_qty": 1})
         self.assertIsNone(line._sb_line_exact_volume_mm3(line))
+
+    def test_demand_is_exact_flag_and_value(self):
+        t = self._geo_variant()
+        back = self._mat("cl_back2", ["back"], thickness=6.35)
+        bp = self.env["product.product"].create({"name": "bk2"}); bp.product_tmpl_id.material_id = back.id
+        bom = self.env["mrp.bom"].create({"product_tmpl_id": t.id, "product_id": t.product_variant_id.id})
+        bl = self.env["mrp.bom.line"].create({"bom_id": bom.id, "product_id": bp.id, "product_qty": 1})
+        self.assertTrue(bl.material_demand_is_exact)
+        self.assertGreater(bl.material_demand_qty, 0.0)
+
+    def test_unmapped_line_falls_back_and_flag_false(self):
+        t = self._geo_variant()
+        fam = self.env["material.family"].create({"name": "cl_nr", "code": "cl_nr"})
+        m = self.env["southbrook.kitchen.material"].create({
+            "name": "cl_norole", "code": "cl_norole", "family_id": fam.id,
+            "density": 0.68, "weight_source": "density_volume", "thickness_mm": 19.05})
+        p = self.env["product.product"].create({"name": "nr"}); p.product_tmpl_id.material_id = m.id
+        bom = self.env["mrp.bom"].create({"product_tmpl_id": t.id, "product_id": t.product_variant_id.id})
+        bl = self.env["mrp.bom.line"].create({"bom_id": bom.id, "product_id": p.id, "product_qty": 1})
+        self.assertFalse(bl.material_demand_is_exact)   # no roles -> estimate
+        self.assertGreater(bl.material_demand_qty, 0.0)  # still non-zero (share)

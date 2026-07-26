@@ -172,6 +172,13 @@ class MrpBomLine(models.Model):
              "(never fabricated). Drives the suggested purchase quantity — "
              "the native BoM product_qty is left untouched (Fork 1).",
     )
+    material_demand_is_exact = fields.Boolean(
+        string="Exact (cutlist)", compute="_compute_material_demand_qty",
+        store=True,
+        help="True when this line's demand/weight came from the exact panels "
+             "its material uniquely owns; False when it fell back to the "
+             "estimation-grade carcass share.",
+    )
     suggested_purchase_qty = fields.Float(
         string="Suggested Order Qty",
         compute="_compute_suggested_purchase_qty",
@@ -756,6 +763,12 @@ class MrpBomLine(models.Model):
         # this fix closes.
         "bom_id.bom_line_ids.product_qty",
         "bom_id.bom_line_ids.material_id",
+        # Cutlist Precision Task 3 — exact-first volume selection depends on
+        # which roles a material claims (this line's own material AND every
+        # sibling's, since ownership/ambiguity is BoM-wide); the sibling
+        # material link itself is already covered above
+        # ("bom_id.bom_line_ids.material_id").
+        "material_id.panel_role_ids",
     )
     def _compute_component_weight(self):
         # FIX-D (repair wave 1, finding #9) — one cache dict for this
@@ -769,11 +782,21 @@ class MrpBomLine(models.Model):
                 line.component_volume_mm3 = 0.0
                 line.component_weight_kg = 0.0
                 continue
-            vol = (
-                self._sb_component_share_volume_mm3(line, _dims_cache=dims_cache)
-                if m.weight_source == "density_volume"
-                else 0.0
-            )
+            if m.weight_source == "density_volume":
+                # Cutlist Precision Task 3 — exact-first: when this line's
+                # material uniquely owns one or more panel roles on its BoM,
+                # use the EXACT per-role volume (never the estimate) so
+                # weight and demand (_compute_material_demand_qty) agree on
+                # which volume they used. Falls back to the qty-weighted
+                # carcass share when nothing is unambiguously owned or the
+                # geometry can't be resolved (None, not 0.0 — see
+                # _sb_line_exact_volume_mm3's docstring).
+                exact = line._sb_line_exact_volume_mm3(line, _dims_cache=dims_cache)
+                vol = exact if exact is not None else self._sb_component_share_volume_mm3(
+                    line, _dims_cache=dims_cache
+                )
+            else:
+                vol = 0.0
             line.component_volume_mm3 = vol
             line.component_weight_kg = self._weight_for_qty(m, vol, line.product_qty)
 
@@ -792,6 +815,11 @@ class MrpBomLine(models.Model):
         "bom_id.product_id.sb_finished_sides",
         "bom_id.bom_line_ids.product_qty",
         "bom_id.bom_line_ids.material_id",
+        # Cutlist Precision Task 3 — see the matching note on
+        # _compute_component_weight above; ownership is BoM-wide, so a
+        # role claimed/dropped on ANY line's material can flip this line's
+        # exact-vs-estimate outcome.
+        "material_id.panel_role_ids",
     )
     def _compute_material_demand_qty(self):
         """Consumption of this component per this BoM, in the material's
@@ -843,6 +871,15 @@ class MrpBomLine(models.Model):
         share wrapper AND the linear-branch's direct call. Behavior is
         byte-identical: a cache hit returns the exact same `dims` a fresh
         call would produce (see `_panel_volume_mm3`'s cache docstring).
+
+        Cutlist Precision Task 3 — exact-first: the density_volume/
+        density_area branch below now prefers `_sb_line_exact_volume_mm3`
+        (the exact per-owned-role volume) over the qty-weighted estimate,
+        mirroring `_compute_component_weight` exactly so weight and demand
+        always agree on which volume they used. `material_demand_is_exact`
+        (stored) records which source won: True for the exact panel
+        volume, False for the estimate OR any non-density branch (linear/
+        per_unit/none/no-material).
         """
         Bom = self.env["mrp.bom"]
         has_geo = hasattr(Bom, "_compute_panel_dimensions")
@@ -851,7 +888,13 @@ class MrpBomLine(models.Model):
             mat = line.material_id
             src = mat.weight_source if mat else "none"
             if src in ("density_volume", "density_area"):
-                vol = line._sb_component_share_volume_mm3(line, _dims_cache=dims_cache)
+                exact = line._sb_line_exact_volume_mm3(line, _dims_cache=dims_cache)
+                if exact is not None:
+                    vol = exact
+                    line.material_demand_is_exact = True
+                else:
+                    vol = line._sb_component_share_volume_mm3(line, _dims_cache=dims_cache)
+                    line.material_demand_is_exact = False
                 if not vol:
                     line.material_demand_qty = 0.0
                     continue
@@ -862,6 +905,7 @@ class MrpBomLine(models.Model):
                 # exactly like the weight path and the linear branch below.
                 line.material_demand_qty = vol * line.product_qty / th / 1_000_000.0
             elif src == "linear_density":
+                line.material_demand_is_exact = False
                 geo = line._sb_resolve_geo() if has_geo else {}
                 if not geo:
                     line.material_demand_qty = 0.0
@@ -875,6 +919,7 @@ class MrpBomLine(models.Model):
                 line.material_demand_qty = length_mm / 1000.0 * line.product_qty
             else:
                 # per_unit / none / no material: native count model is correct
+                line.material_demand_is_exact = False
                 line.material_demand_qty = line.product_qty
 
 
