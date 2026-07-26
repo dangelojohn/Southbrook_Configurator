@@ -19,6 +19,30 @@
     -->
     <data noupdate="1">
 
+  <!--
+      Cutlist Precision Task 4: panel-role assignment on the carcass box
+      sheet goods (`sb.panel.role`, Task 1). Standard shop defaults,
+      correctable by the shop after seeding (noupdate="1" — a later `-u`
+      never clobbers a hand-edited `panel_role_ids`).
+
+      Box materials (mat_mdf_34, mat_particle_34, mat_melamine_34,
+      mat_mel_58, mat_ply_34) all get side_L/side_R/top/bottom — every
+      one of them is a live carcass-box substrate. On top of that, per
+      shop convention, mat_ply_34 (plywood) and mat_melamine_34
+      (melamine) ALSO get the `shelf` role: shelves are the two sheet
+      goods the shop actually cuts adjustable/fixed shelves from
+      (plywood boxes get plywood shelves; melamine boxes get melamine
+      shelves) — MDF/particleboard/5-8" melamine are not used as shelf
+      stock today, so `shelf` is deliberately withheld from them.
+
+      Back sheet goods (mat_ply_14_back, mat_hardboard_14) get `back`
+      only — a cabinet back is never also a side/top/bottom/shelf.
+
+      No seeded door-stock material exists yet, so `panel_role_door` is
+      not assigned anywhere in this file; it will be added to whichever
+      material the shop designates when door-stock is first seeded.
+  -->
+
   <record id="mat_mdf_34" model="southbrook.kitchen.material">
     <field name="name">MDF 3/4"</field>
     <field name="code">MDF34</field>
@@ -26,6 +50,7 @@
     <field name="thickness_mm">19.05</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom')])]"/>
   </record>
 
   <record id="mat_mdf_12" model="southbrook.kitchen.material">
@@ -44,6 +69,7 @@
     <field name="thickness_mm">19.05</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom'),ref('panel_role_shelf')])]"/>
   </record>
 
   <record id="mat_ply_12" model="southbrook.kitchen.material">
@@ -62,6 +88,7 @@
     <field name="thickness_mm">6.35</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_back')])]"/>
   </record>
 
   <record id="mat_particle_34" model="southbrook.kitchen.material">
@@ -71,6 +98,7 @@
     <field name="thickness_mm">19.05</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom')])]"/>
   </record>
 
   <record id="mat_melamine_34" model="southbrook.kitchen.material">
@@ -80,6 +108,7 @@
     <field name="thickness_mm">19.05</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom'),ref('panel_role_shelf')])]"/>
   </record>
 
   <!--
@@ -113,6 +142,7 @@
     <field name="thickness_mm">15.875</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom')])]"/>
   </record>
 
   <record id="mat_hardboard_14" model="southbrook.kitchen.material">
@@ -122,6 +152,7 @@
     <field name="thickness_mm">6.35</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_back')])]"/>
   </record>
 
     </data>

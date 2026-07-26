@@ -104,6 +104,20 @@ class TestThicknessSpecificMaterials(TransactionCase):
                 "southbrook_estimating not installed -- no geometry "
                 "source for _panel_volume_mm3.")
 
+        # Cutlist Precision Task 4 seeded mat_hardboard_14.panel_role_ids
+        # = ['back']. On THIS test's synthetic single-line BoM that role
+        # is uniquely owned (only material on the BoM), which activates
+        # Task 2/3's exact-panel-volume path -- a pure area calc that is
+        # thickness-INDEPENDENT by design (`vol / th` cancels `th`), so
+        # it can no longer demonstrate the thickness-driven area
+        # difference this test exists to prove (Hygiene A2's fix to the
+        # ESTIMATE path's cut-constant fallback). Clear the role for the
+        # duration of this test only (TransactionCase rolls it back) to
+        # keep this test isolated to the estimate-path math it targets;
+        # the exact-path behavior itself is covered by
+        # sb_material_mrp/tests/test_cutlist_exact.py.
+        self.mat_hardboard_14.write({"panel_role_ids": [(5, 0, 0)]})
+
         # Control: identical cabinet geometry, but resolved through a
         # 3/4"=19.05mm material (the OLD fallback thickness both
         # RM-MELAMINE_WHITE_5_8 and RM-HARDBOARD_1_4 used to get from

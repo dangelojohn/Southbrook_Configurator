@@ -16,3 +16,12 @@ class TestPanelRole(TransactionCase):
             "name": "Test Back Mat", "code": "t_backmat",
             "panel_role_ids": [(6, 0, back.ids)]})
         self.assertEqual(mat.panel_role_ids.mapped("code"), ["back"])
+
+    def test_seeded_back_material_has_back_role(self):
+        back = self.env.ref("sb_material_core.mat_ply_14_back")
+        self.assertIn("back", back.panel_role_ids.mapped("code"))
+
+    def test_seeded_carcass_material_has_box_roles(self):
+        mel = self.env.ref("sb_material_core.mat_melamine_34")
+        self.assertTrue({"side_L", "side_R", "top", "bottom"}
+                        <= set(mel.panel_role_ids.mapped("code")))

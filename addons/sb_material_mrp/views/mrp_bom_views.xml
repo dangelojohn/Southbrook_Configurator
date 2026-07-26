@@ -28,6 +28,11 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='bom_line_ids']/list/field[@name='product_qty']" position="after">
                 <field name="material_demand_qty" optional="show"/>
+                <!-- Cutlist Precision Task 4: surface which demand values
+                     came from the exact per-owned-panel-role volume
+                     (Task 2/3) vs. the estimation-grade carcass share,
+                     right beside the demand number it qualifies. -->
+                <field name="material_demand_is_exact" widget="boolean_toggle" optional="show"/>
                 <field name="suggested_purchase_qty" optional="show"/>
                 <field name="suggested_purchase_uom_id" optional="hide"/>
             </xpath>
