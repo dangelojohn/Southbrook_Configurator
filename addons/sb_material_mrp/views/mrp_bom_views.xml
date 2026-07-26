@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    Phase-2 Task 5: surface the material-assist numbers on the native
+    BoM-line list. xpath grep-verified against the installed Odoo 19 CE
+    core (/Users/naadmin/Downloads/Official/V19C/odoo/addons/mrp/views/
+    mrp_bom_views.xml, record id="mrp_bom_form_view", external id
+    mrp.mrp_bom_form_view): the Components page holds
+
+        <field name="bom_line_ids" ...>
+            <list string="Components" editable="bottom">
+                ...
+                <field name="product_qty"/>
+                ...
+            </list>
+        </field>
+
+    i.e. the nested list is a `<list>` (not a `<tree>`, per v19), a direct
+    child of `<field name="bom_line_ids">`, so
+    `//field[@name='bom_line_ids']/list/field[@name='product_qty']` matches
+    cleanly.
+-->
+<odoo>
+    <record id="mrp_bom_form_sb_procurement" model="ir.ui.view">
+        <field name="name">mrp.bom.form.sb.procurement</field>
+        <field name="model">mrp.bom</field>
+        <field name="inherit_id" ref="mrp.mrp_bom_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='bom_line_ids']/list/field[@name='product_qty']" position="after">
+                <field name="material_demand_qty" optional="show"/>
+                <field name="suggested_purchase_qty" optional="show"/>
+                <field name="suggested_purchase_uom_id" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

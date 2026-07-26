@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    Phase-2 Task 5: Buy-route helper button. xpath grep-verified against
+    the installed Odoo 19 CE core (/Users/naadmin/Downloads/Official/V19C/
+    odoo/addons/product/views/product_views.xml, record
+    id="product_template_form_view", external id
+    product.product_template_form_view):
+
+        <div class="oe_button_box" name="button_box">
+
+    `//div[@name='button_box']` matches this button box.
+
+    `invisible="not material_id"` gates the button to material-linked
+    products only (material_id is the Wave-3 field added by sb_material_core
+    on product.template).
+-->
+<odoo>
+    <record id="product_template_form_sb_route_buy" model="ir.ui.view">
+        <field name="name">product.template.form.sb.route.buy</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_sb_set_route_buy" type="object"
+                        class="oe_stat_button" icon="fa-shopping-cart"
+                        invisible="not material_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Set Buy Route</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>

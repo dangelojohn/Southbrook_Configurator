@@ -10,3 +10,5 @@ from . import test_weight_rollup_multilevel
 from . import test_component_material_fallback_e2e
 # Phase-2 Task 4 — suggested_purchase_qty assist number.
 from . import test_suggested_purchase_qty
+# Phase-2 Task 5 — Buy-route helper button.
+from . import test_route_buy_helper
