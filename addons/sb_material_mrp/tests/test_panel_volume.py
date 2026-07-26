@@ -93,3 +93,45 @@ class TestPanelVolume(TransactionCase):
             "bom_id": bom.id,
         })
         self.assertGreater(mo.material_weight_total, 0.0)
+
+    def test_line_geometry_override_fields_exist_and_default_to_zero(self):
+        """Task B1 (Increment B): verify that mrp.bom.line has the three
+        per-line geometry override fields (sb_line_width_mm, sb_line_height_mm,
+        sb_line_depth_mm) and that they all default to 0 (meaning "use variant
+        geometry").
+        """
+        bom = self._cabinet_bom(with_geometry=True)
+        component = self._density_volume_component("Melamine 5/8 (B1)")
+        line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+        })
+
+        # Verify all three fields exist
+        self.assertTrue(hasattr(line, "sb_line_width_mm"))
+        self.assertTrue(hasattr(line, "sb_line_height_mm"))
+        self.assertTrue(hasattr(line, "sb_line_depth_mm"))
+
+        # Verify all three fields default to 0
+        self.assertEqual(line.sb_line_width_mm, 0)
+        self.assertEqual(line.sb_line_height_mm, 0)
+        self.assertEqual(line.sb_line_depth_mm, 0)
+
+    def test_line_geometry_override_fields_can_be_set(self):
+        """Task B1 (Increment B): verify that the per-line geometry override
+        fields can be explicitly set to non-zero values (for drag-resized/
+        filler placements, future use).
+        """
+        bom = self._cabinet_bom(with_geometry=True)
+        component = self._density_volume_component("Melamine 5/8 (B1-set)")
+        line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id,
+            "product_id": component.id,
+            "product_qty": 1,
+            "sb_line_width_mm": 500,
+            "sb_line_height_mm": 750,
+            "sb_line_depth_mm": 600,
+        })
+
+        self.assertEqual(line.sb_line_width_mm, 500)
+        self.assertEqual(line.sb_line_height_mm, 750)
+        self.assertEqual(line.sb_line_depth_mm, 600)

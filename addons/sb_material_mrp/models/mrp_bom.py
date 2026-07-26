@@ -125,6 +125,23 @@ class MrpBomLine(models.Model):
         digits=(10, 2),
     )
 
+    # Task B1: Per-line geometry override fields (Increment B)
+    sb_line_width_mm = fields.Integer(
+        string="Override Width (mm)",
+        default=0,
+        help="Per-line geometry override: width in mm. 0 = use variant geometry.",
+    )
+    sb_line_height_mm = fields.Integer(
+        string="Override Height (mm)",
+        default=0,
+        help="Per-line geometry override: height in mm. 0 = use variant geometry.",
+    )
+    sb_line_depth_mm = fields.Integer(
+        string="Override Depth (mm)",
+        default=0,
+        help="Per-line geometry override: depth in mm. 0 = use variant geometry.",
+    )
+
     @api.depends("product_id")
     def _compute_material_id(self):
         for line in self:
