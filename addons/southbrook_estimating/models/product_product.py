@@ -226,6 +226,7 @@ class ProductProduct(models.Model):
             ("sb_depth_mm", "=", 0),
         ])
         updated = 0
+        updated_variants = self.browse()
         for variant in candidates:
             sku = variant.default_code or ""
             sku_row = sku_defaults.get(sku)
@@ -252,7 +253,53 @@ class ProductProduct(models.Model):
                 "sb_drawer_count": drawer_count,
             })
             updated += 1
+            updated_variants |= variant
+
+        if updated_variants:
+            self._sb_recompute_dependent_bom_weights(updated_variants)
         return updated
+
+    def _sb_recompute_dependent_bom_weights(self, variants):
+        """Finding I-2 fix (final review, 2026-07-24).
+
+        `sb_material_mrp.mrp.bom.line.component_weight_kg` /
+        `component_volume_mm3` are `store=True` but their `@api.depends`
+        cannot fully reach through to a cabinet variant's geometry (see
+        that field's depends-list comment) — so when THIS method backfills
+        geometry onto a variant that already has BoM lines pointing at it
+        (`bom_id.product_id`), those lines' stored weight/volume would
+        otherwise stay frozen at their prior (usually 0.00) value until
+        something unrelated happened to touch them. That's display-only
+        staleness (the unstored `mrp.bom.material_weight_total` headline
+        is always fresh), but real: the bom.line view would show a wrong
+        number right after this backfill runs.
+
+        Soft-guarded: `sb_material_mrp` is not a hard manifest dependency
+        of `southbrook_estimating` (it's the other way around — see that
+        module's `mrp_bom.py` docstring), so `mrp.bom.line` may not carry
+        these fields at all when this runs; skip silently in that case.
+
+        Mechanism: mark the two co-computed fields "to compute" for every
+        affected line (`env.add_to_compute`), then process that pending
+        computation immediately via `Field.recompute()` (the same call
+        Odoo's own flush cycle would eventually make) and flush the
+        result to the database — rather than leaving it queued for
+        whatever unrelated flush happens to come next.
+        """
+        BomLine = self.env["mrp.bom.line"]
+        if "component_weight_kg" not in BomLine._fields:
+            return
+        lines = BomLine.sudo().search([
+            ("bom_id.product_id", "in", variants.ids),
+        ])
+        if not lines:
+            return
+        weight_field = BomLine._fields["component_weight_kg"]
+        volume_field = BomLine._fields["component_volume_mm3"]
+        self.env.add_to_compute(weight_field, lines)
+        self.env.add_to_compute(volume_field, lines)
+        weight_field.recompute(lines)
+        lines.flush_recordset(["component_weight_kg", "component_volume_mm3"])
 
     def _sb_geometry_inputs(self):
         """Task A1 — Return geometry inputs dict for Materials calc.

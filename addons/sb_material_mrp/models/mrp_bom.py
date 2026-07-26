@@ -314,6 +314,29 @@ class MrpBomLine(models.Model):
         "material_id.linear_density",
         "material_id.weight_per_unit",
         "material_id.thickness_mm",
+        # Finding I-2 (final review, 2026-07-24) — best-effort depends so a
+        # future direct edit of the cabinet's geometry or this line's
+        # override retriggers the stored weight. Only covers the
+        # `bom_id.product_id` (variant-BoM) path — `_panel_volume_mm3`
+        # also falls back to `bom_id.product_tmpl_id.product_variant_id`
+        # when `product_id` is unset, and that fallback path can't be
+        # expressed as a static dotted depends here (it's a runtime `or`
+        # on two different fields, not a stored relation Odoo's
+        # dependency graph can walk). The REQUIRED fix for the documented
+        # staleness (A3 backfill onto a PRE-EXISTING variant) is the
+        # targeted recompute at the end of
+        # `product.product._sb_backfill_geometry()` — this depends list
+        # is the best-effort half for direct edits going forward.
+        "sb_line_width_mm",
+        "sb_line_height_mm",
+        "sb_line_depth_mm",
+        "bom_id.product_id.sb_width_mm",
+        "bom_id.product_id.sb_height_mm",
+        "bom_id.product_id.sb_depth_mm",
+        "bom_id.product_id.sb_panel_family",
+        "bom_id.product_id.sb_door_count",
+        "bom_id.product_id.sb_drawer_count",
+        "bom_id.product_id.sb_finished_sides",
     )
     def _compute_component_weight(self):
         for line in self:

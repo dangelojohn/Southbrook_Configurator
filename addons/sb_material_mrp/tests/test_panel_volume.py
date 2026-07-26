@@ -159,6 +159,143 @@ class TestPanelVolume(TransactionCase):
         override_volume = override_line._panel_volume_mm3(override_line)
         self.assertGreater(override_volume, baseline_volume)
 
+    # ------------------------------------------------------------------
+    # Finding I-1 (final review, 2026-07-24) — end-to-end through the real
+    # `product.config.session.get_variant_vals()` write path, not just a
+    # hand-set `product.product` (that's already covered by
+    # `test_panel_volume_zero_without_geometry` above). This proves the
+    # write-side fix all the way down to the honest 0.0 panel volume /
+    # weight for a template with no real geometry signal, and a
+    # regression that the fix does not break the honest positive case.
+    # ------------------------------------------------------------------
+    def test_panel_volume_zero_for_config_variant_with_no_geometry_signal(self):
+        """A template that hits neither `_SKU_DEFAULTS` nor carries an
+        `attr_width` pick must materialise (via the OCA configurator
+        wizard flow) with sb_* dims honestly at 0, so `_panel_volume_mm3`
+        (and therefore `component_weight_kg`) must be 0.0 — never a
+        fabricated non-zero weight."""
+        ProductTemplate = self.env["product.template"]
+        Attribute = self.env["product.attribute"]
+        Value = self.env["product.attribute.value"]
+        AttrLine = self.env["product.template.attribute.line"]
+
+        attr = Attribute.create({
+            "name": "TestAttr_I1PanelVol", "create_variant": "no_variant",
+        })
+        val = Value.create({"name": "X", "attribute_id": attr.id})
+        tmpl = ProductTemplate.create({
+            "name": "Unknown Cabinet Tmpl (panel-vol)",
+            "default_code": "TST-I1-PANELVOL",  # not in _SKU_DEFAULTS
+            "config_ok": True,
+            "type": "consu",
+        })
+        AttrLine.create({
+            "product_tmpl_id": tmpl.id,
+            "attribute_id": attr.id,
+            "value_ids": [(6, 0, val.ids)],
+        })
+        session = self.env["product.config.session"].create({
+            "product_tmpl_id": tmpl.id,
+            "value_ids": [(6, 0, val.ids)],
+            "user_id": self.env.uid,
+        })
+        variant = session.create_get_variant(value_ids=val.ids)
+
+        self.assertEqual(variant.sb_width_mm, 0)
+        self.assertEqual(variant.sb_height_mm, 0)
+        self.assertEqual(variant.sb_depth_mm, 0)
+        self.assertEqual(variant._sb_geometry_inputs(), {})
+
+        bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": variant.product_tmpl_id.id,
+            "product_id": variant.id,
+        })
+        component = self._density_volume_component("Melamine 5/8 (I-1)")
+        line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+        })
+        self.assertEqual(line._panel_volume_mm3(line), 0.0,
+                         "honesty contract: no geometry signal -> 0.0, never fabricated")
+        self.assertEqual(line.component_weight_kg, 0.0)
+
+    def test_panel_volume_nonzero_for_real_sku_config_variant_regression(self):
+        """Regression: the I-1 fix must not break the honest positive
+        case — a real SKU-matching, locked Q8 template must still get
+        its geometry written by `get_variant_vals` and produce non-zero
+        panel volume / weight, exactly as before the fix."""
+        tmpl = self.env.ref(
+            "southbrook_estimating.base_1dr", raise_if_not_found=False)
+        if not tmpl:
+            self.skipTest("base_1dr template not present")
+        session = self.env["product.config.session"].create({
+            "product_tmpl_id": tmpl.id, "user_id": self.env.uid,
+        })
+        variant = session.create_get_variant(session.value_ids.ids)
+        self.assertTrue(
+            variant.sb_width_mm and variant.sb_height_mm and variant.sb_depth_mm,
+        )
+
+        bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": variant.product_tmpl_id.id,
+            "product_id": variant.id,
+        })
+        component = self._density_volume_component("Melamine 5/8 (I-1-regress)")
+        line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+        })
+        self.assertGreater(line._panel_volume_mm3(line), 0.0)
+        self.assertGreater(line.component_weight_kg, 0.0)
+
+    # ------------------------------------------------------------------
+    # Finding I-2 (final review, 2026-07-24) — stored per-line weight
+    # must not go stale after `_sb_backfill_geometry()` populates
+    # geometry onto a pre-existing variant.
+    # ------------------------------------------------------------------
+    def test_backfill_recomputes_stale_dependent_bom_line_weight(self):
+        """After `_sb_backfill_geometry()` resolves geometry on a
+        variant that ALREADY has a BoM + density_volume component line
+        (the pre-existing-variant scenario the finding describes), the
+        line's STORED `component_weight_kg` must reflect the newly
+        non-zero geometry immediately — not stay frozen at the stale
+        0.00 it had while the variant carried no geometry."""
+        variant = self.env["product.product"].create({
+            "name": "Legacy Weight Test",
+            "default_code": "SB-BASE-1DR",  # real _SKU_DEFAULTS row
+            "type": "consu",
+        })
+        bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": variant.product_tmpl_id.id,
+            "product_id": variant.id,
+        })
+        component = self._density_volume_component("Melamine 5/8 (I-2)")
+        line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+        })
+
+        # Staleness precondition: no geometry yet -> honest stored 0.00.
+        self.assertEqual(variant.sb_width_mm, 0)
+        self.assertEqual(line.component_weight_kg, 0.0)
+
+        self.env["product.product"]._sb_backfill_geometry()
+
+        variant.invalidate_recordset()
+        self.assertTrue(
+            variant.sb_width_mm and variant.sb_height_mm and variant.sb_depth_mm,
+            "precondition: backfill must have actually resolved geometry",
+        )
+
+        # Force a genuine re-read of the STORED column (not just
+        # whatever happens to be sitting in the env cache from the
+        # backfill call itself) to prove the fix persisted the
+        # recomputed value to the database.
+        line.invalidate_recordset(["component_weight_kg", "component_volume_mm3"])
+        self.assertGreater(
+            line.component_weight_kg, 0.0,
+            "component_weight_kg must be recomputed (not stale 0.00) "
+            "immediately after _sb_backfill_geometry() resolves geometry",
+        )
+        self.assertGreater(line.component_volume_mm3, 0.0)
+
     def test_panel_volume_falls_back_to_variant_when_override_incomplete(self):
         """Task B2 regression: a line with the override left at the default
         0 (or only partially set) must still use the variant's own geometry
