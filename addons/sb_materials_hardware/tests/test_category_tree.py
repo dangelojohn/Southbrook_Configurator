@@ -41,7 +41,7 @@ class TestCategoryTree(TransactionCase):
 
     def test_rollup_arithmetic_with_siblings(self):
         """Verify rollup counts exactly match descendants, not overcount."""
-        # Create fixtures with known counts
+        # Create fixtures with known, DIFFERENT counts to catch branch-swapping bugs
         cat_cabinet = self.env.ref(
             "southbrook_mrp_kitchen_tools.cat_screw_cabinet")
         cat_euro = self.env.ref("southbrook_mrp_kitchen_tools.cat_screw_euro")
@@ -59,13 +59,17 @@ class TestCategoryTree(TransactionCase):
             "x_southbrook_tool_category_id": cat_cabinet.id,
         })
 
-        # Create 2 templates under cat_screw_euro (sibling to confirmat)
+        # Create 3 templates under cat_screw_euro (DIFFERENT count to catch swaps)
         tmpl_euro_1 = self.env["product.template"].create({
             "name": "Euro Screw 5x35",
             "x_southbrook_tool_category_id": cat_euro.id,
         })
         tmpl_euro_2 = self.env["product.template"].create({
             "name": "Euro Screw 6x40",
+            "x_southbrook_tool_category_id": cat_euro.id,
+        })
+        tmpl_euro_3 = self.env["product.template"].create({
+            "name": "Euro Screw 7x45",
             "x_southbrook_tool_category_id": cat_euro.id,
         })
 
@@ -78,29 +82,74 @@ class TestCategoryTree(TransactionCase):
         # Refresh categories to pick up new templates
         cats = self._cats()
 
-        # Verify sibling counts: each template creates 1 variant by default
+        # Verify sibling counts with exact arithmetic (not >=)
         self.assertEqual(
             cats[cat_cabinet.id]["count"], 2,
-            f"Cabinet category should have 2 variants (1 per template), "
+            f"Cabinet category should have exactly 2 variants (1 per template), "
             f"got {cats[cat_cabinet.id]['count']}")
         self.assertEqual(
-            cats[cat_euro.id]["count"], 2,
-            f"Euro category should have 2 variants (1 per template), "
+            cats[cat_euro.id]["count"], 3,
+            f"Euro category should have exactly 3 variants (1 per template), "
             f"got {cats[cat_euro.id]['count']}")
+        self.assertEqual(
+            cats[cat_adhesives.id]["count"], 1,
+            f"Adhesives category should have exactly 1 variant, "
+            f"got {cats[cat_adhesives.id]['count']}")
 
-        # Verify parent (cat_screws) sums siblings correctly
-        # cat_screws should have at least: cabinet(2) + euro(2) + confirmat(1) = 5
-        expected_min = 5
-        self.assertGreaterEqual(
-            cats[self.cat_screws.id]["count"], expected_min,
-            f"Screws parent should have >= {expected_min} (cabinet 2 + euro 2 + "
-            f"confirmat 1), got {cats[self.cat_screws.id]['count']}")
+        # Verify parent (cat_screws) sums siblings exactly
+        # Arithmetic: 2 cabinet + 3 euro + 1 confirmat (from setUp) = 6
+        expected_screw_count = 6
+        self.assertEqual(
+            cats[self.cat_screws.id]["count"], expected_screw_count,
+            f"Screws parent should have exactly {expected_screw_count} "
+            f"(2 cabinet + 3 euro + 1 confirmat from setUp), "
+            f"got {cats[self.cat_screws.id]['count']}")
 
-        # Verify unrelated adhesives branch products are not included in screw counts
-        adhesive_count = cats[cat_adhesives.id]["count"]
-        screw_count = cats[self.cat_screws.id]["count"]
-        # They should be clearly different (adhesives ≠ screws)
+        # Prove unrelated branch is genuinely excluded by exact numbers
+        # Screws total (6) does NOT equal adhesives total (1) ✓
         self.assertNotEqual(
-            adhesive_count, screw_count,
-            f"Adhesive count ({adhesive_count}) should not equal screw count "
-            f"({screw_count})")
+            cats[self.cat_screws.id]["count"], cats[cat_adhesives.id]["count"],
+            f"Screw count must exclude adhesives: screws={cats[self.cat_screws.id]['count']}, "
+            f"adhesives={cats[cat_adhesives.id]['count']}")
+
+    def test_rollup_counts_variants_not_templates(self):
+        """Verify _categories counts product.product (variants), not templates.
+
+        Regression test for Finding 1: counts must include all variants of a
+        template, not just the template itself. Without this test, a reversion
+        to grouping product.template would silently pass the suite if variants
+        are never created during test runs.
+        """
+        cat_drawer = self.env.ref(
+            "southbrook_mrp_kitchen_tools.cat_screw_drawer")
+
+        # Create 1 template with manually-created extra variant
+        # (Tests that _categories counts product.product, not product.template)
+        tmpl_drawer = self.env["product.template"].create({
+            "name": "Drawer Screw Multi-Variant",
+            "x_southbrook_tool_category_id": cat_drawer.id,
+        })
+        # Default variant created automatically; count should be 1 so far
+        self.assertEqual(tmpl_drawer.product_variant_count, 1)
+
+        # Manually create an extra variant in the same template
+        # Use the default variant as a template and create a sibling
+        default_variant = tmpl_drawer.product_variant_ids[0]
+        extra_variant = self.env["product.product"].create({
+            "product_tmpl_id": tmpl_drawer.id,
+            "name": f"{tmpl_drawer.name} (2)",
+        })
+        # Now template has 2 variants
+        tmpl_drawer.invalidate_recordset(['product_variant_count'])
+        self.assertEqual(tmpl_drawer.product_variant_count, 2)
+
+        # Refresh categories
+        cats = self._cats()
+
+        # Crucial: category count must reflect BOTH variants (count=2),
+        # not just the template (count=1). This proves _read_group groups
+        # product.product, not product.template.
+        self.assertEqual(
+            cats[cat_drawer.id]["count"], 2,
+            f"Drawer category should count both variants (2), not just template (1), "
+            f"got {cats[cat_drawer.id]['count']}")
