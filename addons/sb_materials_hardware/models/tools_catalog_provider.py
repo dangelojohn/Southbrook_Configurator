@@ -25,6 +25,7 @@ class ToolsCatalogProvider(models.AbstractModel):
             return self._degrade("Unknown category: %s" % category_id, scope)
         return {
             "ok": True,
+            "reason": None,
             "scope": scope,
             "categories": [],
             "facets": [],

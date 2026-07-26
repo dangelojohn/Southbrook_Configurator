@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 from odoo.tests.common import TransactionCase, tagged
 
-REQUIRED_KEYS = {"ok", "scope", "categories", "facets", "columns",
+REQUIRED_KEYS = {"ok", "reason", "scope", "categories", "facets", "columns",
                  "rows", "detail", "total", "provenance"}
 
 
