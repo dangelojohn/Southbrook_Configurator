@@ -289,9 +289,45 @@ class ProductProduct(models.Model):
         BomLine = self.env["mrp.bom.line"]
         if "component_weight_kg" not in BomLine._fields:
             return
-        lines = BomLine.sudo().search([
+        # FIX-B (repair wave 1, finding #2) — this used to search only
+        # `bom_id.product_id in variants`, which misses template-level
+        # BoMs (`product_id` unset). 22/23 LIVE BoMs are template-level;
+        # their read path (`_panel_volume_mm3`) falls back to
+        # `bom_id.product_tmpl_id.product_variant_id` (the template's
+        # first variant) when `product_id` is False. Backfilling
+        # geometry onto that fallback variant must still recompute those
+        # lines, or the stored weight stays frozen at 0.00 forever.
+        #
+        # `product_tmpl_id.product_variant_id` is itself a non-stored
+        # compute (`product.template._compute_product_variant_id`,
+        # Odoo 19 core) — it CANNOT appear in an ORM search domain
+        # (`ValueError: ... is not stored`). So this is a two-phase
+        # match: (1) a broad SQL search on the real, stored
+        # `product_variant_ids` One2many to find every candidate
+        # template-level BoM that has ANY backfilled variant on its
+        # template, then (2) a precise Python-side filter down to only
+        # the lines whose ACTUAL read-path fallback
+        # (`product_variant_id`, i.e. variant_ids[:1]) is one of the
+        # backfilled variants — so a multi-variant template that
+        # happened to backfill a non-first variant is correctly left
+        # alone (that variant is never read by `_panel_volume_mm3`).
+        candidate_lines = BomLine.sudo().search([
+            "|",
             ("bom_id.product_id", "in", variants.ids),
+            "&",
+            ("bom_id.product_id", "=", False),
+            ("bom_id.product_tmpl_id.product_variant_ids", "in", variants.ids),
         ])
+        if not candidate_lines:
+            return
+        variant_id_set = set(variants.ids)
+        lines = candidate_lines.filtered(
+            lambda l: (
+                l.bom_id.product_id.id in variant_id_set
+                if l.bom_id.product_id
+                else l.bom_id.product_tmpl_id.product_variant_id.id in variant_id_set
+            )
+        )
         if not lines:
             return
         weight_field = BomLine._fields["component_weight_kg"]

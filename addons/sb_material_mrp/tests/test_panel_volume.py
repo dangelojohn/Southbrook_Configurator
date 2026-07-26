@@ -296,6 +296,62 @@ class TestPanelVolume(TransactionCase):
         )
         self.assertGreater(line.component_volume_mm3, 0.0)
 
+    # ------------------------------------------------------------------
+    # FIX-B (repair wave 1, finding #2) — the I-2 recompute above only
+    # proved the VARIANT-level BoM case (bom.product_id = variant.id).
+    # 22/23 LIVE BoMs are template-level (product_id unset), whose read
+    # path (`_panel_volume_mm3`) falls back to
+    # `bom_id.product_tmpl_id.product_variant_id`. Before the fix,
+    # `_sb_recompute_dependent_bom_weights`'s search only matched
+    # `bom_id.product_id in variants`, which a template-level BoM can
+    # never satisfy (its product_id is always False) — so this
+    # recompute was silently skipped and the stored weight stayed
+    # frozen at 0.00 forever, not just until the next unrelated touch.
+    # ------------------------------------------------------------------
+    def test_backfill_recomputes_template_level_bom_line_weight(self):
+        """A template-level BoM (product_id unset) on a template whose
+        variant[0] gains geometry via backfill must have its stored
+        component_weight_kg refresh to a real, non-zero value."""
+        variant = self.env["product.product"].create({
+            "name": "Legacy Template-BoM Weight Test",
+            "default_code": "SB-BASE-1DR",  # real _SKU_DEFAULTS row
+            "type": "consu",
+        })
+        bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": variant.product_tmpl_id.id,
+            # product_id deliberately left unset -> template-level BoM,
+            # matching the LIVE 22/23 shape and the fallback in
+            # `_panel_volume_mm3` (`bom_id.product_tmpl_id.
+            # product_variant_id`).
+        })
+        self.assertFalse(bom.product_id, "test precondition: template-level BoM")
+        component = self._density_volume_component("Melamine 5/8 (FIX-B)")
+        line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": component.id, "product_qty": 1,
+        })
+
+        # Staleness precondition: no geometry yet -> honest stored 0.00.
+        self.assertEqual(variant.sb_width_mm, 0)
+        self.assertEqual(line.component_weight_kg, 0.0)
+
+        self.env["product.product"]._sb_backfill_geometry()
+
+        variant.invalidate_recordset()
+        self.assertTrue(
+            variant.sb_width_mm and variant.sb_height_mm and variant.sb_depth_mm,
+            "precondition: backfill must have actually resolved geometry "
+            "onto the template's variant[0]",
+        )
+
+        line.invalidate_recordset(["component_weight_kg", "component_volume_mm3"])
+        self.assertGreater(
+            line.component_weight_kg, 0.0,
+            "FIX-B: a template-level BoM line's stored component_weight_kg "
+            "must refresh after backfill resolves geometry onto the "
+            "fallback variant, not stay frozen at 0.00",
+        )
+        self.assertGreater(line.component_volume_mm3, 0.0)
+
     def test_panel_volume_falls_back_to_variant_when_override_incomplete(self):
         """Task B2 regression: a line with the override left at the default
         0 (or only partially set) must still use the variant's own geometry

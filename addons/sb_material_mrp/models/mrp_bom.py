@@ -175,7 +175,19 @@ class MrpBomLine(models.Model):
         """
         src = material.weight_source
         if src == "density_volume":
-            return self._weight_from_volume(material, volume_mm3) * qty
+            # FIX-C (repair wave 1, finding #12) — `_weight_from_volume`
+            # only rounds the PER-UNIT weight; multiplying by a
+            # fractional `qty` can reintroduce more than 2 decimal
+            # places (e.g. 2.815kg * 2.5 = 7.0375). The linear_density
+            # and per_unit branches below both apply a final HALF-UP
+            # 2dp round to their qty-multiplied result — mirror that
+            # here so all three branches return the same LOCKED
+            # precision contract (module docstring, line 10).
+            return float_round(
+                self._weight_from_volume(material, volume_mm3) * qty,
+                precision_digits=2,
+                rounding_method="HALF-UP",
+            )
         if src == "linear_density":
             return float_round(
                 material.linear_density * qty,
@@ -196,8 +208,21 @@ class MrpBomLine(models.Model):
     # Returns 0.0 (never fabricated) whenever the cabinet's width/height/
     # depth cannot be read from real, stored data.
     # ----------------------------------------------------------------
-    def _panel_volume_mm3(self, line):
+    def _panel_volume_mm3(self, line, _dims_cache=None):
         """Total CARCASS panel volume (mm3) for the cabinet `line` belongs to.
+
+        `_dims_cache` (FIX-D, repair wave 1, finding #9) — optional dict
+        passed in by a caller iterating many lines in one compute pass
+        (e.g. `_compute_component_weight`, `_compute_material_weight_
+        total`'s exploded-lines loop). Lines belonging to the same BoM
+        share identical cabinet geometry, so `_compute_panel_dimensions`
+        would otherwise be re-solved with byte-identical inputs once per
+        line. Keyed on the exact resolved `geo` dict (sorted items
+        tuple) so behavior is unchanged — a cache hit returns the exact
+        same `dims` a fresh call would have produced. Local dict, scoped
+        to a single compute pass; NOT an `ormcache` (no cross-request
+        staleness risk). `None` (the default) disables caching entirely
+        for any caller that doesn't opt in.
 
         Task A4 (Materials geometry-writeback plan): the gap documented in
         the module docstring above is closed — `product.product`
@@ -263,7 +288,14 @@ class MrpBomLine(models.Model):
             )
             return 0.0
 
-        dims = Bom._compute_panel_dimensions(**geo)
+        if _dims_cache is None:
+            dims = Bom._compute_panel_dimensions(**geo)
+        else:
+            cache_key = tuple(sorted(geo.items()))
+            dims = _dims_cache.get(cache_key)
+            if dims is None:
+                dims = Bom._compute_panel_dimensions(**geo)
+                _dims_cache[cache_key] = dims
 
         # Task C1 (weight-accuracy refinement): when the line's resolved
         # material carries a real sheet thickness (sb_material_core,
@@ -327,6 +359,17 @@ class MrpBomLine(models.Model):
         # targeted recompute at the end of
         # `product.product._sb_backfill_geometry()` — this depends list
         # is the best-effort half for direct edits going forward.
+        #
+        # DOCUMENT-ONLY (repair wave 1, findings #6/#8, confirmed) —
+        # `_sb_recompute_dependent_bom_weights()`'s search now ALSO
+        # matches template-level BoM lines via `bom_id.product_tmpl_id.
+        # product_variant_id` (FIX-B), so the backfill path is covered.
+        # What remains UN-covered, by design, per the above: a direct
+        # form/API edit to a template's variant[0] geometry (bypassing
+        # `_sb_backfill_geometry()` entirely) still won't retrigger this
+        # stored field, because @api.depends genuinely cannot express
+        # the runtime fallback. No exotic depends attempted here — see
+        # the reasons above.
         "sb_line_width_mm",
         "sb_line_height_mm",
         "sb_line_depth_mm",
@@ -339,6 +382,11 @@ class MrpBomLine(models.Model):
         "bom_id.product_id.sb_finished_sides",
     )
     def _compute_component_weight(self):
+        # FIX-D (repair wave 1, finding #9) — one cache dict for this
+        # whole compute pass; lines sharing a `bom_id` (and therefore
+        # identical cabinet geometry) hit the cache instead of re-
+        # solving `_compute_panel_dimensions` redundantly.
+        dims_cache = {}
         for line in self:
             m = line.material_id
             if not m:
@@ -346,7 +394,7 @@ class MrpBomLine(models.Model):
                 line.component_weight_kg = 0.0
                 continue
             vol = (
-                self._panel_volume_mm3(line)
+                self._panel_volume_mm3(line, _dims_cache=dims_cache)
                 if m.weight_source == "density_volume"
                 else 0.0
             )
@@ -375,6 +423,9 @@ class MrpBom(models.Model):
     def _compute_material_weight_total(self):
         for bom in self:
             total = 0.0
+            # FIX-D (repair wave 1, finding #9) — cache scoped to this
+            # single bom's explode loop; see _panel_volume_mm3 docstring.
+            dims_cache = {}
             # explode to leaves so nested/phantom BoMs are flattened (blindspot #5)
             _boms, lines = bom.explode(
                 bom.product_id or bom.product_tmpl_id.product_variant_id,
@@ -386,7 +437,7 @@ class MrpBom(models.Model):
                     continue
                 qty = data.get("qty", line.product_qty)
                 vol = (
-                    line._panel_volume_mm3(line)
+                    line._panel_volume_mm3(line, _dims_cache=dims_cache)
                     if m.weight_source == "density_volume"
                     else 0.0
                 )
