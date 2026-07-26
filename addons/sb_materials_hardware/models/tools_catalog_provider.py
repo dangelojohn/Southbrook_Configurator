@@ -284,8 +284,21 @@ class ToolsCatalogProvider(models.AbstractModel):
 
         Spec fields live on product.template, so templates are read ONCE in
         a batch and joined in Python — never one read per row.
+
+        Absence is type-aware, driven by the field's actual type
+        (product.template._fields[key].type):
+        - Char/Text/Selection/Html and relational (m2o/m2m/o2m) fields:
+          Odoo's False/empty for "never set" is reported as None.
+        - Boolean: False is a real value, not absence — kept as-is.
+        - Date/Datetime: False means absent — reported as None.
+        - Float/Integer/Monetary: kept as-is, never folded to None. LIMIT:
+          the ORM returns 0 (or 0.0) for both "never entered" and "entered
+          as zero" on a numeric field — those two states are genuinely
+          indistinguishable at the ORM level. This catalog shows the zero
+          rather than pretending it can tell the difference.
         """
         Product = self.env["product.product"]
+        Tmpl = self.env["product.template"]
         domain = [("product_tmpl_id.x_southbrook_tool_category_id",
                    "child_of", category.id)] if category else []
         for leaf in self._facet_domain(facets):
@@ -308,6 +321,10 @@ class ToolsCatalogProvider(models.AbstractModel):
             for rec in products.mapped("product_tmpl_id").read(spec_keys):
                 tmpl_data[rec["id"]] = rec
 
+        # Numeric and boolean values are never absence — 0 and False are
+        # real data for these types and must survive verbatim.
+        VALUE_IS_NEVER_ABSENT = {"float", "integer", "monetary", "boolean"}
+
         rows = []
         for product in products:
             row = {
@@ -318,7 +335,12 @@ class ToolsCatalogProvider(models.AbstractModel):
             specs = tmpl_data.get(product.product_tmpl_id.id, {})
             for key in spec_keys:
                 value = specs.get(key)
-                # False from an unset Char/Float is "absent", not zero.
-                row[key] = None if value in (False, None, "") else value
+                field = Tmpl._fields.get(key)
+                ftype = field.type if field else None
+                if ftype in VALUE_IS_NEVER_ABSENT:
+                    row[key] = value
+                else:
+                    # False, "" or an empty relation all mean "never set".
+                    row[key] = None if not value else value
             rows.append(row)
         return rows, total
