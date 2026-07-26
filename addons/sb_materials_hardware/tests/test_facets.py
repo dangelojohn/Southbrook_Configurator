@@ -117,22 +117,22 @@ class TestFacets(TransactionCase):
         self.env["product.template"].create({
             "name": "TEST Confirmat Dedup",
             "x_southbrook_tool_category_id": child.id,
-            "x_southbrook_drive_type": "phillips",
+            "x_southbrook_material_grade": "hardwood",
         })
-        # Use drive_type instead of thread_type to avoid collision with seeded facet_screws_thread
+        # Use material_grade (not seeded on cat_screws) to avoid collision
         self.Facet.create({
-            "name": "Drive type (ancestor label)", "category_id": parent.id,
-            "field_name": "x_southbrook_drive_type", "facet_type": "enum",
+            "name": "Material grade (ancestor label)", "category_id": parent.id,
+            "field_name": "x_southbrook_material_grade", "facet_type": "enum",
         })
         self.Facet.create({
-            "name": "Drive type (child label)", "category_id": child.id,
-            "field_name": "x_southbrook_drive_type", "facet_type": "enum",
+            "name": "Material grade (child label)", "category_id": child.id,
+            "field_name": "x_southbrook_material_grade", "facet_type": "enum",
         })
         payload = self.Provider.get_catalog(scope="tools", category_id=child.id)
         matches = [f for f in payload["facets"]
-                   if f["key"] == "x_southbrook_drive_type"]
+                   if f["key"] == "x_southbrook_material_grade"]
         self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0]["label"], "Drive type (child label)")
+        self.assertEqual(matches[0]["label"], "Material grade (child label)")
 
     def test_m2m_facet_sorts_alphabetically_by_label(self):
         """Relation-valued ("value" is a database id) facets must sort by
