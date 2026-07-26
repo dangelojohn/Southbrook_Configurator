@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sb_planning_run_user,southbrook.planning.run user,model_southbrook_planning_run,base.group_user,1,0,0,0
+access_sb_planning_run_mrp,southbrook.planning.run mrp,model_southbrook_planning_run,mrp.group_mrp_user,1,1,1,1
+access_sb_planning_line_user,southbrook.planning.line user,model_southbrook_planning_line,base.group_user,1,0,0,0
+access_sb_planning_line_mrp,southbrook.planning.line mrp,model_southbrook_planning_line,mrp.group_mrp_user,1,1,1,1

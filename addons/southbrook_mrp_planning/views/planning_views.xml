@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="seq_southbrook_planning_run" model="ir.sequence">
+            <field name="name">Southbrook Planning Run</field>
+            <field name="code">southbrook.planning.run</field>
+            <field name="prefix">REQ/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="view_sb_planning_line_list" model="ir.ui.view">
+            <field name="name">southbrook.planning.line.list</field>
+            <field name="model">southbrook.planning.line</field>
+            <field name="arch" type="xml">
+                <list string="Requirements" create="false" editable="bottom">
+                    <field name="product_id" readonly="1"/>
+                    <field name="is_independent" optional="show"/>
+                    <field name="gross_qty" readonly="1" sum="Required"/>
+                    <field name="supply_qty" readonly="1"/>
+                    <field name="net_qty" readonly="1" sum="To Supply"/>
+                    <field name="supply_type"/>
+                    <field name="planned_date"/>
+                    <field name="released" readonly="1"/>
+                    <field name="generated_ref" readonly="1" optional="show"/>
+                    <button name="action_release" type="object"
+                            string="Release" icon="fa-play"
+                            invisible="released"
+                            help="Create the manufacturing or purchase order"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_sb_planning_run_list" model="ir.ui.view">
+            <field name="name">southbrook.planning.run.list</field>
+            <field name="model">southbrook.planning.run</field>
+            <field name="arch" type="xml">
+                <list string="Planning Runs">
+                    <field name="name"/>
+                    <field name="date"/>
+                    <field name="warehouse_id"/>
+                    <field name="line_count"/>
+                    <field name="released_count"/>
+                    <field name="state"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_sb_planning_run_form" model="ir.ui.view">
+            <field name="name">southbrook.planning.run.form</field>
+            <field name="model">southbrook.planning.run</field>
+            <field name="arch" type="xml">
+                <form string="Planning Run">
+                    <header>
+                        <button name="action_compute" type="object"
+                                string="Compute Requirements"
+                                class="oe_highlight"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="name" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="date"/>
+                                <field name="warehouse_id"/>
+                                <field name="horizon_days"/>
+                            </group>
+                            <group>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                                <field name="line_count"/>
+                                <field name="released_count"/>
+                            </group>
+                        </group>
+                        <field name="note" readonly="1"
+                               invisible="not note"/>
+                        <notebook>
+                            <page string="Requirements" name="requirements">
+                                <field name="line_ids" nolabel="1"
+                                       context="{'tree_view_ref': 'southbrook_mrp_planning.view_sb_planning_line_list'}"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_sb_planning_run" model="ir.actions.act_window">
+            <field name="name">Requirements Planning</field>
+            <field name="res_model">southbrook.planning.run</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a planning run
+                </p>
+                <p>
+                    A run reads confirmed sales orders, explodes them through
+                    bills of materials, nets the result against available
+                    supply, and lists what needs to be manufactured or bought.
+                    Nothing is created until you release a line.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>
