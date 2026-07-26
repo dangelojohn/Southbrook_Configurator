@@ -29,16 +29,19 @@ class ToolsCatalogProvider(models.AbstractModel):
             category_id) if category_id else None
         if category is not None and not category.exists():
             return self._degrade("Unknown category: %s" % category_id, scope)
+        columns = self._columns(category)
+        rows, total = self._rows(category, facets, search, offset, limit,
+                                  columns)
         return {
             "ok": True,
             "reason": None,
             "scope": scope,
             "categories": self._categories(),
             "facets": self._facets(category),
-            "columns": self._columns(category),
-            "rows": [],
+            "columns": columns,
+            "rows": rows,
             "detail": {},
-            "total": 0,
+            "total": total,
             "provenance": PROVENANCE,
         }
 
@@ -274,3 +277,48 @@ class ToolsCatalogProvider(models.AbstractModel):
                 domain += ["|"] * (len(values) - 1)
                 domain += [(field_name, "=", v) for v in values]
         return domain
+
+    @api.model
+    def _rows(self, category, facets, search, offset, limit, columns):
+        """One row per variant.
+
+        Spec fields live on product.template, so templates are read ONCE in
+        a batch and joined in Python — never one read per row.
+        """
+        Product = self.env["product.product"]
+        domain = [("product_tmpl_id.x_southbrook_tool_category_id",
+                   "child_of", category.id)] if category else []
+        for leaf in self._facet_domain(facets):
+            domain.append(("product_tmpl_id.%s" % leaf[0], leaf[1], leaf[2])
+                          if isinstance(leaf, tuple) else leaf)
+        if search:
+            domain += ["|", ("name", "ilike", search),
+                       ("default_code", "ilike", search)]
+
+        total = Product.search_count(domain)
+        products = Product.search(domain, offset=offset, limit=limit,
+                                  order="default_code, name")
+        if not products:
+            return [], total
+
+        spec_keys = [c["key"] for c in columns
+                     if c["key"] not in ("name", "default_code")]
+        tmpl_data = {}
+        if spec_keys:
+            for rec in products.mapped("product_tmpl_id").read(spec_keys):
+                tmpl_data[rec["id"]] = rec
+
+        rows = []
+        for product in products:
+            row = {
+                "product_id": product.id,
+                "name": product.name,
+                "default_code": product.default_code or False,
+            }
+            specs = tmpl_data.get(product.product_tmpl_id.id, {})
+            for key in spec_keys:
+                value = specs.get(key)
+                # False from an unset Char/Float is "absent", not zero.
+                row[key] = None if value in (False, None, "") else value
+            rows.append(row)
+        return rows, total
