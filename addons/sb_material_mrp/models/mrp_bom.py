@@ -121,6 +121,7 @@ reference it. A single density_volume line is its own only sibling, so
 its share is 100% and its stored weight is unchanged.
 """
 import logging
+import math
 
 from odoo import api, fields, models
 from odoo.tools import float_round
@@ -171,6 +172,27 @@ class MrpBomLine(models.Model):
              "(never fabricated). Drives the suggested purchase quantity — "
              "the native BoM product_qty is left untouched (Fork 1).",
     )
+    suggested_purchase_qty = fields.Float(
+        string="Suggested Order Qty",
+        compute="_compute_suggested_purchase_qty",
+        store=True,
+        digits=(12, 2),
+        help="Assist-only: CEIL(demand x (1 + waste%) / yield-per-unit) in "
+             "the vendor's purchase unit. Transparent suggestion a buyer "
+             "confirms - this NEVER creates or confirms a PO. 0 when demand, "
+             "yield, or a vendor is missing (no fabricated suggestion).",
+    )
+    suggested_purchase_uom_id = fields.Many2one(
+        "uom.uom", string="Suggested Order UoM",
+        compute="_compute_suggested_purchase_qty", store=True,
+        help="Vendor's purchase UoM (product.supplierinfo.product_uom_id) "
+             "when a seller resolves, else the product's own uom_id. Odoo 19 "
+             "removed product.uom_po_id (a single uom_id replaces the old "
+             "sales/purchase UoM split) — verified by grep against the "
+             "installed core (product/models/product_template.py, "
+             "product_product.py) and against product_supplierinfo.py, "
+             "which exposes product_uom_id, not product_uom.",
+    )
 
     _SB_DEFAULT_SHEET_THICKNESS_MM = 19.05  # 3/4" — documented fallback
 
@@ -204,6 +226,59 @@ class MrpBomLine(models.Model):
             line.material_id = (
                 line.product_id._resolve_material() if line.product_id else False
             )
+
+    # ----------------------------------------------------------------
+    # Task 4 (Materials Phase-2 Procurement) — the assist number.
+    #
+    # `product.supplierinfo` in this build's installed v19 core exposes
+    # the purchase UoM as `product_uom_id`, NOT `product_uom` (the brief's
+    # tentative name) — verified by grepping the running container's core
+    # (`/usr/lib/python3/dist-packages/odoo/addons/product/models/
+    # product_supplierinfo.py`, lines ~25-26: `product_uom_id = fields.
+    # Many2one('uom.uom', ...)`).
+    #
+    # The brief's documented fallback, `line.product_id.uom_po_id`, does
+    # NOT exist anywhere in this build: `uom_po_id` was removed from
+    # product.template/product.product in this Odoo version (the old
+    # separate sales/purchase UoM split was consolidated into a single
+    # `uom_id`) — confirmed by grepping the entire installed core
+    # (product + purchase addons) for `uom_po_id` and finding zero Python
+    # hits (only stale .po translation files). Two sibling modules in
+    # this same repo already document and work around the identical
+    # trap: `southbrook_configurator_ux/controllers/main.py` ("product.
+    # template in Odoo 19 exposes uom_id but NOT uom_po_id") and
+    # `southbrook_installer/models/southbrook_damage_flag.py` ("v19
+    # removed product.uom_po_id; the single product UoM is product.
+    # uom_id"), both falling back to `product.uom_id`. Using the brief's
+    # literal `uom_po_id` fallback would raise AttributeError on every
+    # line lacking a resolved seller UoM — an unconditional crash, not a
+    # graceful "no fabricated suggestion" — so this compute uses
+    # `line.product_id.uom_id` instead, matching the established repo
+    # precedent exactly.
+    # ----------------------------------------------------------------
+    @api.depends(
+        "material_demand_qty", "material_id",
+        "material_id.waste_pct", "material_id.family_id",
+        "product_id",
+    )
+    def _compute_suggested_purchase_qty(self):
+        for line in self:
+            line.suggested_purchase_qty = 0.0
+            line.suggested_purchase_uom_id = False
+            mat = line.material_id
+            demand = line.material_demand_qty
+            if not mat or demand <= 0.0:
+                continue
+            seller = line.product_id._select_seller() if line.product_id else False
+            yield_qty = seller.uom_yield_qty if seller else 0.0
+            if not seller or yield_qty <= 0.0:
+                continue
+            waste = mat._effective_waste_pct()
+            gross = demand * (1.0 + waste / 100.0)
+            line.suggested_purchase_qty = float(math.ceil(gross / yield_qty))
+            line.suggested_purchase_uom_id = (
+                seller.product_uom_id or line.product_id.uom_id
+            ).id
 
     # ----------------------------------------------------------------
     # Pure helpers — LOCKED conversion + weight_source dispatch.

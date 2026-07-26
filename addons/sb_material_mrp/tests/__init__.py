@@ -8,3 +8,5 @@ from . import test_weight_line
 from . import test_weight_rollup_multilevel
 # Repair Wave 3 — end-to-end money test: template material_id fallback.
 from . import test_component_material_fallback_e2e
+# Phase-2 Task 4 — suggested_purchase_qty assist number.
+from . import test_suggested_purchase_qty
