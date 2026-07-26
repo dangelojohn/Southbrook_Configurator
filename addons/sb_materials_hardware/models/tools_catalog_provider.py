@@ -27,10 +27,22 @@ VALUE_IS_NEVER_ABSENT = {"float", "integer", "monetary", "boolean"}
 def _normalize_value(value, field):
     """Apply the catalog's absence convention to one raw field value.
 
+    Shared by _rows() (table cells) and _detail_value() (spec grid +
+    engineering rail) so there is exactly one place that decides both
+    what "absent" means AND how a relational value is shaped — the row
+    and the detail panel can never disagree (finding F4).
+
+    `value` may be a batched read()'s raw shape: a many2one comes back as
+    Odoo's (id, display_name) tuple, which is unwrapped to the display
+    name here, before the same field ever reaches its type-aware absence
+    check below.
+
     `field` is the product.template field object (or None if the key isn't
     a real field on the model) — its `.type` decides whether a falsy raw
     value means "never set" (-> None) or is genuine data to keep as-is.
     """
+    if isinstance(value, tuple):
+        value = value[1] if len(value) > 1 else (value[0] if value else False)
     ftype = field.type if field else None
     if ftype in VALUE_IS_NEVER_ABSENT:
         return value
@@ -193,6 +205,21 @@ class ToolsCatalogProvider(models.AbstractModel):
 
         Each facet's values are built with ONE grouped query (or one
         aggregate query for range), never a query per value.
+
+        Counts are variant-scoped (product.product), to match the category
+        rail and the table's `total` (finding F3) — EXCEPT range facets,
+        which carry no per-value count at all, only a min/max. A numeric
+        spec lives on product.template and is identical across every
+        variant of that template, so a variant-scoped aggregate would
+        report the same numbers as a template-scoped one; it is also not
+        mechanically available in one query, because _read_group's
+        aggregate spec (unlike its groupby spec) must name a field
+        declared directly on the queried model — "product_tmpl_id.<field>"
+        is rejected for aggregates even though the identical path is
+        accepted for groupby. Range facets are left grouped against
+        product.template deliberately; nothing here is silently
+        inconsistent, there is simply no "count" for this shape to disagree
+        about.
         """
         if not category:
             return []
@@ -211,7 +238,10 @@ class ToolsCatalogProvider(models.AbstractModel):
             by_field[dec.field_name] = dec
 
         Tmpl = self.env["product.template"]
+        Product = self.env["product.product"]
         tmpl_domain = [("x_southbrook_tool_category_id", "child_of", category.id)]
+        variant_domain = [("product_tmpl_id.x_southbrook_tool_category_id",
+                           "child_of", category.id)]
         out = []
         for dec in by_field.values():
             field = Tmpl._fields.get(dec.field_name)
@@ -219,6 +249,7 @@ class ToolsCatalogProvider(models.AbstractModel):
                 continue
             entry = {"key": dec.field_name, "label": dec.name,
                      "type": dec.facet_type, "values": []}
+            variant_field = "product_tmpl_id.%s" % dec.field_name
             if dec.facet_type == "range":
                 # Aggregate in Postgres — a bare aggregate query (no GROUP
                 # BY, since groupby=[]) always returns exactly one row, even
@@ -226,8 +257,16 @@ class ToolsCatalogProvider(models.AbstractModel):
                 # _read_group: NULL aggregates postprocess to False, which we
                 # normalise to None — the "no data" sentinel must not be
                 # confused with a legitimate all-zero dataset.
+                #
+                # No `!= False` leaf here (finding F1): MIN/MAX skip NULL
+                # natively in SQL, so the leaf was never needed for
+                # correctness — and on a Float/Integer/Monetary field it
+                # actively hurt: falsy_value=0 means the ORM rewrites
+                # `!= False` into `NOT IN (0.0)`, which drops a row whose
+                # value is a genuine 0 out of the aggregate too, quietly
+                # raising the reported minimum.
                 grouped = Tmpl._read_group(
-                    tmpl_domain + [(dec.field_name, "!=", False)],
+                    tmpl_domain,
                     groupby=[],
                     aggregates=["%s:min" % dec.field_name,
                                 "%s:max" % dec.field_name],
@@ -237,13 +276,16 @@ class ToolsCatalogProvider(models.AbstractModel):
                 entry["max"] = raw_max if raw_max is not False else None
             elif dec.facet_type == "flag":
                 entry["values"] = [{"value": True, "label": dec.name,
-                                    "count": Tmpl.search_count(
-                                        tmpl_domain + [(dec.field_name, "=", True)])}]
+                                    "count": Product.search_count(
+                                        variant_domain +
+                                        [(variant_field, "=", True)])}]
             else:
                 # Odoo 17+ API: list of (group_value, count) tuples.
-                grouped = Tmpl._read_group(
-                    tmpl_domain + [(dec.field_name, "!=", False)],
-                    groupby=[dec.field_name],
+                # Grouped over product.product via the product_tmpl_id.*
+                # path — one query, variant-scoped counts (finding F3).
+                grouped = Product._read_group(
+                    variant_domain + [(variant_field, "!=", False)],
+                    groupby=[variant_field],
                     aggregates=["__count"],
                 )
                 raw = []
@@ -303,10 +345,36 @@ class ToolsCatalogProvider(models.AbstractModel):
                 continue
             if isinstance(selection, dict):          # range
                 low, high = selection.get("min"), selection.get("max")
+                # F2: on a nullable Float/Integer/Monetary column, Odoo's
+                # domain-to-SQL layer ORs in "field IS NULL" for a `<=`/`>=`
+                # leaf whenever the field's falsy value (0) itself satisfies
+                # the comparison — e.g. `<= 50` matches unset rows too,
+                # because 0 <= 50. A leaf whose bound doesn't reject that
+                # (max-only, or a min <= 0) leaves the null-acceptance in
+                # place for the whole AND'ed domain, so rows with NO value
+                # recorded come back alongside genuine matches.
+                null_would_match = True
                 if low is not None:
                     domain.append((field_name, ">=", low))
+                    null_would_match = null_would_match and low <= 0
                 if high is not None:
                     domain.append((field_name, "<=", high))
+                    null_would_match = null_would_match and high >= 0
+                if (low is not None or high is not None) and null_would_match:
+                    # There is no clean domain leaf for "IS NOT NULL, but a
+                    # genuine 0 still counts" on these field types: the only
+                    # available leaf, `(field_name, "!=", False)`, compiles
+                    # to `NOT IN (0.0)` (falsy_value=0), which also excludes
+                    # a row whose value really is 0 — the same trap as the
+                    # facet min/max aggregate (see _facets(), finding F1).
+                    # Deliberate trade-off: a range filter must never surface
+                    # unset rows, even at the cost of also hiding a real
+                    # zero under this one filter shape (max-only, or a
+                    # min <= 0). Min-only and both-bounds-with-min>0 don't
+                    # need this — a positive ">=" leaf already fails outright
+                    # (rather than OR-ing in IS NULL) for a NULL column, so
+                    # the AND with any other leaf already excludes it.
+                    domain.append((field_name, "!=", False))
                 continue
             values = [v for v in (selection or []) if v not in (None, "")]
             if not values:
@@ -336,11 +404,22 @@ class ToolsCatalogProvider(models.AbstractModel):
           as zero" on a numeric field — those two states are genuinely
           indistinguishable at the ORM level. This catalog shows the zero
           rather than pretending it can tell the difference.
+
+        No category (finding F6): an unscoped call must not fan out across
+        every product on the instance. `_columns(None)` and `_facets(None)`
+        already degrade safely to "nothing declared yet"; `_rows` mirrors
+        that with an empty result rather than a scoped default — there is
+        no principled "default" category to fall back to, and picking one
+        would silently show a different, arbitrary subset instead of the
+        rail's neutral "choose a category" state the frontend already
+        renders when `categoryId` is null.
         """
+        if not category:
+            return [], 0
         Product = self.env["product.product"]
         Tmpl = self.env["product.template"]
         domain = [("product_tmpl_id.x_southbrook_tool_category_id",
-                   "child_of", category.id)] if category else []
+                   "child_of", category.id)]
         for leaf in self._facet_domain(facets):
             domain.append(("product_tmpl_id.%s" % leaf[0], leaf[1], leaf[2])
                           if isinstance(leaf, tuple) else leaf)
@@ -388,7 +467,20 @@ class ToolsCatalogProvider(models.AbstractModel):
         so a many2one comes back as Odoo's (id, display_name) tuple, from
         which we take the display name: the detail panel must never show
         a raw database id.
+
+        Access (finding F5): get_catalog's scope check is incidental — it
+        only happens because _build_payload always calls _categories(),
+        which searches southbrook.tool.category (readable only by
+        group_tool_operator and friends). _build_detail has no equivalent
+        forced touch: _columns(category) short-circuits to the generic
+        columns whenever `category` is falsy, so a product with NO
+        x_southbrook_tool_category_id set never reaches that model at all,
+        and a base.group_user-only account could otherwise call get_detail
+        directly and read title/specs/badges/engineering with no gate.
+        Enforce the same scope check unconditionally, before any data is
+        assembled, rather than relying on it happening to fire.
         """
+        self.env["southbrook.tool.category"].browse().check_access("read")
         product = self.env["product.product"].browse(product_id)
         if not product.exists():
             return self._degrade_detail("Unknown product")
@@ -431,11 +523,11 @@ class ToolsCatalogProvider(models.AbstractModel):
         """One field's value, read()-shaped, normalized, relation-resolved.
 
         `data` came from a batched tmpl.read(); a many2one there is Odoo's
-        (id, display_name) tuple — collapse it to the name so the detail
-        panel renders "ACME Supply", never a bare id.
+        (id, display_name) tuple. Tuple-unwrapping and the absence rule
+        both live in _normalize_value (finding F4) — the same helper
+        _rows() uses for its cells — so a relation column can never render
+        differently in the table than in this detail panel.
         """
         field = tmpl._fields.get(key)
         raw = data.get(key) if field else False
-        if isinstance(raw, tuple):
-            raw = raw[1]
         return _normalize_value(raw, field)

@@ -28,6 +28,28 @@ class TestAccess(TransactionCase):
         self.assertIn("TEST Visible screw",
                       {r["name"] for r in payload["rows"]})
 
+    def test_get_detail_without_operator_group_is_denied(self):
+        """get_catalog's access gate is incidental: it only fires because
+        _build_payload always calls _categories(), which touches
+        southbrook.tool.category. _build_detail reaches that model only
+        via _columns(category), which short-circuits when category is
+        falsy — so a product with NO category set let a base.group_user
+        -only account read get_detail() with no gate at all (finding F5).
+        Use a product with no category to hit exactly that gap.
+        """
+        uncategorized = self.env["product.template"].create({
+            "name": "TEST Uncategorized Widget",
+        })
+        no_access_user = self.env["res.users"].create({
+            "name": "No Catalog Access",
+            "login": "no_catalog_access_test",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        detail = self.env["materials.catalog.provider"].with_user(
+            no_access_user).get_detail(
+                uncategorized.product_variant_ids[0].id)
+        self.assertFalse(detail["ok"])
+
     def test_provider_source_contains_no_sudo(self):
         """The catalog must never elevate to read records.
 

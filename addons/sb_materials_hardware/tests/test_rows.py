@@ -88,4 +88,36 @@ class TestRows(TransactionCase):
     def test_total_is_count_before_pagination(self):
         payload = self._payload(limit=1)
         self.assertEqual(len(payload["rows"]), 1)
-        self.assertGreaterEqual(payload["total"], 3)
+        # Fixture pins this exactly (self.a, self.b, self.c) — a fixed
+        # count deserves an exact assertion, not a lower bound (finding F10).
+        self.assertEqual(payload["total"], 3)
+
+    def test_offset_pagination_returns_a_different_correctly_ordered_row(self):
+        """offset=1 must return the next row in `default_code, name` order,
+        not repeat offset=0's row or silently return nothing (finding F11).
+        """
+        first_page = self._payload(limit=1, offset=0)["rows"]
+        second_page = self._payload(limit=1, offset=1)["rows"]
+        self.assertEqual(len(first_page), 1)
+        self.assertEqual(len(second_page), 1)
+        self.assertNotEqual(first_page[0]["product_id"], second_page[0]["product_id"])
+        # Fixture's default_codes sort as SB-CONF-750, SB-PKT-125, SB-ZERO-000.
+        self.assertEqual(first_page[0]["name"], "TEST Confirmat 7x50")
+        self.assertEqual(second_page[0]["name"], "TEST Pocket screw")
+
+    def test_many2one_column_renders_display_name_not_tuple_or_id(self):
+        """_rows() must route relation values through the same normalizer
+        _build_detail() uses, so a declared many2one column never renders
+        Odoo's raw (id, display_name) read()-tuple or a bare id (finding F4).
+        """
+        vendor = self.env["res.partner"].create({"name": "TEST Vendor Co"})
+        self.env["materials.catalog.column"].create({
+            "name": "Preferred vendor", "category_id": self.cat.id,
+            "field_name": "x_southbrook_preferred_vendor_id", "align": "left",
+        })
+        self.a.write({"x_southbrook_preferred_vendor_id": vendor.id})
+        rows = {r["name"]: r for r in self._payload()["rows"]}
+        value = rows["TEST Confirmat 7x50"]["x_southbrook_preferred_vendor_id"]
+        self.assertEqual(value, vendor.display_name)
+        self.assertNotIsInstance(value, tuple)
+        self.assertNotIsInstance(value, int)

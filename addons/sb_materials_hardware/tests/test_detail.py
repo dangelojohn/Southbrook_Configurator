@@ -40,8 +40,17 @@ class TestDetail(TransactionCase):
         self.assertEqual(labels["Open time (min)"], 8.0)
 
     def test_hazard_badge_present(self):
+        """Only x_southbrook_hazardous is set on this fixture — assert the
+        other badge fields are absent too, not just that the set one shows
+        up (finding F9). Without the negative assertion, a regression to
+        "show every badge whose field exists" would pass unnoticed.
+        """
         detail = self.Provider.get_detail(self.product.id)
         self.assertIn("Hazardous", detail["badges"])
+        self.assertNotIn("Flammable", detail["badges"])
+        self.assertNotIn("MSDS required", detail["badges"])
+        self.assertNotIn("Ventilation required", detail["badges"])
+        self.assertNotIn("Expiry tracked", detail["badges"])
 
     def test_engineering_rail_includes_min_stock(self):
         detail = self.Provider.get_detail(self.product.id)
