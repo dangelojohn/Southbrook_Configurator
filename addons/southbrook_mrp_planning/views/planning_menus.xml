@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <menuitem id="menu_sb_planning_root"
+                  name="Requirements Planning"
+                  parent="mrp.mrp_planning_menu_root"
+                  sequence="45"
+                  groups="mrp.group_mrp_user"/>
+
+        <menuitem id="menu_sb_planning_runs"
+                  name="Planning Runs"
+                  parent="menu_sb_planning_root"
+                  action="action_sb_planning_run"
+                  sequence="10"/>
+
+    </data>
+</odoo>
