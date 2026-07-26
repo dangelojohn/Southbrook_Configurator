@@ -8,3 +8,5 @@ from . import test_material_seed_data
 from . import test_family_density_backfill
 # Repair Wave 3 — product.template.material_id fallback for _resolve_material().
 from . import test_product_material_fallback
+# Task 1 — supplierinfo.uom_yield_qty for procurement (Phase-2 T1).
+from . import test_supplierinfo_yield
