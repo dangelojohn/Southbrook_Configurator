@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+"""Catalog contract: one shell, many providers.
+
+The frontend calls get_catalog() and renders whatever comes back. It knows
+nothing about hardware, tooling or sheet goods. A provider maps one data
+domain onto the payload contract.
+
+CONTRACT — the frontend reads exactly these keys:
+    ok, reason, scope, categories, facets, columns, rows, detail, total,
+    provenance
+Rows are keyed on `product_id`. Renaming that key makes rows silently
+unselectable in the UI.
+
+Any failure degrades to {"ok": False, "reason": ...}. The catalog never
+returns a 500 to the client action.
+"""
+import logging
+
+from odoo import api, models
+
+_logger = logging.getLogger(__name__)
+
+SCOPES = {
+    "tools": "tools.catalog.provider",
+}
+
+
+class MaterialsCatalogProvider(models.AbstractModel):
+    _name = "materials.catalog.provider"
+    _description = "Materials catalog provider contract"
+
+    @api.model
+    def get_catalog(self, scope="tools", category_id=None, facets=None,
+                    search="", offset=0, limit=80):
+        """Return one catalog payload. Never raises."""
+        try:
+            provider_name = SCOPES.get(scope)
+            if not provider_name or provider_name not in self.env:
+                return self._degrade("Unknown catalog scope: %s" % scope, scope)
+            provider = self.env[provider_name]
+            return provider._build_payload(
+                scope=scope, category_id=category_id, facets=facets or {},
+                search=search or "", offset=offset, limit=limit)
+        except Exception as exc:  # noqa: BLE001 — degrade, never 500
+            _logger.exception("Catalog payload build failed")
+            return self._degrade(str(exc)[:200], scope)
+
+    @api.model
+    def _degrade(self, reason, scope):
+        return {
+            "ok": False, "reason": reason, "scope": scope,
+            "categories": [], "facets": [], "columns": [], "rows": [],
+            "detail": {}, "total": 0,
+            "provenance": "Catalog unavailable.",
+        }
+
+    # ---- to be implemented by each provider -------------------------
+    @api.model
+    def _build_payload(self, scope, category_id, facets, search, offset, limit):
+        raise NotImplementedError(
+            "%s must implement _build_payload" % self._name)
