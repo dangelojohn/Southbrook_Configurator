@@ -185,8 +185,32 @@ class ProductConfigSession(models.Model):
              count + plausible dimensions for the locked Q8 templates.
           3. Per-attribute picks on session.value_ids — these override
              whatever the SKU seeded as the user makes choices.
+
+        Finding I-1 (materials geometry-writeback final review, 2026-07-24):
+        this method ALWAYS returns non-zero width/height/depth (the hard
+        defaults at step 1 guarantee that), so callers cannot distinguish
+        "the viewport needs SOME geometry to render, even if guessed" (the
+        3D-payload use case this method was originally built for) from "we
+        genuinely resolved real geometry for this variant" (what A2's
+        variant-materialisation write needs, per the honesty contract).
+
+        The returned dict now carries an extra `"_geo_resolved"` bool
+        signal (additive — every existing key + the return type are
+        unchanged, so `get_3d_payload()` / `_cut_list_to_3d_payload()` and
+        any other existing caller keep working with zero changes). It is
+        True when EITHER:
+          - the SKU lookup (step 2) hit a real `_SKU_DEFAULTS` row, OR
+          - a real `attr_width` pick with a non-zero `value_mm` was found
+            on `session.value_ids` (step 3).
+        It is False when the dict is built ENTIRELY from the hard
+        defaults at step 1 — i.e. an unknown/non-cabinet template with no
+        width pick. Callers that need to render *something* (the 3D
+        viewport) can ignore the flag and keep using the guessed hard
+        defaults; callers that must never fabricate stored data (A2's
+        `get_variant_vals` writeback) gate on it.
         """
         ref = self.env.ref
+        resolved = False
         # 1. Hard defaults.
         out = {
             "width_mm": 609,
@@ -229,6 +253,7 @@ class ProductConfigSession(models.Model):
             out["width_mm"] = w
             out["height_mm"] = h
             out["depth_mm"] = d
+            resolved = True
 
         def attr_xml(name):
             return ref(f"southbrook_estimating.{name}", raise_if_not_found=False)
@@ -249,6 +274,10 @@ class ProductConfigSession(models.Model):
             attr = val.attribute_id
             if attr_width and attr == attr_width and val.value_mm:
                 out["width_mm"] = val.value_mm
+                # I-1: a real attr_width pick with a real value_mm is a
+                # genuine geometry signal on its own, independent of
+                # whether the SKU table also matched.
+                resolved = True
             elif attr_height and attr == attr_height and val.value_mm:
                 out["height_mm"] = val.value_mm
             elif attr_depth and attr == attr_depth and val.value_mm:
@@ -340,6 +369,7 @@ class ProductConfigSession(models.Model):
                 )
                 slug = "_".join(slug.split())
                 out["pull_finish"] = slug
+        out["_geo_resolved"] = resolved
         return out
 
     @api.model

@@ -208,6 +208,83 @@ class TestGeometryWritebackVariantCreation(TransactionCase):
         variant = session.create_get_variant(value_ids=val.ids)
         self.assertTrue(variant)
 
+    def test_variant_for_unknown_template_leaves_geometry_honestly_at_zero(self):
+        """Finding I-1 (final review, 2026-07-24): `get_variant_vals` must
+        NOT stamp hard-default geometry (609x762x609, family=base) onto a
+        variant whose template neither hits `_SKU_DEFAULTS` nor carries a
+        real `attr_width` pick. Before the fix,
+        `_extract_cabinet_inputs()` always returned non-zero hard
+        defaults, so the write-side `if geo:` was always truthy and
+        fabricated geometry (and therefore a fabricated non-zero panel
+        weight downstream) on exactly this kind of unknown/non-cabinet
+        template — the opposite of A3's honest "leave unresolved
+        variants at 0/0/0" contract.
+        """
+        ProductTemplate = self.env["product.template"]
+        Attribute = self.env["product.attribute"]
+        Value = self.env["product.attribute.value"]
+        AttrLine = self.env["product.template.attribute.line"]
+
+        attr = Attribute.create({
+            "name": "TestAttr_I1Honesty", "create_variant": "no_variant",
+        })
+        val = Value.create({"name": "X", "attribute_id": attr.id})
+        tmpl = ProductTemplate.create({
+            "name": "Unknown Cabinet Tmpl I1",
+            "default_code": "TST-I1-HONEST",  # not in _SKU_DEFAULTS
+            "config_ok": True,
+        })
+        AttrLine.create({
+            "product_tmpl_id": tmpl.id,
+            "attribute_id": attr.id,
+            "value_ids": [(6, 0, val.ids)],
+        })
+        session = self.Session.create({
+            "product_tmpl_id": tmpl.id,
+            "value_ids": [(6, 0, val.ids)],
+            "user_id": self.env.uid,
+        })
+        variant = session.create_get_variant(value_ids=val.ids)
+
+        self.assertEqual(variant.sb_width_mm, 0)
+        self.assertEqual(variant.sb_height_mm, 0)
+        self.assertEqual(variant.sb_depth_mm, 0)
+        self.assertEqual(
+            variant._sb_geometry_inputs(), {},
+            "an unresolved template must never receive fabricated "
+            "geometry from get_variant_vals",
+        )
+
+    def test_extract_cabinet_inputs_geo_resolved_signal(self):
+        """Unit-level check of the `_geo_resolved` signal itself: True on
+        a real SKU-table hit, False when nothing but the hard defaults
+        applied."""
+        tmpl = self.env.ref(
+            "southbrook_estimating.base_1dr", raise_if_not_found=False)
+        if not tmpl:
+            self.skipTest("base_1dr template not present")
+        resolved_session = self.Session.create({
+            "product_tmpl_id": tmpl.id,
+            "user_id": self.env.uid,
+        })
+        self.assertTrue(
+            resolved_session._extract_cabinet_inputs()["_geo_resolved"],
+        )
+
+        ProductTemplate = self.env["product.template"]
+        unresolved_tmpl = ProductTemplate.create({
+            "name": "Unresolved Tmpl",
+            "default_code": "TST-I1-SIGNAL",
+            "config_ok": True,
+        })
+        unresolved_session = self.Session.create({
+            "product_tmpl_id": unresolved_tmpl.id,
+            "user_id": self.env.uid,
+        })
+        self.assertFalse(
+            unresolved_session._extract_cabinet_inputs()["_geo_resolved"],
+        )
+
 
 @tagged("post_install", "-at_install", "sb_geo")
 class TestGeometryBackfill(TransactionCase):

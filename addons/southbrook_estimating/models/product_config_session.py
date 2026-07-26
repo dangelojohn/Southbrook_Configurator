@@ -43,6 +43,13 @@ LIVE: `_extract_cabinet_inputs()` is wrapped in try/except so a
 resolver failure on a non-cabinet / malformed template NEVER breaks
 variant creation for the rest of the catalogue — it just leaves the
 geometry fields at their model defaults (0 / "base" / "none").
+
+Finding I-1 fix (final review, 2026-07-24) — the write is additionally
+gated on `geo.get("_geo_resolved")`: `_extract_cabinet_inputs()` always
+returns non-zero hard-default dims (it was built for the 3D viewport,
+which needs SOMETHING to render), so an ungated `if geo:` fabricated
+geometry on templates with no real SKU-table hit and no `attr_width`
+pick. Only a resolver-confirmed real geometry signal gets written.
 """
 import hashlib
 import logging
@@ -87,7 +94,19 @@ class ProductConfigSession(models.Model):
                 self.id, tmpl.id,
             )
             geo = None
-        if geo:
+        # Finding I-1 fix (2026-07-24): `_extract_cabinet_inputs()` always
+        # returns a non-empty dict — it seeds hard-default geometry
+        # (609x762x609, family=base) at step 1 before the SKU lookup even
+        # runs, so a plain `if geo:` was always truthy and stamped
+        # fabricated non-zero dims onto EVERY configured variant,
+        # including templates with no real SKU-table hit and no
+        # `attr_width` pick. Gate on the resolver's own `_geo_resolved`
+        # signal instead — True only when the SKU lookup or a real
+        # attr_width pick actually resolved geometry (see that method's
+        # docstring). An unresolved template now honestly leaves the
+        # variant's sb_* fields at their model defaults (0 / "base" /
+        # "none"), matching A3's backfill honesty contract exactly.
+        if geo and geo.get("_geo_resolved"):
             vals.update({
                 "sb_width_mm": int(geo.get("width_mm") or 0),
                 "sb_height_mm": int(geo.get("height_mm") or 0),
