@@ -10,4 +10,20 @@
             </field>
         </field>
     </record>
+
+    <!-- Inline column on the vendor grid (product Purchase tab / Vendor Pricelists
+         list) so uom_yield_qty is editable without opening each vendor line.
+         Inherits the base supplierinfo list; the purchase Purchase-tab grid
+         (product_supplierinfo_tree_view2) is a primary derivative, so the column
+         flows through to it. -->
+    <record id="product_supplierinfo_tree_sb_yield" model="ir.ui.view">
+        <field name="name">product.supplierinfo.list.sb.yield</field>
+        <field name="model">product.supplierinfo</field>
+        <field name="inherit_id" ref="product.product_supplierinfo_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="price" position="after">
+                <field name="uom_yield_qty" optional="show"/>
+            </field>
+        </field>
+    </record>
 </odoo>
