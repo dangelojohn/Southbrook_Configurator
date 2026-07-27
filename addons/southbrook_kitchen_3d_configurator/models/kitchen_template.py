@@ -164,29 +164,52 @@ class SouthbrookKitchenTemplateResolve(models.Model):
         if slot.product_id:
             return slot.product_id
         if slot.archetype_id:
+            # Only templates that HAVE a variant qualify — the canonical Q8
+            # catalog is OCA-configurable (config_ok) with ZERO variants
+            # until a config session builds one; resolving to a variantless
+            # template would silently yield an empty product (T4 finding).
             tmpls = self.env["product.template"].search([
                 ("x_prodboard_archetype_id", "=", slot.archetype_id.id),
                 ("southbrook_is_cabinet", "=", True),
-            ])
+            ]).filtered("product_variant_ids")
             if tmpls:
                 # Prefer a width match when the archetype maps to several.
                 exact = tmpls.filtered(
                     lambda t: abs((t.southbrook_width_in or 0.0) - width_in) < 0.51)
                 return (exact[:1] or tmpls[:1]).product_variant_id
             return Product  # archetype known, no linked product -> unresolved
-        # Last rung: cabinet_type + exact width among flagged cabinets.
+        # Last rung: cabinet_type + exact width among flagged cabinets
+        # (again variant-bearing only — see the archetype rung's note).
         tmpls = self.env["product.template"].search([
             ("southbrook_is_cabinet", "=", True),
             ("southbrook_cabinet_type", "=", slot.cabinet_type),
-        ])
+        ]).filtered("product_variant_ids")
         exact = tmpls.filtered(
             lambda t: abs((t.southbrook_width_in or 0.0) - width_in) < 0.51)
         return exact[:1].product_variant_id if exact else Product
 
     # -- parametric fill math (spec §Parametric fill math) --------------
+    def _slot_fixed_width(self, s, module_w, appliance_widths):
+        """Width a non-repeat floor slot occupies in the run arithmetic."""
+        if s.cabinet_type == "appliance":
+            return float(appliance_widths.get(
+                s.appliance_type or "", s.nominal_width_in or 0.0))
+        return float(
+            s.nominal_width_in
+            or (s.product_id.product_tmpl_id.southbrook_width_in
+                if s.product_id else 0.0)
+            or module_w)
+
     def parametric_fit(self, cabinet_count=None, module_width_in=None,
                        appliance_widths=None):
         """Pure math: bound the count, size every slot, trim/grow modules.
+
+        PER-WALL arithmetic (T4): each wall is an independent run — its
+        length comes from the room dimension it spans (back/front = room
+        width, left/right = room depth), its fixed slots consume it, and
+        repeat slots may only grow within THEIR wall's leftover capacity.
+        Galley/multi-wall templates are impossible to bound with a single
+        summed run (two 96" walls are not one 192" wall).
 
         Returns {"ok", "message", "count", "n_max", "module_width_in",
         "slots": [(slot, width_in), ...]}. UI-grade bound only — the
@@ -196,49 +219,61 @@ class SouthbrookKitchenTemplateResolve(models.Model):
         self.ensure_one()
         module_w = float(module_width_in or self.default_module_width_in or 24.0)
         appliance_widths = appliance_widths or {}
-        wall_len = float(self.default_room_width_in or 0.0)
         corner_in = kitchen_layout_engine._CORNER_FOOTPRINT_MM / 25.4
+        room_w = float(self.default_room_width_in or 0.0)
+        room_d = float(self.default_room_depth_in or 0.0)
+        run_len = {"back": room_w, "front": room_w,
+                   "left": room_d, "right": room_d}
 
         slots = self.line_ids.sorted(lambda s: (s.wall, s.run_seq, s.sequence))
-        base_like = slots.filtered(
-            lambda s: s.cabinet_type in ("base", "tall") and not s.product_id
-            or (s.cabinet_type in ("base", "tall") and s.repeat_ok))
-        corner_claims = corner_in * len(slots.filtered(
-            lambda s: s.cabinet_type == "corner"))
-        fixed = 0.0
+        fixed = dict.fromkeys(run_len, 0.0)
+        claimed = dict.fromkeys(run_len, 0.0)
         for s in slots:
-            if s.cabinet_type == "appliance":
-                fixed += float(appliance_widths.get(
-                    s.appliance_type or "", s.nominal_width_in or 0.0))
-            elif s.cabinet_type in ("wall", "corner"):
-                continue  # wall tier / engine-claimed
-            elif not s.repeat_ok and (s.nominal_width_in or s.product_id):
-                fixed += float(
-                    s.nominal_width_in
-                    or s.product_id.product_tmpl_id.southbrook_width_in
-                    or module_w)
-        usable = wall_len - corner_claims - fixed
-        n_max = int(usable // module_w) if module_w > 0 else 0
+            if s.cabinet_type == "wall":
+                continue  # upper tier — separate plane, engine-checked
+            if s.cabinet_type == "corner":
+                claimed[s.wall] += corner_in  # engine-claimed leg footprint
+            elif not s.repeat_ok:
+                fixed[s.wall] += self._slot_fixed_width(
+                    s, module_w, appliance_widths)
+        for w, ln in run_len.items():
+            if ln > 0 and fixed[w] + claimed[w] > ln + 1e-6:
+                return {"ok": False, "count": 0, "n_max": 0,
+                        "module_width_in": module_w, "slots": [],
+                        "message": (
+                            "%(tpl)s: the fixed cabinets/appliances on the "
+                            "%(wall)s wall need %(need)g\" but that run is "
+                            "only %(len)g\". Choose smaller appliance sizes "
+                            "— the room is never grown automatically." % {
+                                "tpl": self.name, "wall": w,
+                                "need": fixed[w] + claimed[w], "len": ln})}
+        capacity = {
+            w: int(max(run_len[w] - claimed[w] - fixed[w], 0.0) // module_w)
+            if module_w > 0 else 0
+            for w in run_len}
         repeat_slots = slots.filtered(
             lambda s: s.repeat_ok and s.cabinet_type in ("base", "tall"))
         floor_slots = slots.filtered(
             lambda s: s.cabinet_type not in ("wall", "corner"))
         n_fixed_modules = len(floor_slots.filtered(
             lambda s: s.cabinet_type != "appliance")) - len(repeat_slots)
+        # Growth happens only inside repeat slots, bounded per wall.
+        n_grow = sum(capacity[w] for w in
+                     set(repeat_slots.mapped("wall")) & set(capacity))
         count = cabinet_count if cabinet_count is not None else (
             n_fixed_modules + len(repeat_slots))
         min_count = max(self.min_cabinet_count or 1, n_fixed_modules)
-        cap = n_fixed_modules + max(n_max, 0)
+        cap = n_fixed_modules + n_grow
         if count > cap:
             return {"ok": False, "count": count, "n_max": cap,
                     "module_width_in": module_w, "slots": [],
                     "message": (
-                        "%(tpl)s cannot fit %(count)d cabinets of %(w)g\" in a "
-                        "%(room)g\" room (max %(cap)d with the chosen appliance "
+                        "%(tpl)s cannot fit %(count)d cabinets of %(w)g\" in "
+                        "this room (max %(cap)d with the chosen appliance "
                         "sizes). Reduce the count or module width — the room "
                         "is never grown automatically." % {
                             "tpl": self.name, "count": count, "w": module_w,
-                            "room": wall_len, "cap": cap})}
+                            "cap": cap})}
         if count < min_count:
             return {"ok": False, "count": count, "n_max": cap,
                     "module_width_in": module_w, "slots": [],
@@ -250,25 +285,36 @@ class SouthbrookKitchenTemplateResolve(models.Model):
                     "module_width_in": module_w, "slots": [],
                     "message": "%s has no repeatable slot to grow the run." %
                                self.name}
+        # Round-robin the extra modules across repeat slots, never
+        # exceeding any single wall's leftover capacity.
+        alloc = dict.fromkeys(repeat_slots.ids, 0)
+        remaining = dict(capacity)
+        need = max(n_repeat_needed, 0)
+        while need > 0:
+            progressed = False
+            for s in repeat_slots:
+                if need <= 0:
+                    break
+                if remaining.get(s.wall, 0) > 0:
+                    alloc[s.id] += 1
+                    remaining[s.wall] -= 1
+                    need -= 1
+                    progressed = True
+            if not progressed:  # count <= cap makes this unreachable; guard
+                return {"ok": False, "count": count, "n_max": cap,
+                        "module_width_in": module_w, "slots": [],
+                        "message": "%s has no repeatable slot capacity left."
+                                   % self.name}
         out = []
         for s in slots:
-            if s.cabinet_type == "appliance":
-                out.append((s, float(appliance_widths.get(
-                    s.appliance_type or "", s.nominal_width_in or 0.0))))
-            elif s.cabinet_type == "corner":
+            if s.cabinet_type == "corner":
                 continue  # engine inserts corners; slot is a preference only
-            elif s.repeat_ok:
-                for _n in range(max(n_repeat_needed, 0) or 0):
+            if s in repeat_slots:
+                for _n in range(alloc.get(s.id, 0)):
                     out.append((s, s.nominal_width_in or module_w))
-                if n_repeat_needed <= 0:
-                    # trimmed away entirely (count == fixed modules)
-                    continue
             else:
-                out.append((s, float(
-                    s.nominal_width_in
-                    or (s.product_id.product_tmpl_id.southbrook_width_in
-                        if s.product_id else 0.0)
-                    or module_w)))
+                out.append((s, self._slot_fixed_width(
+                    s, module_w, appliance_widths)))
         return {"ok": True, "message": "", "count": count, "n_max": cap,
                 "module_width_in": module_w, "slots": out}
 

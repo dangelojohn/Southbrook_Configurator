@@ -69,3 +69,8 @@ from . import test_collision_matrix
 from . import test_kitchen_template_model
 from . import test_template_instantiate
 from . import test_template_picker
+
+# Kitchen Templates T4 (2026-07-27) — the shipped starter catalog:
+# every active template instantiates fully resolved at defaults,
+# galley per-wall fit math, inactive engine-blocked placeholders.
+from . import test_template_catalog

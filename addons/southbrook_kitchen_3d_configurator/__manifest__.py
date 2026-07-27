@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.5.28.0",
+    "version": "19.0.5.29.0",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -26,6 +26,12 @@
     ],
     "data": [
         "data/template_support_products.xml",
+        # Kitchen Templates T4 — the starter template catalog (6 kept
+        # rows from the validated catalog design; 2 ship inactive).
+        # noupdate="0" per spec locked decision #2 — dimension fixes
+        # land via -u without code deploys. MUST load after
+        # template_support_products.xml (appliance stand-ins).
+        "data/kitchen_templates.xml",
         # 2026-07-01 E2E audit fix — security/groups.xml + kitchen_design_rules.xml
         # existed on disk but were NOT declared in this manifest. That
         # left ir.model.access.csv referring to group xml_ids

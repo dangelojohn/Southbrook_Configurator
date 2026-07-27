@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kitchen Templates T4 — the starter template catalog.
+
+  Source of truth: the blindspot/ReAct catalog validation run
+  (scratchpad sdd-briefs/ktmpl-catalog-design.md) — only the 6 kept
+  templates (score >= 7/10) are authored here. Slot widths are
+  translated from the catalog doc's shorthand to the REAL products
+  this database ships:
+
+    SINK  -> base @ 30"  (SB30 Sink Base — demo catalog)
+    DRWR  -> base @ 24"  (B24/DB24 — demo catalog)
+    PANTRY-> tall @ 24"  (tall_pantry / demo T24)
+    module-> base, nominal 0 + repeat_ok  (module-width knob fills it)
+    W     -> wall @ 24"  (demo W24)
+    APPL  -> appliance_type slot; nominal = catalog default width, the
+             picker's appliance dropdowns override it at instantiate.
+
+  Rules locked by the spec (2026-07-27-kitchen-templates-design.md):
+    * noupdate="0" — dimension corrections must land via -u, no deploys
+      of Python needed to fix a template.
+    * NO corner slots and NO filler slots in the starter set — corners
+      and fillers are ENGINE-derived (corner engine M2/M3), never
+      templated. L-10x8 (T4a) introduces the first corner-preference
+      slot after the SB-CORNER data repair.
+    * The room is never grown: templates whose defaults don't fit
+      simply refuse to instantiate.
+
+  Two catalog rows ship INACTIVE (search-invisible, picker-invisible)
+  as honest placeholders — the engine can't lay them out yet:
+    * PEN-10X10 — needs a free-anchor peninsula run.
+    * H-14X12   — needs multi-run-per-wall + connector gaps.
+-->
+<odoo>
+  <data noupdate="0">
+
+    <!-- ═══ SW-08 · Straight Single-Wall — Studio (96" x 60") ═══ -->
+    <record id="ktpl_sw_08" model="southbrook.kitchen.template">
+      <field name="name">Studio Single Wall 8'</field>
+      <field name="code">SW-08</field>
+      <field name="layout_shape">straight</field>
+      <field name="sequence">10</field>
+      <field name="default_room_width_in">96.0</field>
+      <field name="default_room_depth_in">60.0</field>
+      <field name="default_room_height_in">96.0</field>
+      <field name="default_module_width_in">24.0</field>
+      <field name="min_cabinet_count">2</field>
+      <field name="description">Compact one-wall kitchen for studios and suites: sink, range and one adjustable bank of base cabinets, with an upper cabinet over the prep zone.</field>
+    </record>
+    <record id="ktpl_sw_08_sink" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_08"/>
+      <field name="slot_code">SINK</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_sw_08_range" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_08"/>
+      <field name="slot_code">RANGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">range</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_sw_08_m1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_08"/>
+      <field name="slot_code">M1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_sw_08_w1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_08"/>
+      <field name="slot_code">W1</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+
+    <!-- ═══ SW-12 · Straight Single-Wall — Large w/ Pantry (144" x 72") ═══ -->
+    <record id="ktpl_sw_12" model="southbrook.kitchen.template">
+      <field name="name">Single Wall 12' with Pantry</field>
+      <field name="code">SW-12</field>
+      <field name="layout_shape">straight</field>
+      <field name="sequence">20</field>
+      <field name="default_room_width_in">144.0</field>
+      <field name="default_room_depth_in">72.0</field>
+      <field name="default_room_height_in">96.0</field>
+      <field name="default_module_width_in">24.0</field>
+      <field name="min_cabinet_count">3</field>
+      <field name="description">Full 12-foot wall: tall pantry, sink, range, drawer bank and a growing run of base cabinets with two uppers.</field>
+    </record>
+    <record id="ktpl_sw_12_pantry" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_12"/>
+      <field name="slot_code">PANTRY</field>
+      <field name="cabinet_type">tall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">20</field>
+    </record>
+    <record id="ktpl_sw_12_sink" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_12"/>
+      <field name="slot_code">SINK</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_sw_12_range" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_12"/>
+      <field name="slot_code">RANGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">range</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">36.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_sw_12_drwr" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_12"/>
+      <field name="slot_code">DRWR</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">40</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_sw_12_m1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_12"/>
+      <field name="slot_code">M1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">50</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_sw_12_w1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_12"/>
+      <field name="slot_code">W1</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_sw_12_w2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_sw_12"/>
+      <field name="slot_code">W2</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+
+    <!-- ═══ GAL-08 · Galley — Compact (96" x 90") ═══
+         Aisle = 90 − 2×24 = 42" (exactly the NKBA floor).
+         Fixture split: sink+range on the back wall, fridge+prep on
+         the front wall — never duplicated across walls. -->
+    <record id="ktpl_gal_08" model="southbrook.kitchen.template">
+      <field name="name">Compact Galley 8'</field>
+      <field name="code">GAL-08</field>
+      <field name="layout_shape">galley</field>
+      <field name="sequence">30</field>
+      <field name="default_room_width_in">96.0</field>
+      <field name="default_room_depth_in">90.0</field>
+      <field name="default_room_height_in">96.0</field>
+      <field name="default_module_width_in">24.0</field>
+      <field name="min_cabinet_count">3</field>
+      <field name="description">Two facing runs: sink and range on one side, refrigerator and prep drawers on the other, with a 42-inch working aisle.</field>
+    </record>
+    <record id="ktpl_gal_08_sink" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">SINK</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_gal_08_range" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">RANGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">range</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_gal_08_m1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">M1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_gal_08_fridge" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">FRIDGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">fridge</field>
+      <field name="wall">front</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">36.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_gal_08_drwr" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">DRWR</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">front</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_gal_08_m2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">M2</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">front</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_gal_08_w1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">W1</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_gal_08_w2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">W2</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">front</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_gal_08_w3" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_08"/>
+      <field name="slot_code">W3</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">front</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+
+    <!-- ═══ GAL-10 · Galley — Standard (120" x 96") ═══
+         Aisle = 96 − 2×24 = 48". -->
+    <record id="ktpl_gal_10" model="southbrook.kitchen.template">
+      <field name="name">Standard Galley 10'</field>
+      <field name="code">GAL-10</field>
+      <field name="layout_shape">galley</field>
+      <field name="sequence">40</field>
+      <field name="default_room_width_in">120.0</field>
+      <field name="default_room_depth_in">96.0</field>
+      <field name="default_room_height_in">96.0</field>
+      <field name="default_module_width_in">24.0</field>
+      <field name="min_cabinet_count">4</field>
+      <field name="description">The classic working galley: drawers, sink and range down one side; refrigerator, tall pantry and prep storage on the other, with a 48-inch aisle.</field>
+    </record>
+    <record id="ktpl_gal_10_drwr" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">DRWR</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_gal_10_sink" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">SINK</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_gal_10_range" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">RANGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">range</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_gal_10_m1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">M1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">40</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_gal_10_fridge" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">FRIDGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">fridge</field>
+      <field name="wall">front</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">36.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_gal_10_pantry" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">PANTRY</field>
+      <field name="cabinet_type">tall</field>
+      <field name="wall">front</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">20</field>
+    </record>
+    <record id="ktpl_gal_10_drwr2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">DRWR2</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">front</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_gal_10_m2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">M2</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">front</field>
+      <field name="run_seq">40</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_gal_10_w1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">W1</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_gal_10_w2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">W2</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_gal_10_w3" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">W3</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">front</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_gal_10_w4" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_gal_10"/>
+      <field name="slot_code">W4</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">front</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+
+    <!-- ═══ PEN-10X10 · Peninsula (INACTIVE placeholder) ═══
+         Catalog score 9/10, but the layout engine has no free-anchor
+         run support yet: the peninsula segment (dishwasher + worktop
+         return jutting into the room) cannot be posed. Ships
+         active=False so it never appears in the picker — honest
+         placeholder, not a broken template. Slots model ONLY the back
+         wall; the peninsula segment is deliberately NOT authored. -->
+    <record id="ktpl_pen_10x10" model="southbrook.kitchen.template">
+      <field name="name">Peninsula Kitchen 10' x 10'</field>
+      <field name="code">PEN-10X10</field>
+      <field name="layout_shape">peninsula</field>
+      <field name="sequence">50</field>
+      <field name="active" eval="False"/>
+      <field name="default_room_width_in">120.0</field>
+      <field name="default_room_depth_in">120.0</field>
+      <field name="default_room_height_in">96.0</field>
+      <field name="default_module_width_in">24.0</field>
+      <field name="min_cabinet_count">3</field>
+      <field name="description">Back-wall run with an eat-at peninsula return. Coming soon.</field>
+      <field name="notes">INACTIVE until the layout engine supports free-anchor (peninsula) runs. The peninsula segment (DW24 + worktop, catalog §PEN-10x10) is intentionally not authored — modelling it as a wall run would lie about its geometry. Re-activate + add the segment when the engine grows peninsula support.</field>
+    </record>
+    <record id="ktpl_pen_10x10_drwr" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_pen_10x10"/>
+      <field name="slot_code">DRWR</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_pen_10x10_sink" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_pen_10x10"/>
+      <field name="slot_code">SINK</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_pen_10x10_range" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_pen_10x10"/>
+      <field name="slot_code">RANGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">range</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_pen_10x10_m1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_pen_10x10"/>
+      <field name="slot_code">M1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">40</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_pen_10x10_w1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_pen_10x10"/>
+      <field name="slot_code">W1</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_pen_10x10_w2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_pen_10x10"/>
+      <field name="slot_code">W2</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+
+    <!-- ═══ H-14X12 · H-Shape / Double Galley (INACTIVE placeholder) ═══
+         Catalog flags this Phase-2: it needs FOUR independent runs
+         (two per wall) separated by connector gaps, and the engine
+         currently supports one continuous run per wall (blocker #7).
+         Ships active=False; slots are a simplified back+front sketch
+         retained so the eventual activation starts from real data. -->
+    <record id="ktpl_h_14x12" model="southbrook.kitchen.template">
+      <field name="name">Double Galley 14' x 12'</field>
+      <field name="code">H-14X12</field>
+      <field name="layout_shape">custom</field>
+      <field name="sequence">60</field>
+      <field name="active" eval="False"/>
+      <field name="default_room_width_in">168.0</field>
+      <field name="default_room_depth_in">144.0</field>
+      <field name="default_room_height_in">96.0</field>
+      <field name="default_module_width_in">24.0</field>
+      <field name="min_cabinet_count">4</field>
+      <field name="description">Four independent cabinet runs with walk-through gaps. Coming soon.</field>
+      <field name="notes">INACTIVE until the layout engine supports multiple runs per wall with connector gaps (catalog blocker #7). Authored as a simplified back+front sketch; the real template needs per-segment run_length_in + gap_width_in knobs.</field>
+    </record>
+    <record id="ktpl_h_14x12_sink" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_h_14x12"/>
+      <field name="slot_code">SINK</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_h_14x12_range" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_h_14x12"/>
+      <field name="slot_code">RANGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">range</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_h_14x12_m1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_h_14x12"/>
+      <field name="slot_code">M1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_h_14x12_fridge" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_h_14x12"/>
+      <field name="slot_code">FRIDGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">fridge</field>
+      <field name="wall">front</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">36.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_h_14x12_drwr" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_h_14x12"/>
+      <field name="slot_code">DRWR</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">front</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_h_14x12_m2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_h_14x12"/>
+      <field name="slot_code">M2</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">front</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+
+  </data>
+</odoo>

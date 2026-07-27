@@ -2414,7 +2414,13 @@ class SouthbrookKitchenDesignTemplatePicker(models.TransientModel):
     # live on the design/top frame; here shape (template) leads, then the
     # cabinet selections. Legacy `preset` kept ONLY for compat callers.
     _COMPAT_PRESET_CODES = {
-        # reconciled against the T4 catalog codes at data-authoring time
+        # Reconciled against the shipped T4 catalog (data/kitchen_templates.xml):
+        #   galley  -> GAL-10 (shipped, active)
+        #   l_shape -> L-10X8 (ships in T4a, after the SB-CORNER data repair)
+        #   u_shape -> U-10X8X10 (NOT shipped — needs 2 corners; blocked on
+        #              corner SKU inventory per catalog blocker #1. The
+        #              action_create compat path falls back to the legacy
+        #              5.6.12 preset seeding until the template exists.)
         "empty": None,
         "l_shape": "L-10X8",
         "u_shape": "U-10X8X10",
@@ -2523,22 +2529,40 @@ class SouthbrookKitchenDesignTemplatePicker(models.TransientModel):
             template = code and self.env["southbrook.kitchen.template"].search(
                 [("code", "=", code)], limit=1)
             if code and not template:
-                raise UserError(
-                    "Legacy preset '%s' maps to template code %s, which is "
-                    "not loaded. Pick a template explicitly." % (
-                        self.preset, code))
+                # Mapped data template not loaded (e.g. L-10X8 ships only
+                # after the corner-SKU repair). Honor the 5.6.12 legacy
+                # onboarding contract instead of dead-ending the rep:
+                # canonical room dims + starters-or-chatter (T4 fix — the
+                # T3 rewrite raised UserError here and silently broke the
+                # track_b preset regression pins).
+                return self._action_create_legacy_preset()
         if not template:
-            # empty room — plain draft design, no template
-            design = self.env["southbrook.kitchen.design"].create({
-                "name": "New Kitchen Design",
-                "state": "draft",
-                "partner_id": self.partner_id.id if self.partner_id else False,
-            })
-            return design.action_open_configurator()
+            # Blank canvas — the legacy 'empty' spec still owns the
+            # canonical blank-canvas room dims (5.6.12 pin).
+            return self._action_create_legacy_preset()
         design = template.action_instantiate(
             partner_id=self.partner_id.id if self.partner_id else False,
             cabinet_count=self.cabinet_count or None,
             module_width_in=float(self.module_width_in or "24"),
             appliance_widths=self._appliance_widths(),
         )
+        return design.action_open_configurator()
+
+    def _action_create_legacy_preset(self):
+        """Deprecated 5.6.12 fallback — used only when no data template
+        can serve the request (preset='empty'/none, or a compat code
+        whose template isn't loaded). Keeps the onboarding contract:
+        canonical preset room dims land, starters seed or the skips are
+        chatter-logged; the design still opens either way."""
+        self.ensure_one()
+        Design = self.env["southbrook.kitchen.design"]
+        preset = self.preset or "empty"
+        spec = Design._get_preset_layout(preset)
+        design = Design.create({
+            "name": spec["name"] if spec else "New Kitchen Design",
+            "state": "draft",
+            "partner_id": self.partner_id.id if self.partner_id else False,
+        })
+        if spec:
+            design._apply_kitchen_template(preset)
         return design.action_open_configurator()
