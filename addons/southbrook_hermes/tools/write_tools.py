@@ -21,8 +21,10 @@ def post_internal_note(env, record_model: str, record_id: int, content: str):
             f"Hermes can't post notes on '{record_model}'. "
             f"Allowed: {', '.join(allowed_models)}.")
     record = env[record_model].browse(record_id)
-    record.check_access_rights("write")
-    record.check_access_rule("write")
+    # v18+ merged check_access_rights + check_access_rule into a single
+    # check_access(operation); the old pair is deprecated and spams the
+    # test log with multi-frame DeprecationWarning tracebacks.
+    record.check_access("write")
     msg = record.message_post(
         body=content, message_type="comment",
         subtype_xmlid="mail.mt_note")
@@ -38,8 +40,7 @@ def post_internal_note(env, record_model: str, record_id: int, content: str):
 )
 def send_spec_pdf_email(env, order_id: int):
     order = env["sale.order"].browse(order_id)
-    order.check_access_rights("read")
-    order.check_access_rule("read")
+    order.check_access("read")
     template = env.ref(
         "sale.email_template_edi_sale", raise_if_not_found=False)
     if not template:
@@ -63,8 +64,8 @@ def schedule_followup_activity(env, order_id: int, summary: str, due_date: str):
     if parsed_date < datetime.date.today():
         raise UserError("Activity due_date must be today or in the future.")
     order = env["sale.order"].browse(order_id)
-    order.check_access_rights("read")
-    order.check_access_rule("read")  # record-rule scope per spec § 4.4
+    # check_access(operation) does both ACL + record-rule scope per spec § 4.4
+    order.check_access("read")
     activity_type = env.ref("mail.mail_activity_data_todo")
     activity = env["mail.activity"].create({
         "res_id": order.id,
