@@ -58,15 +58,28 @@ class LayoutCapacityExceeded(Exception):
     Impossible layouts fail explicitly here rather than silently overflowing
     the room (which would ship a non-manufacturable design). Carries the
     numbers so a caller can surface e.g. ROOM_TOO_SMALL(capacity, requested).
+
+    NOTE: the raise fires on the geometric postcondition (a cabinet's
+    footprint falls outside the room), NOT on the capacity precheck — so
+    requested_mm is not necessarily greater than capacity_mm (a corner
+    reservation can push an otherwise-fitting run past the wall even when
+    total requested run length is under capacity). The message must not
+    claim ">" for that reason.
+
+    `outside`, when given, is a list of dicts describing each cabinet that
+    failed the in-room postcondition: {"id", "overflow_mm", "wall"} — the
+    worst-case overhang (mm) past the room bounds and the wall it was on.
     """
-    def __init__(self, capacity_mm, requested_mm, detail=""):
+    def __init__(self, capacity_mm, requested_mm, detail="", outside=None):
         self.capacity_mm = capacity_mm
         self.requested_mm = requested_mm
         self.detail = detail
+        self.outside = outside or []
         super().__init__(
-            "layout exceeds wall capacity: requested %.0fmm > capacity "
-            "%.0fmm%s" % (requested_mm, capacity_mm,
-                          (" (%s)" % detail) if detail else ""))
+            "layout does not fit: %d cabinet(s) outside room "
+            "(capacity %.0fmm, requested %.0fmm)%s" % (
+                len(self.outside), capacity_mm, requested_mm,
+                (" — %s" % detail) if detail else ""))
 
 
 # ── Geometry helpers (shared by the engine + the invariant suite) ───────
@@ -89,6 +102,49 @@ def footprint_mm(cab, place):
         return (x, x + d, z - w / 2, z + w / 2)
     # rot == 270        # right: along +Z, depth -X
     return (x - d, x, z - w / 2, z + w / 2)
+
+
+def anchor_pose_mm(cab, place):
+    """Convert an engine placement (along-axis CENTRED — the module's
+    internal convention, see footprint_mm) to the persisted anchor
+    convention (COORDINATE_CONTRACT.md: back-left-bottom corner, mesh
+    rotated about +Y around the anchor). Returns a NEW dict; inputs
+    untouched. y and rotation_deg pass through unchanged."""
+    w = cab.get("width_mm", 0)
+    x = place["x"]
+    z = place["z"]
+    rot = int(round(place.get("rotation_deg", 0))) % 360
+    out = dict(place)
+    if rot == 0:
+        out["x"] = x - w / 2.0
+    elif rot == 90:
+        out["z"] = z + w / 2.0
+    elif rot == 180:
+        out["x"] = x + w / 2.0
+    else:   # 270
+        out["z"] = z - w / 2.0
+    return out
+
+
+def footprint_from_anchor_mm(cab, place):
+    """World AABB (x0,x1,z0,z1) of a cabinet whose place uses the
+    persisted ANCHOR convention (back-left-bottom corner + rotation
+    about the anchor) — the renderer's math, for validating persisted
+    poses. Sibling of footprint_mm (which assumes the engine's
+    along-axis-centred convention)."""
+    w = cab.get("width_mm", 0)
+    d = cab.get("depth_mm", 0)
+    x = place["x"]
+    z = place["z"]
+    rot = int(round(place.get("rotation_deg", 0))) % 360
+    if rot == 0:
+        return (x, x + w, z, z + d)
+    if rot == 180:
+        return (x - w, x, z - d, z)
+    if rot == 90:
+        return (x, x + d, z - w, z)
+    # rot == 270
+    return (x - d, x, z, z + w)
 
 
 def footprints_overlap(a, b, eps=1.0):
@@ -673,13 +729,26 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     # fail explicitly instead of returning an unmanufacturable layout.
     by_id = {c["id"]: c for c in final}
     place_by_id = {p["id"]: p for p in placements}
-    outside = [c["id"] for c in final
-               if not within_room(by_id[c["id"]], place_by_id[c["id"]], room)]
+    room_w = room.get("width_mm", 0)
+    room_d = room.get("depth_mm", 0)
+    outside = []
+    for c in final:
+        cid = c["id"]
+        if within_room(by_id[cid], place_by_id[cid], room):
+            continue
+        x0, x1, z0, z1 = footprint_mm(by_id[cid], place_by_id[cid])
+        overflow_mm = max(0.0, -x0, x1 - room_w, -z0, z1 - room_d)
+        outside.append({"id": cid, "overflow_mm": overflow_mm,
+                        "wall": by_id[cid].get("wall") or "back"})
     if outside:
         cap = wall_capacity_mm(room, wall_order)
         req = check_capacity(cabinets, room, wall_order)["requested_mm"]
-        raise LayoutCapacityExceeded(
-            cap, req, detail="%d cabinet(s) outside room" % len(outside))
+        worst = max(outside, key=lambda o: o["overflow_mm"])
+        detail = ("%d cabinet(s) extend past the end of their wall; "
+                  "worst: id=%s overflows %.0fmm on wall=%s"
+                  % (len(outside), worst["id"], worst["overflow_mm"],
+                     worst["wall"]))
+        raise LayoutCapacityExceeded(cap, req, detail=detail, outside=outside)
 
     return {"cabinets": final, "placements": placements, "corners": corners,
             "inserted": inserted, "removed_ids": sorted(removed_ids)}

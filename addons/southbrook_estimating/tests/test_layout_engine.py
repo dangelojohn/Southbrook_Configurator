@@ -483,3 +483,89 @@ class TestKitchenLayoutEngine(TransactionCase):
         self.assertEqual(len(base_back), 1)
         self.assertAlmostEqual(
             pl[base_back[0]["id"]]["x"] - 300, E._CORNER_FOOTPRINT_MM)
+
+
+class TestAnchorConversion(TransactionCase):
+    """`anchor_pose_mm` / `footprint_from_anchor_mm` — the along-axis-CENTRED
+    (engine) ↔ back-left-bottom-corner-ANCHORED (persisted, per
+    COORDINATE_CONTRACT.md) conversion applied once at the ORM write
+    boundary. Load-bearing property: converting an engine placement to the
+    anchor convention and then re-deriving its footprint via the anchor-side
+    formula must reproduce EXACTLY the footprint the engine itself computes
+    for that placement (footprint_mm) — the two conventions describe the
+    same physical box."""
+
+    CAB = {"id": "cab-1", "width_mm": 600, "depth_mm": 450}
+
+    def test_anchor_footprint_matches_engine_footprint_all_rotations(self):
+        place_base = {"x": 1234.5, "z": 678.25, "y": 762, "rotation_deg": None}
+        for rot in E.ALLOWED_ROTATIONS:
+            place = dict(place_base, rotation_deg=rot)
+            anchored = E.anchor_pose_mm(self.CAB, place)
+            self.assertEqual(
+                E.footprint_from_anchor_mm(self.CAB, anchored),
+                E.footprint_mm(self.CAB, place),
+                "mismatch at rotation_deg=%s" % rot)
+
+    def test_anchor_pose_mm_does_not_mutate_input(self):
+        place = {"x": 10.0, "z": 20.0, "y": 300, "rotation_deg": 90}
+        snapshot = dict(place)
+        E.anchor_pose_mm(self.CAB, place)
+        self.assertEqual(place, snapshot)
+
+    def test_anchor_pose_mm_passes_through_extra_keys(self):
+        place = {"id": "should-be-overwritten-by-caller-not-here",
+                  "x": 10.0, "z": 20.0, "y": 762, "rotation_deg": 180}
+        out = E.anchor_pose_mm(self.CAB, place)
+        self.assertEqual(out["y"], place["y"])
+        self.assertEqual(out["rotation_deg"], place["rotation_deg"])
+        self.assertEqual(out["id"], place["id"])
+        # x is the only field that should differ for rot 180
+        self.assertNotEqual(out["x"], place["x"])
+
+    def test_anchor_pose_mm_returns_new_dict(self):
+        place = {"x": 10.0, "z": 20.0, "y": 762, "rotation_deg": 0}
+        out = E.anchor_pose_mm(self.CAB, place)
+        self.assertIsNot(out, place)
+
+
+class TestLayoutCapacityExceededOutside(TransactionCase):
+    """LayoutCapacityExceeded.outside — carries per-cabinet overflow so a
+    caller can report the worst offender instead of a bare count. Reuses the
+    capacity-failure fixtures from test_layout_invariants.py
+    (test_capacity_exceeded_raises / test_capacity_full_wall_cannot_seat_corner)."""
+
+    @staticmethod
+    def _base(n):
+        return [{"id": i, "width_mm": 600, "height_mm": 876, "depth_mm": 600,
+                 "family": "base", "cabinet_type": "base", "zone": "base_run"}
+                for i in range(1, n + 1)]
+
+    def test_outside_nonempty_with_positive_overflow(self):
+        room = {"width_mm": 6000, "depth_mm": 5000, "height_mm": 2400}
+        with self.assertRaises(E.LayoutCapacityExceeded) as ctx:
+            E.resolve_and_layout(self._base(25), room)
+        exc = ctx.exception
+        self.assertTrue(exc.outside)
+        for entry in exc.outside:
+            self.assertIn("id", entry)
+            self.assertIn("wall", entry)
+            self.assertGreater(entry["overflow_mm"], 0)
+        self.assertNotIn(">", str(exc))
+
+    def test_full_wall_cannot_seat_corner_outside_nonempty(self):
+        room = {"width_mm": 6000, "depth_mm": 5000, "height_mm": 2400}
+        with self.assertRaises(E.LayoutCapacityExceeded) as ctx:
+            E.resolve_and_layout(self._base(18), room)
+        exc = ctx.exception
+        self.assertTrue(exc.outside)
+        self.assertGreater(max(o["overflow_mm"] for o in exc.outside), 0)
+
+    def test_positional_signature_still_works(self):
+        # Existing callers/tests construct LayoutCapacityExceeded
+        # positionally — this MUST keep working.
+        exc = E.LayoutCapacityExceeded(1000, 2000, "legacy detail")
+        self.assertEqual(exc.capacity_mm, 1000)
+        self.assertEqual(exc.requested_mm, 2000)
+        self.assertEqual(exc.detail, "legacy detail")
+        self.assertEqual(exc.outside, [])

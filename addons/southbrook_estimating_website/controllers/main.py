@@ -2873,12 +2873,6 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         same_wall = design.cabinet_line_ids.filtered(
             lambda l: l.origin == "configurator"
             and (l.wall or "back") == line_wall)
-        # 2026-07-12 Task 3 (corner-resolution-geometric-rule) — captured
-        # BEFORE the new line exists: did this wall already have a
-        # configurator cabinet? Gates corner resolution below so the FIRST
-        # cabinet on a brand-new wall is never eligible to be consumed by
-        # the SAME add that placed it.
-        wall_had_cabinets = bool(same_wall)
         run_seq = max(same_wall.mapped("run_seq") or [-1]) + 1
         Line = request.env["southbrook.kitchen.design.line"].sudo()
         line = Line.create({
@@ -2906,6 +2900,26 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         # the pure engine (snaps to the next free position, auto-orients).
         # Only the NEW line is repositioned; existing cabinets (incl. D8
         # mount heights) are untouched.
+        #
+        # 2026-07-26 defect C9 fix — resolution now ALWAYS runs (no gate)
+        # once the design's configurator cabinets span >=2 walls, INCLUDING
+        # on the very first cabinet placed on a brand-new wall. The
+        # 2026-07-12 "Task 3" gate (formerly `wall_had_cabinets`, captured
+        # before this line existed) used to skip resolution for that first
+        # cabinet, so the bare engine laid it at the start of the wall's
+        # run — physically interpenetrating whatever the adjacent wall
+        # already had in the shared corner cell, with no corner cabinet
+        # substituted until a SECOND cabinet landed on the same wall.
+        # That gate existed only to dodge a "vanishing cabinet" UX bug
+        # (commit 5f15786): resolving AND still returning the plain `item`
+        # shape meant the client rendered nothing, because resolution can
+        # archive the very line the response claimed to describe. The
+        # correct fix, applied here, is to always return the RE-LAID
+        # payload whenever resolution runs — design_tab already replaces
+        # the whole scene on `res.relaid` + `res.payload`, so the user
+        # simply sees their cabinet become/join the corner arrangement;
+        # nothing "vanishes".
+        layout_warning = None
         if wall:
             self._sb_place_line_on_wall(design, line)
             # Continuous corners — if the new cabinet completes an inside
@@ -2914,27 +2928,44 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             # per-drop manufacturing mirror — the 5-min cron / an explicit
             # auto-arrange catches BOM/price up). Return the full re-laid
             # payload so the scene reflects the corner + any re-flow.
-            #
-            # 2026-07-12 Task 3 — gated on wall_had_cabinets: resolution may
-            # only run when this wall ALREADY had a configurator cabinet
-            # before this add. The first cabinet placed on a brand-new wall
-            # must always come back as the plain item response below (never
-            # relaid/consumed by the same request that placed it) — that
-            # was the "vanishing cabinet" bug. Later adds to an
-            # already-occupied wall may still trigger resolution.
-            if wall_had_cabinets:
-                walls_used = {
-                    (dl.wall or "back")
-                    for dl in design.cabinet_line_ids.filtered(
-                        lambda l: l.origin == "configurator"
-                        and l.layout_role != "derived"
-                        and l.cabinet_type not in ("filler", "panel"))
-                }
-                if len(walls_used) >= 2:
+            walls_used = {
+                (dl.wall or "back")
+                for dl in design.cabinet_line_ids.filtered(
+                    lambda l: l.origin == "configurator"
+                    and l.layout_role != "derived"
+                    and l.cabinet_type not in ("filler", "panel"))
+            }
+            if len(walls_used) >= 2:
+                try:
                     design.action_auto_arrange(sync=False)
+                except kitchen_layout_engine.LayoutCapacityExceeded as ex:
+                    # The new line already exists and is engine-placed on
+                    # its wall (above) — resolution merely couldn't find a
+                    # geometrically valid corner substitution for the
+                    # design as a whole. Don't fail the add; fall through
+                    # to the plain item response below with a warning the
+                    # client can surface to the user.
+                    outside = getattr(ex, "outside", []) or []
+                    if outside:
+                        overflow_in = max(
+                            o.get("overflow_mm", 0.0) for o in outside
+                        ) / 25.4
+                        layout_warning = (
+                            "Cabinet added, but %d cabinet(s) don't fit "
+                            "the room and the layout could not be "
+                            "auto-arranged (up to %.1f\" over)." % (
+                                len(outside), overflow_in)
+                        )
+                    else:
+                        layout_warning = (
+                            "Cabinet added, but the layout could not be "
+                            "auto-arranged — the design does not fit the "
+                            "room."
+                        )
+                else:
                     return {"ok": True, "relaid": True,
                             "payload": self._southbrook_design_payload(design)}
-        return {"ok": True, "item": {
+        response = {"ok": True, "item": {
             "id":            product.id,
             "product_id":    product.id,
             "product_name":  product.display_name,
@@ -2954,6 +2985,9 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             "price":         line.price_unit,
             "quantity":      line.quantity,
         }}
+        if layout_warning:
+            response["layout_warning"] = layout_warning
+        return response
 
     def _sb_place_line_on_wall(self, design, new_line):
         """Compute the new cabinet's x/y/z + rotation on its assigned wall

@@ -68,6 +68,39 @@ If cabinets cannot fit the available walls, the engine raises
 `LayoutCapacityExceeded` rather than emitting an overflowing (invalid)
 layout. Consumers may rely on "if it returned, it is valid."
 
+## Engine-internal vs. persisted convention (2026-07-26)
+
+`kitchen_layout_engine.py`'s INTERNAL placements (as emitted by `layout()` /
+`resolve_and_layout()` and consumed by `footprint_mm`) use a different
+along-wall anchor than the one this contract defines above:
+
+- **Engine-internal convention:** the along-wall axis coordinate is the
+  cabinet's **CENTRE** (`footprint_mm`, `_place_on_wall`) — i.e. `x` (or `z`
+  on left/right walls) is the midpoint of the run-facing edge, not a corner.
+  This is deliberate: it is what makes the run-cursor arithmetic in
+  `_place_on_wall` simple, and it is purely an engine-internal bookkeeping
+  choice.
+- **Persisted convention (this contract):** the back-left-bottom corner
+  anchor described above.
+
+These are NOT the same point, and the engine's raw output must never be
+written to `southbrook.kitchen.design.line` / `sale.order.line` (or handed to
+the renderer) as-is — doing so shifts every cabinet by half its width along
+its wall. The conversion happens **exactly once**, at the ORM write boundary,
+via `anchor_pose_mm(cab, place)` (in `kitchen_layout_engine.py`, alongside
+`footprint_mm`). `footprint_from_anchor_mm(cab, place)` is the anchor-side
+sibling of `footprint_mm`, for validating already-persisted (anchor-
+convention) poses — e.g. `footprint_from_anchor_mm(cab, anchor_pose_mm(cab,
+place)) == footprint_mm(cab, place)` for every placement the engine emits.
+
+Every ORM-facing writer/reader (design-line seeding, the 3D payload builder,
+any future importer) MUST call `anchor_pose_mm` on the engine's raw output
+before persisting or rendering it. `footprint_mm` / `within_room` /
+`footprints_overlap` inside the engine continue to operate on the
+engine-internal (centred) convention, since that is the convention the
+engine's own placements are already in — do not feed persisted (anchor)
+poses into `footprint_mm`; use `footprint_from_anchor_mm` for those instead.
+
 ## Known migration debt (2026-07-11)
 
 The renderer does NOT yet conform to this contract:

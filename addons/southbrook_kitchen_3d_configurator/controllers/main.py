@@ -8,6 +8,15 @@ from odoo.http import request
 # truth for valid wall identifiers server-side too. Imported the same
 # way models/kitchen_design.py:11 does.
 from odoo.addons.southbrook_estimating.models import kitchen_layout_engine
+# C2 — same exception the model's action_auto_arrange raises when the
+# corner-resolution engine can't physically fit the cabinets. Imported
+# the same way kitchen_layout_engine itself is above (models/
+# kitchen_design.py never needs this one directly — it lets the
+# savepoint rollback speak for itself — but the controller surfaces a
+# human-readable warning to the client instead of a bare 500).
+from odoo.addons.southbrook_estimating.models.kitchen_layout_engine import (
+    LayoutCapacityExceeded,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -539,6 +548,71 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                     "rotation_deg":   pose["rotation_deg"],
                 })
 
+        # C2 — corner resolution. The website portal's add route
+        # (southbrook_estimating_website/controllers/main.py ~2894-2905)
+        # already calls design.action_auto_arrange(sync=False) the moment
+        # a design has cabinets on 2+ walls, so an inside corner gets a
+        # real SB-CORNER / SB-WALL-CORNER cabinet instead of two runs
+        # silently interpenetrating. This page had no equivalent hook —
+        # mirror that pattern here, once per save, after the PR4
+        # non-back-wall placement pass above has settled every line's
+        # wall assignment.
+        relaid = False
+        layout_warning = None
+        walls_used = {
+            (dl.wall or "back")
+            for dl in design.cabinet_line_ids.filtered(
+                lambda l: l.origin == "configurator"
+                and l.layout_role != "derived"
+                and l.cabinet_type not in ("filler", "panel"))
+        }
+        if len(walls_used) >= 2:
+            try:
+                design.action_auto_arrange(sync=False)
+                relaid = True
+            except LayoutCapacityExceeded as e:
+                # action_auto_arrange runs inside its own cr.savepoint() —
+                # this exception means it already rolled itself back, so
+                # the design as saved above is untouched/still persisted.
+                # relaid stays False: nothing changed for the client to
+                # pull, but we still owe the rep a plain-English reason
+                # the corner didn't resolve.
+                outside = getattr(e, "outside", []) or []
+                if outside:
+                    worst_overflow_in = max(
+                        (o.get("overflow_mm") or 0) for o in outside
+                    ) / 25.4
+                    layout_warning = (
+                        "Your cabinet run is too long for the wall: %d "
+                        "cabinet(s) don't fit (worst overflows ~%.1f in). "
+                        "Remove a cabinet or enlarge the room."
+                    ) % (len(outside), round(worst_overflow_in, 1))
+                else:
+                    layout_warning = (
+                        "Your cabinet run is too long for the wall. "
+                        "Remove a cabinet or enlarge the room."
+                    )
+        elif design.cabinet_line_ids.filtered(
+            lambda l: l.layout_role == "derived"
+        ):
+            # Fewer than 2 walls now in use but stale derived corner lines
+            # remain (e.g. the rep deleted cabinets back down to a single
+            # wall since the last auto-arrange) — clean up so the scene
+            # doesn't keep showing a corner cabinet with no corner. Mirrors
+            # action_auto_arrange's own reset block (kitchen_design.py
+            # ~461-477): restore archived canonical lines, then unlink the
+            # derived ones.
+            ctx = design.with_context(active_test=False)
+            ctx.cabinet_line_ids.filtered(
+                lambda l: not l.active).write({"active": True})
+            design.invalidate_recordset(["cabinet_line_ids"])
+            ctx.cabinet_line_ids.filtered(
+                lambda l: l.layout_role == "derived").unlink()
+            relaid = True
+
+        if relaid:
+            design.invalidate_recordset()
+
         return {
             "id":     design.id,
             "name":   design.display_name,
@@ -546,6 +620,14 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             # moved, so the client can apply them onto state.items and
             # re-render immediately without a reload.
             "placed": placed,
+            # C2 — when the corner engine (or the stale-derived-line
+            # cleanup) changed the line set/geometry, `lines` carries the
+            # authoritative post-save state (same shape as
+            # load_design_lines) so the client can replace state.items
+            # wholesale instead of trusting its own pre-save guess.
+            "relaid":         relaid,
+            "lines":          self._serialize_design_lines(design) if relaid else None,
+            "layout_warning": layout_warning,
         }
 
     # ── v19.0.4.20.0 · Smart-pinning RPC surface ─────────────────────────────────
@@ -580,33 +662,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             design.check_access("read")
         except Exception:
             return {"lines": []}
-        lines = design.cabinet_line_ids.filtered(
-            lambda l: l.origin == "configurator"
-        )
-        out = []
-        for line in lines:
-            product = line.product_id
-            out.append({
-                "id":             product.id,
-                "product_id":     product.id,
-                "product_name":   product.display_name,
-                "layout_key":     line.layout_key,
-                "cabinet_type":   line.cabinet_type,
-                "width_in":       line.width_in,
-                "height_in":      line.height_in,
-                "depth_in":       line.depth_in,
-                "x_position_in":  line.x_position_in,
-                "y_position_in":  line.y_position_in,
-                "z_position_in":  line.z_position_in,
-                "rotation_deg":   line.rotation_deg,
-                "pinned":         line.pinned,
-                "price":          line.price_unit,
-                "quantity":       line.quantity,
-                # PR2 — read-side emission. NULL on pre-PR2 rows (no
-                # migration) reads back as "back" for backward compat,
-                # matching the model field's own default.
-                "wall":           line.wall or "back",
-            })
+        out = self._serialize_design_lines(design)
         # PR2.5a (Gap 1) — additive: a direct-URL reload of the
         # configurator restores the client action's `design_id` (via the
         # actionStack fallback in kitchen_configurator.js) but NOT the
@@ -684,6 +740,45 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         return {"ok": True, "removed": n}
 
     # ── Helpers ──────────────────────────────────────────────────────────────────
+    def _serialize_design_lines(self, design):
+        """Return this design's configurator-origin lines as the same list
+        of item dicts load_design_lines has always returned.
+
+        Factored out (C2) so save_design can hand the client fresh server
+        geometry after a corner-resolution pass without duplicating the
+        field list — keep this the single source of truth for the
+        line → item-dict shape. Behaviour must stay byte-identical to the
+        pre-factor inline loop in load_design_lines.
+        """
+        lines = design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator"
+        )
+        out = []
+        for line in lines:
+            product = line.product_id
+            out.append({
+                "id":             product.id,
+                "product_id":     product.id,
+                "product_name":   product.display_name,
+                "layout_key":     line.layout_key,
+                "cabinet_type":   line.cabinet_type,
+                "width_in":       line.width_in,
+                "height_in":      line.height_in,
+                "depth_in":       line.depth_in,
+                "x_position_in":  line.x_position_in,
+                "y_position_in":  line.y_position_in,
+                "z_position_in":  line.z_position_in,
+                "rotation_deg":   line.rotation_deg,
+                "pinned":         line.pinned,
+                "price":          line.price_unit,
+                "quantity":       line.quantity,
+                # PR2 — read-side emission. NULL on pre-PR2 rows (no
+                # migration) reads back as "back" for backward compat,
+                # matching the model field's own default.
+                "wall":           line.wall or "back",
+            })
+        return out
+
     def _validate_end_cap_panel_placement(self, items, tol=0.5):
         """Log a warning for any `cabinet_type == "panel"` item whose
         x_position_in does not correspond to a host cabinet's exposed

@@ -903,8 +903,19 @@ class SouthbrookKitchenConfigurator extends Component {
 
     // Total inches consumed by the longest cabinet row (max of base
     // run / wall run / extras). Used to auto-extend room width on add.
+    //
+    // C5 — only BACK-wall items may drive this. room.width_in is the
+    // back wall's length; a run added on the left/right/front wall has
+    // its own axis (kitchen_layout_engine places it along Z, not the
+    // back wall's X — see the PR4 comment on packRow below) and must
+    // never inflate the back wall's room width. Before this fix, a
+    // left-wall run's cabinet widths were summed in with the back
+    // wall's and grew room.width_in to fit (measured: 120in -> 240in
+    // for a single added left-wall run) — the C5 defect.
     _currentRunWidthIn() {
-        const items = this.state.items || [];
+        const items = (this.state.items || []).filter(
+            it => (it.wall || "back") === "back"
+        );
         const by = {};
         for (const it of items) {
             const t = it.cabinet_type || "other";
@@ -1048,9 +1059,25 @@ class SouthbrookKitchenConfigurator extends Component {
         // of each bucket is ever handed to packRow. Counts/price
         // above still see every item regardless of wall.
         const isBackWall = (it) => (it.wall || "back") === "back";
-        packRow(bases.filter(isBackWall));
-        packRow(walls.filter(isBackWall));
-        packRow(tailItems.filter(isBackWall));
+        // C2/C5 — server-authoritative geometry mode. Once a design
+        // spans 2+ walls (or already carries a corner cabinet), the
+        // whole layout's geometry belongs to the server-side
+        // kitchen_layout_engine (via design.action_auto_arrange /
+        // _place_lines_on_wall) — it reserves the 36" corner cell and
+        // re-flows both runs. Repacking locally from x=0 here would
+        // shove the back-wall cabinets straight into that reserved
+        // corner cell, undoing what the server just computed. A
+        // single-(back)-wall design has no server involvement in its
+        // geometry, so it keeps the legacy local packing untouched.
+        const multiWall = (this.state.items || []).some(
+            it => ((it.wall || "back") !== "back")
+                || it.cabinet_type === "corner"
+        );
+        if (!multiWall) {
+            packRow(bases.filter(isBackWall));
+            packRow(walls.filter(isBackWall));
+            packRow(tailItems.filter(isBackWall));
+        }
         // NOTE: filler items get X from server /layout; end-cap panels get X
         //       relative to their host cabinet (set by _addCabinetFromProduct
         //       or downstream). Both are left untouched here on purpose.
