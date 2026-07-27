@@ -60,6 +60,7 @@
     <field name="thickness_mm">12.70</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_shelf')])]"/>
   </record>
 
   <record id="mat_ply_34" model="southbrook.kitchen.material">
@@ -69,7 +70,10 @@
     <field name="thickness_mm">19.05</field>
     <field name="sheet_width_mm">1219.2</field>
     <field name="sheet_height_mm">2438.4</field>
-    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_side_l'),ref('panel_role_side_r'),ref('panel_role_top'),ref('panel_role_bottom'),ref('panel_role_shelf')])]"/>
+    <!-- Cutlist role curation (Decision 1a, 2026-07-27): ¾" ply is shelf-only,
+         so melamine (MEL58) is the unique carcass-box owner on cabinets that
+         list both. box roles removed to resolve the box ambiguity. -->
+    <field name="panel_role_ids" eval="[(6,0,[ref('panel_role_shelf')])]"/>
   </record>
 
   <record id="mat_ply_12" model="southbrook.kitchen.material">
