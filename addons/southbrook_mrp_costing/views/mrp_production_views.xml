@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_mrp_production_costing_form" model="ir.ui.view">
+            <field name="name">mrp.production.form.southbrook.costing</field>
+            <field name="model">mrp.production</field>
+            <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+            <field name="arch" type="xml">
+                <notebook position="inside">
+                    <page string="Costing" name="sbk_costing"
+                          groups="mrp.group_mrp_manager">
+                        <div class="alert alert-warning" role="alert"
+                             invisible="not costing_note">
+                            <field name="costing_note" readonly="1" nolabel="1"/>
+                        </div>
+                        <group>
+                            <group string="Standard (from BoM)">
+                                <field name="std_mat_cost" readonly="1"/>
+                                <field name="std_var_cost" readonly="1"/>
+                                <field name="std_fixed_cost" readonly="1"/>
+                                <field name="std_direct_cost" readonly="1"/>
+                                <field name="std_direct_cost_unit" readonly="1"/>
+                            </group>
+                            <group string="Planned (frozen at confirm)">
+                                <field name="planned_mat_cost" readonly="1"/>
+                                <field name="planned_var_cost" readonly="1"/>
+                                <field name="planned_fixed_cost" readonly="1"/>
+                                <field name="planned_direct_cost" readonly="1"/>
+                                <field name="planned_direct_cost_unit" readonly="1"/>
+                            </group>
+                            <group string="Actual">
+                                <field name="qty_costed" readonly="1"/>
+                                <field name="actual_mat_cost" readonly="1"/>
+                                <field name="actual_var_cost" readonly="1"/>
+                                <field name="industrial_cost" readonly="1"/>
+                                <field name="industrial_cost_unit" readonly="1"/>
+                            </group>
+                            <group string="Variance">
+                                <field name="delta_direct_cost" readonly="1"/>
+                            </group>
+                        </group>
+                    </page>
+                </notebook>
+            </field>
+        </record>
+
+    </data>
+</odoo>
