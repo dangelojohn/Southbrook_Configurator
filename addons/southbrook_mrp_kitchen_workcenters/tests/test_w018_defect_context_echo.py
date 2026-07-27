@@ -20,7 +20,7 @@ from odoo.tests.common import TransactionCase, tagged
 
 
 class _FakeRequest:
-    def __init__(self, path="/sb/qr/scan", ua="pytest", ip="127.0.0.1"):
+    def __init__(self, env=None, path="/sb/qr/scan", ua="pytest", ip="127.0.0.1"):
         class _HR:
             pass
         hr = _HR()
@@ -31,6 +31,13 @@ class _FakeRequest:
         # The controller normally sets this on dispatch; the defect
         # handler reads it as a fallback for defect_type.
         self.qr_parsed_ident = "scratch"
+        # v19 translation machinery (odoo.tools.translate._get_lang)
+        # reads request.env.lang during any `_()` call when a request
+        # is bound. Provide both env (real Environment) and a session
+        # dict so the handler under test can run end-to-end without
+        # falling through to RuntimeError("object is not bound").
+        self.env = env
+        self.session = {}
 
 
 @contextmanager
@@ -97,7 +104,7 @@ class TestW018DefectContextEcho(TransactionCase):
         # is small enough, no logs match. Easiest is to assert the
         # parameter is read at call time.
         try:
-            with _patched_request(_FakeRequest()):
+            with _patched_request(_FakeRequest(env=self.env)):
                 # No log row exists yet; resolver returns False.
                 resolved = self.Handler._resolve_workorder_from_context()
             self.assertFalse(
@@ -124,7 +131,7 @@ class TestW018DefectContextEcho(TransactionCase):
             "user_id": self.env.uid,
             "payload": "synthetic-w018-test",
         })
-        with _patched_request(_FakeRequest()):
+        with _patched_request(_FakeRequest(env=self.env)):
             result = self.Handler.handle_action(
                 self.env["southbrook.mi.check"],
                 action="open",
@@ -170,7 +177,7 @@ class TestW018DefectContextEcho(TransactionCase):
             "name": "W018 sentinel",
             "login": "w018_sentinel@example.invalid",
         })
-        with _patched_request(_FakeRequest()):
+        with _patched_request(_FakeRequest(env=self.env)):
             result = self.Handler.with_user(sentinel).handle_action(
                 self.env["southbrook.mi.check"],
                 action="open",

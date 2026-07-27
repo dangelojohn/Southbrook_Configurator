@@ -54,11 +54,13 @@ class TestW026TravelerRichness(TransactionCase):
         (wo, product). If with_product_image=True, plants a 1x1 PNG
         on product.image_1920 so the CAD-thumbnail-fallback test has
         something to fall back TO."""
-        # 1x1 transparent PNG — smallest valid PNG that exercises the
-        # binary path without dragging in pillow gymnastics.
+        # 1x1 transparent PNG — smallest VALID PNG that PIL parses
+        # cleanly. The previous placeholder had a malformed IDAT chunk
+        # name ("  IE" with spaces) which tripped PIL's PngStream
+        # validator on Pillow >= 10.x.
         png_1x1 = base64.b64decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
-            "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk"
+            "+A8AAQUBAScY42YAAAAASUVORK5CYII="
         )
         product_vals = {
             "name": "W026 cabinet",
