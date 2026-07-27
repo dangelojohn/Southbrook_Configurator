@@ -31,8 +31,8 @@ def repair_corner_sku(env):
     4. The WALL-layer corner SKU (SB-WALL-CORNER) is seeded if absent —
        the arrange engine substitutes it for junction uppers, and with
        no product it silently ARCHIVES those uppers and inserts nothing
-       (catalog blocker #1: "no wall-layer equivalent"). Placeholder
-       price flagged for the shop to reprice.
+       (catalog blocker #1: "no wall-layer equivalent"). Name/price are
+       John's (2026-07-27): "Wall Corner 24" @ $345.
     """
     summary = {"width_fixed": 0, "codes_set": 0, "rh_created": False,
                "wall_corner_created": False}
@@ -40,10 +40,10 @@ def repair_corner_sku(env):
     if not Template.search(
             [("default_code", "=", "SB-WALL-CORNER")], limit=1):
         vals = {
-            "name": "Corner Wall Cabinet",
+            "name": "Wall Corner 24",
             "default_code": "SB-WALL-CORNER",
             "type": "consu",
-            "list_price": 295.0,
+            "list_price": 345.0,
         }
         if "southbrook_cabinet_type" in Template._fields:
             # Classification fields belong to the 3D configurator addon
