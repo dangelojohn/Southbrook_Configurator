@@ -14,7 +14,7 @@ Custom Odoo v19 CE Website Snippet and OWL Component for 3D Cabinet visualizatio
     'author': 'Southbrook Cabinetry / CAD Studio',
     'website': 'https://southbrookcabinetry.space',
     'category': 'Website/Website',
-    'version': '19.0.1.0.1',
+    'version': '19.0.1.0.2',
     # southbrook_estimating carries the VENDORED Three.js r160 (air-gapped
     # house doctrine — the zip's CDN three@r128 entries are replaced below;
     # every API this component touches exists on r160).
