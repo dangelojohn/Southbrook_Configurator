@@ -136,6 +136,13 @@ class SouthbrookKitchenConfigurator extends Component {
             products:  [],
             items:     [],
             selected:  null,
+            // F14 — catalog BROWSING is not layout SELECTION. Clicking an
+            // inventory row previews/highlights that catalog product; it
+            // must never write `selected` (a raw catalog product has no
+            // layout_key, so the "Selected Cabinet" edit drawer's actions
+            // — remove/width/swap — would silently no-op via findIndex
+            // -1). Only `_previewCatalogProduct` writes this field.
+            catalogPreview: null,
             // PR1 — which room wall is the active target. Owned here as
             // pure UI state only; the shared <KitchenCanvas> does all the
             // wall hover/click/highlight/raycast and reports the pick via
@@ -179,6 +186,16 @@ class SouthbrookKitchenConfigurator extends Component {
             // sensible wall-cab positions.
             wallCabTopAlignment: params.wall_cab_top_alignment || "fixed_gap",
             soffitHeightIn:      params.soffit_height_in       || 84.0,
+            // F12 — reactive mirror of `this._hydratedFromDesign` (a
+            // plain, non-reactive flag `_refreshLayout()` already uses
+            // internally to stop regenerating a reopened design's
+            // layout). This copy exists purely so the template can
+            // disable the filler-strategy / wall-cab-top / soffit
+            // controls once hydrated — those controls are dead post-
+            // hydration (see `_refreshLayout`'s guard) but, before this
+            // fix, still fired the debounced auto-save and lit the
+            // "Auto-saved" pill, lying about having applied the edit.
+            hydratedFromDesign: false,
             warnings:            [],
             // D13 — searchable inventory + drag-and-drop add.
             inventorySearch: "",
@@ -521,6 +538,8 @@ class SouthbrookKitchenConfigurator extends Component {
             }
             this._recomputeLayoutFromItems();
             this._hydratedFromDesign = true;
+            // F12 — reactive mirror; see the state field's doc comment.
+            this.state.hydratedFromDesign = true;
         } catch (e) {
             // PR2.5a (Gap 2) — fail loud, don't fall back to the
             // generator. A TRANSIENT load_design_lines failure used to
@@ -620,7 +639,20 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // D7 — Change the filler placement strategy + re-emit the layout.
+    //
+    // F12 fix (2026-07-27) — once hydrated from a saved design,
+    // `_refreshLayout()` below is a guaranteed no-op for this control
+    // (see its own early-return comment): it never regenerates the
+    // filler placement. Before this fix the handler still mutated
+    // `state.fillerStrategy` and queued an auto-save regardless — the
+    // control looked live (the select's value changed, the "Auto-saved"
+    // pill lit up) while doing nothing to the actual layout. Early-return
+    // BEFORE any state write or auto-save so a no-op edit never claims to
+    // have saved. The <select> is also disabled in the template for the
+    // same reason (belt + suspenders: a stale bundle or a direct call
+    // still can't lie).
     async _changeFillerStrategy(value) {
+        if (this._hydratedFromDesign) return;
         const allowed = ["split", "left", "right", "scribe"];
         const v = (value || "").toLowerCase();
         if (!allowed.includes(v)) return;
@@ -631,7 +663,11 @@ class SouthbrookKitchenConfigurator extends Component {
 
     // D8 — Wall-cab top alignment selector. Re-runs layout so the
     // wall cabinets snap to the chosen mode immediately.
+    //
+    // F12 fix (2026-07-27) — same rationale as _changeFillerStrategy
+    // above: dead post-hydration, so guarded the same way.
     async _changeWallAlignment(value) {
+        if (this._hydratedFromDesign) return;
         const allowed = ["fixed_gap", "to_ceiling", "to_soffit"];
         const v = (value || "").toLowerCase();
         if (!allowed.includes(v)) return;
@@ -640,7 +676,12 @@ class SouthbrookKitchenConfigurator extends Component {
         this._queueAutoSave();
     }
 
+    // F12 fix (2026-07-27) — soffit height only ever feeds the
+    // to_soffit wall-cab-top alignment mode, which _refreshLayout()
+    // stops regenerating post-hydration exactly like the two controls
+    // above; guarded the same way for the same reason.
     async _changeSoffit(rawValue) {
+        if (this._hydratedFromDesign) return;
         const v = parseFloat(rawValue);
         if (!Number.isFinite(v) || v < 36 || v > 144) return;
         this.state.soffitHeightIn = v;
@@ -666,6 +707,26 @@ class SouthbrookKitchenConfigurator extends Component {
         // observes state.selected via onWillUpdateProps and calls
         // highlightSelected against its own scene.
         this.state.selected = item;
+        // F14 — a real layout-cabinet selection supersedes any inventory
+        // row catalog-preview highlight.
+        this.state.catalogPreview = null;
+    }
+
+    // F14 — inventory row click is catalog BROWSING, not layout
+    // SELECTION. Previously the row's click handler called
+    // `_selectCabinet(product)` directly with the raw catalog product
+    // (no layout_key) — `state.selected` became a dict the "Selected
+    // Cabinet" edit drawer rendered as if it were a placed item, but
+    // every drawer action (`_removeSelectedCabinet` /
+    // `_updateSelectedWidth` / `_swapSelectedProduct`) resolves via
+    // `items.findIndex(it => it.layout_key === sel.layout_key)`, which
+    // is always -1 for a catalog product — a silent no-op the rep had
+    // no way to know failed. `catalogPreview` is a separate,
+    // drawer-inert field used only to highlight the row; it never opens
+    // the drawer or feeds an edit action (see the template's row
+    // is-selected class and the `t-if` gate on the drawer itself).
+    _previewCatalogProduct(product) {
+        this.state.catalogPreview = product;
     }
 
     // ─── D13 — Searchable inventory + drag-and-drop add ─────────────────────────
@@ -674,12 +735,17 @@ class SouthbrookKitchenConfigurator extends Component {
     // full catalog. INVENTORY_CATEGORY_MAP maps each tab key to the
     // cabinet_type values it should include; keeping the map next to
     // the filter keeps the tab UI and the data contract in one place.
+    // F1 fix (2026-07-27) — "tall" used to also swallow "corner", so a
+    // corner unit had no way to surface under its own filter — it only
+    // ever showed up buried inside the Tall tab (mislabeled, uncounted
+    // as its own category). Corner now gets its own key/tab.
     _inventoryCategoryTypes(key) {
         return ({
             all:      null,   // null = passthrough (no cabinet_type filter)
             base:     ["base"],
             wall:     ["wall"],
-            tall:     ["tall", "corner"],
+            tall:     ["tall"],
+            corner:   ["corner"],
             panels:   ["filler", "panel"],
         })[key] || null;
     }
@@ -880,12 +946,18 @@ class SouthbrookKitchenConfigurator extends Component {
             // pure kitchen_layout_engine server-side (_place_lines_on_wall)
             // so a non-back wall gets its canonical engine pose applied
             // back onto state.items immediately (_applyServerPlacements).
-            // Precedence (PR4b): an explicit drop-onto-wall override wins;
-            // otherwise the wall the user click/hover-selected; else BACK.
-            // The drop path (_onCanvasDrop) and the select-then-add path
-            // therefore converge on the SAME persisted record — locked by
+            // Precedence (F7 fix, 2026-07-27 — was PR4b's wallOverride ||
+            // activeWall || BACK): a DELIBERATELY selected Active Wall
+            // now always wins over a drop-raycast override; the ray only
+            // decides the wall when nothing is actively selected. PR4b's
+            // original ordering let an accidental ray (see room_shell.esm
+            // .js's low kick-strip walls for right/front — F7) silently
+            // beat an explicit click-to-select, overriding a wall the rep
+            // deliberately picked. The drop path (_onCanvasDrop) and the
+            // select-then-add path still converge on the SAME persisted
+            // record whenever they agree on a wall — locked by
             // tests/node_js/contracts/09_drag_to_wall_convergence.test.mjs.
-            wall:          wallOverride || this.state.activeWall || WALLS.BACK,
+            wall:          this.state.activeWall || wallOverride || WALLS.BACK,
         };
         this.state.items = [...(this.state.items || []), newItem];
         this.state.selected = newItem;
@@ -898,7 +970,26 @@ class SouthbrookKitchenConfigurator extends Component {
         }
         // D14 — Drop UX feedback: tell the rep WHERE it landed when
         // they used drop-positioning (vs the bare "Added X" toast).
-        if (typeof targetX === "number" && !Number.isNaN(targetX)) {
+        //
+        // F6 fix (2026-07-27, partial — honest-toast only): the position
+        // claim below is only ever true for the BACK wall — _computeDropX
+        // is an X-only floor raycast, and a non-back-wall cabinet's
+        // along-wall position is decided entirely server-side by the
+        // pure kitchen_layout_engine's run-order placement
+        // (_place_lines_on_wall), which hasn't run yet at add-time. Before
+        // this fix, dropping onto e.g. the left wall still toasted
+        // "Added ... at 0 in" — a claim about an X coordinate that has
+        // nothing to do with where the cabinet actually lands (the
+        // engine places it along Z, by run order). Deferred (out of
+        // scope here): true positional side-wall drops — the engine
+        // only supports append-by-run-order today, so a non-back wall
+        // always gets a wall-only toast, never a position.
+        if (newItem.wall !== WALLS.BACK) {
+            this.notification.add(
+                `Added ${product.name} to ${this._wallLabel(newItem.wall)} wall`,
+                { type: "success" }
+            );
+        } else if (typeof targetX === "number" && !Number.isNaN(targetX)) {
             const finalX = newItem.x_position_in;
             this.notification.add(
                 `Added ${product.name} at ${finalX}″`,
@@ -974,7 +1065,13 @@ class SouthbrookKitchenConfigurator extends Component {
         const v = parseFloat(rawValue);
         if (!Number.isFinite(v) || v < 6 || v > 48) return;
         const sel = this.state.selected;
-        if (!sel) return;
+        // F14 — defense in depth: the edit drawer must only ever bind to
+        // a placed layout item (one with a layout_key), never a raw
+        // catalog product. `_previewCatalogProduct` no longer writes
+        // `state.selected` at all, so this should be unreachable in
+        // practice — kept as a hard guard against any future caller
+        // that writes `state.selected` without a layout_key.
+        if (!sel || !sel.layout_key) return;
         const idx = this.state.items.findIndex(it => it.layout_key === sel.layout_key);
         if (idx < 0) return;
         this.state.items[idx].width_in = v;
@@ -991,7 +1088,8 @@ class SouthbrookKitchenConfigurator extends Component {
         const product = (this.state.products || []).find(p => p.product_id === pid);
         if (!product) return;
         const sel = this.state.selected;
-        if (!sel) return;
+        // F14 — see the identical guard comment in _updateSelectedWidth.
+        if (!sel || !sel.layout_key) return;
         const idx = this.state.items.findIndex(it => it.layout_key === sel.layout_key);
         if (idx < 0) return;
         const oldItem = this.state.items[idx];
@@ -1014,7 +1112,8 @@ class SouthbrookKitchenConfigurator extends Component {
     // Remove the selected cabinet entirely.
     _removeSelectedCabinet() {
         const sel = this.state.selected;
-        if (!sel) return;
+        // F14 — see the identical guard comment in _updateSelectedWidth.
+        if (!sel || !sel.layout_key) return;
         const idx = this.state.items.findIndex(it => it.layout_key === sel.layout_key);
         if (idx < 0) return;
         this.state.items.splice(idx, 1);
@@ -1114,15 +1213,51 @@ class SouthbrookKitchenConfigurator extends Component {
         //       or downstream). Both are left untouched here on purpose.
 
         let price = 0;
+        let fillerPrice = 0;
+        let fillerWidthIn = 0;
         for (const it of items) {
-            if (it.cabinet_type !== "filler") price += (it.price || 0);
+            if (it.cabinet_type === "filler") {
+                fillerPrice   += (it.price    || 0);
+                fillerWidthIn += (it.width_in || 0);
+            } else {
+                price += (it.price || 0);
+            }
         }
+        // F13 fix (2026-07-27) — every key here is recomputed FRESH from
+        // the CURRENT state.items on every call; nothing is spread
+        // forward from the previous state.summary. The old code did
+        // `{ ...(this.state.summary || {}), base_count, wall_count,
+        // total, price }` — every other key (cabinet_price, filler_price,
+        // remainder_in, filler_strategy, snap_hint) survived untouched
+        // from whichever /layout response (or even older local
+        // recompute) happened to leave it there. Deleting a filler,
+        // swapping a product, or resizing a cabinet left the sidebar
+        // showing a stale filler price/width and a stale remainder — the
+        // F13 defect.
+        //   - cabinet_price mirrors `price` (same definition server-side:
+        //     controllers/main.py sums non-filler item prices for both).
+        //   - filler_price / remainder_in ARE recomputable locally:
+        //     remainder_in's established meaning (controllers/main.py's
+        //     /layout: `remainder = rw - n * module_w`) is exactly the
+        //     total width of the filler item(s) that fill that gap, so
+        //     it's safely derived here as the sum of current filler
+        //     widths.
+        //   - filler_strategy isn't read from state.summary anywhere in
+        //     the template (state.fillerStrategy is used directly) and
+        //     snap_hint is NOT recomputable client-side (it needs the
+        //     base product's module width, southbrook_width_in, which
+        //     state.items doesn't carry) — both are intentionally
+        //     DROPPED rather than spread forward stale. A fresh /layout
+        //     round-trip (a room-dimension edit on a not-yet-hydrated
+        //     session) repopulates snap_hint when it's next valid.
         this.state.summary = {
-            ...(this.state.summary || {}),
-            base_count: bases.length,
-            wall_count: walls.length,
-            total: bases.length + walls.length,
-            price: price,
+            base_count:    bases.length,
+            wall_count:    walls.length,
+            total:         bases.length + walls.length,
+            price:         price,
+            cabinet_price: price,
+            filler_price:  fillerPrice,
+            remainder_in:  fillerWidthIn,
         };
 
         // Runtime validation — surface a warning if any end-cap panel would
@@ -1280,7 +1415,9 @@ class SouthbrookKitchenConfigurator extends Component {
                 || t.isContentEditable
             );
             if (inEditable) return;
-            if (!this.state.selected) return;
+            // F14 — same guard as the drawer actions: Delete/Backspace
+            // only ever removes a real placed layout item.
+            if (!this.state.selected || !this.state.selected.layout_key) return;
             const doomed = this.state.selected;
             const doomedName = doomed.product_name || doomed.name
                 || doomed.layout_key || "item";
@@ -1879,11 +2016,17 @@ SouthbrookKitchenConfigurator.template = xml`
         Save as my default
       </button>
 
-      <!-- D7 — Filler placement strategy. -->
-      <label class="o_sbk_field">
+      <!-- D7 — Filler placement strategy.
+           F12 fix (2026-07-27) — disabled once hydrated from a saved
+           design: _refreshLayout() never regenerates post-hydration, so
+           this control is dead then (see _changeFillerStrategy's guard);
+           disabling it here means it no longer LOOKS live when it isn't. -->
+      <label class="o_sbk_field"
+             t-att-title="state.hydratedFromDesign ? 'Reopen-safe mode — layout regeneration is disabled for a reopened design' : 'Filler placement strategy'">
         <span>Filler strategy</span>
         <select class="o_sbk_edit_select"
                 t-att-value="state.fillerStrategy"
+                t-att-disabled="state.hydratedFromDesign"
                 t-on-change="(ev) => this._changeFillerStrategy(ev.target.value)">
           <option value="split"  t-att-selected="state.fillerStrategy === 'split'  ? 'selected' : ''">Split — both ends</option>
           <option value="right"  t-att-selected="state.fillerStrategy === 'right'  ? 'selected' : ''">Right end only</option>
@@ -1892,22 +2035,29 @@ SouthbrookKitchenConfigurator.template = xml`
         </select>
       </label>
 
-      <!-- D8 — Wall cabinet top alignment + soffit height. -->
-      <label class="o_sbk_field">
+      <!-- D8 — Wall cabinet top alignment + soffit height.
+           F12 fix (2026-07-27) — same disabled-once-hydrated treatment
+           as filler strategy above; both selects and the soffit input
+           are dead post-hydration. -->
+      <label class="o_sbk_field"
+             t-att-title="state.hydratedFromDesign ? 'Reopen-safe mode — layout regeneration is disabled for a reopened design' : 'Wall cabinet top alignment'">
         <span>Wall cab top</span>
         <select class="o_sbk_edit_select"
                 t-att-value="state.wallCabTopAlignment"
+                t-att-disabled="state.hydratedFromDesign"
                 t-on-change="(ev) => this._changeWallAlignment(ev.target.value)">
           <option value="fixed_gap"  t-att-selected="state.wallCabTopAlignment === 'fixed_gap'  ? 'selected' : ''">18″ gap above counter</option>
           <option value="to_ceiling" t-att-selected="state.wallCabTopAlignment === 'to_ceiling' ? 'selected' : ''">Up to ceiling</option>
           <option value="to_soffit"  t-att-selected="state.wallCabTopAlignment === 'to_soffit'  ? 'selected' : ''">Up to soffit</option>
         </select>
       </label>
-      <label t-if="state.wallCabTopAlignment === 'to_soffit'" class="o_sbk_field">
+      <label t-if="state.wallCabTopAlignment === 'to_soffit'" class="o_sbk_field"
+             t-att-title="state.hydratedFromDesign ? 'Reopen-safe mode — layout regeneration is disabled for a reopened design' : 'Soffit height'">
         <span>Soffit height (in)</span>
         <input type="number" min="36" max="144" step="1"
                class="o_sbk_edit_input"
                t-att-value="state.soffitHeightIn"
+               t-att-disabled="state.hydratedFromDesign"
                t-on-change="(ev) => this._changeSoffit(ev.target.value)"/>
       </label>
 
@@ -2144,6 +2294,15 @@ SouthbrookKitchenConfigurator.template = xml`
                   t-att-selected="state.inventoryCategory === 'tall' ? 'selected' : ''">
             Tall (<t t-esc="_categoryCount('tall')"/>)
           </option>
+          <!-- F1 fix (2026-07-27) — corner units used to be folded into
+               the Tall filter (_inventoryCategoryTypes mapped
+               tall -> ["tall", "corner"]), hiding them under the wrong
+               label with no way to isolate them. Corner now gets its
+               own tab. -->
+          <option t-if="_categoryCount('corner') &gt; 0" value="corner"
+                  t-att-selected="state.inventoryCategory === 'corner' ? 'selected' : ''">
+            Corner (<t t-esc="_categoryCount('corner')"/>)
+          </option>
           <option t-if="_categoryCount('panels') &gt; 0" value="panels"
                   t-att-selected="state.inventoryCategory === 'panels' ? 'selected' : ''">
             Panels (<t t-esc="_categoryCount('panels')"/>)
@@ -2174,15 +2333,30 @@ SouthbrookKitchenConfigurator.template = xml`
         <span>Product</span><span>SKU</span><span>Width</span><span>Qty</span><span>Price</span>
       </div>
 
-      <!-- Product rows -->
+      <!-- Product rows.
+           F14 fix (2026-07-27) — row click now PREVIEWS/highlights the
+           catalog product (_previewCatalogProduct, writes
+           state.catalogPreview) instead of writing state.selected — a
+           raw catalog product has no layout_key, so the edit drawer's
+           actions used to silently no-op against it. is-selected lights
+           up for EITHER a matching real selection or a matching preview.
+           F15 fix (2026-07-27) — a keyboard-reachable "+ Add" button
+           (drag-and-drop was previously the only way to add a cabinet).
+           It's a SIBLING of the row button, not nested inside it
+           (buttons cannot legally nest) — the shared t-foreach lives on
+           the wrapping <t>, which OWL renders as two flat siblings per
+           iteration, no extra wrapper element needed. Appends to the
+           active wall per F7's fixed precedence (state.activeWall wins
+           over any stale drop-wall override). -->
       <div class="o_sbk_product_list">
-        <button t-foreach="_filteredProducts()" t-as="product" t-key="product.product_id"
-            t-att-class="'o_sbk_product_row o_sbk_prod_draggable' + (state.selected &amp;&amp; state.selected.product_id === product.product_id ? ' is-selected' : '')"
+        <t t-foreach="_filteredProducts()" t-as="product" t-key="product.product_id">
+        <button
+            t-att-class="'o_sbk_product_row o_sbk_prod_draggable' + ((state.selected &amp;&amp; state.selected.product_id === product.product_id) || (state.catalogPreview &amp;&amp; state.catalogPreview.product_id === product.product_id) ? ' is-selected' : '')"
             draggable="true"
             t-on-dragstart="(ev) => this._onProductDragStart(ev, product)"
             t-on-dragend="(ev) => this._onProductDragEnd(ev)"
-            t-on-click="() => this._selectCabinet(product)"
-            t-att-title="'Click to select · Drag onto scene to add ' + product.name">
+            t-on-click="() => this._previewCatalogProduct(product)"
+            t-att-title="'Click to preview · drag onto the scene, or use + Add, to place ' + product.name">
           <div class="o_sbk_prod_thumb">
             <img t-att-src="product.image_url" alt="" loading="lazy"/>
           </div>
@@ -2202,6 +2376,12 @@ SouthbrookKitchenConfigurator.template = xml`
                 t-esc="product.available_qty"/>
           <span class="o_sbk_prod_price" t-esc="_money(product.price)"/>
         </button>
+        <button type="button" class="o_sbk_prod_add_btn"
+                draggable="false"
+                t-on-click="() => this._addCabinetFromProduct(product, null, null)"
+                t-att-aria-label="'Add ' + product.name + ' to the layout'"
+                title="Add to layout">+ Add</button>
+        </t>
         <!-- D13 — Empty-state when search yields zero matches. -->
         <div t-if="!_filteredProducts().length &amp;&amp; state.products.length"
              class="o_sbk_inv_empty">
@@ -2213,8 +2393,12 @@ SouthbrookKitchenConfigurator.template = xml`
       <!-- D2 — Selected cabinet inline-edit drawer.
            Width / product swap / remove are now first-class edits;
            the scene rebuilds locally on every change. Save Design
-           still persists the result; D5 will add debounced auto-save. -->
-      <div t-if="state.selected" class="o_sbk_detail">
+           still persists the result; D5 will add debounced auto-save.
+           F14 fix (2026-07-27) — the drawer must only ever bind to a
+           real placed layout item (one with a layout_key), never a
+           catalog-preview product; the t-if gate now says so directly
+           rather than relying solely on the action methods' guards. -->
+      <div t-if="state.selected &amp;&amp; state.selected.layout_key" class="o_sbk_detail">
         <div class="o_sbk_detail_head">
           <h4>Selected Cabinet</h4>
           <button class="o_sbk_detail_remove"

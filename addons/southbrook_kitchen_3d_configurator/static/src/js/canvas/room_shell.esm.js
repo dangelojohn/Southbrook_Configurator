@@ -49,6 +49,14 @@ export function buildRoomShell(THREE, scene, mk, palette, rw, rh, rd) {
     // clickable + glow-highlightable exactly like the tall walls, but too low
     // to occlude. The toolbar wall-picker is the guaranteed way to select any
     // wall; these strips add the click-to-select affordance in 3D.
+    //
+    // F7 fix (2026-07-27) — "back"/"left" here MUST match
+    // constants.esm.js's FULL_HEIGHT_WALLS; kitchen_canvas.esm.js's
+    // drop-inference raycast (`_raycastDropWall`) reads that constant
+    // to decide which wall meshes a drag-drop is allowed to land on
+    // (never the low kick-strips built below for right/front). If a
+    // wall ever moves between the full-height and kick-strip render
+    // paths, update FULL_HEIGHT_WALLS in the same commit.
     const bwall = mk(
         new THREE.PlaneGeometry(rw, rh), palette.wall1,
         [rw/2, rh/2, 0], null,
