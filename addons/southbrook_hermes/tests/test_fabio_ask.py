@@ -7,6 +7,33 @@ from odoo.tests.common import TransactionCase, tagged
 @tagged("post_install", "-at_install", "southbrook", "hermes", "fabio_ask")
 class TestFabioAsk(TransactionCase):
 
+    # 2026-06-30 — Round-2 PR #6 (Pattern E2 fix): the
+    # `_answer_users()` branch walks the live `res.users` table and only
+    # mentions a known-role description when the user is actually present.
+    # In prod those three production users are seeded by the sibling addon
+    # `southbrook_kitchen_workspace` (data/users.xml); under the test
+    # runner that sibling's demo data is not loaded for every install
+    # combination, so the test was asserting cross-addon state integrity
+    # rather than this addon's behaviour. Seed the three internal users we
+    # care about here so the test exercises THIS addon's answer logic
+    # without depending on a sibling's demo seeding order.
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        Users = cls.env["res.users"].sudo()
+        for login, name in (
+            ("alex.estimator@example.invalid", "Alex Estimator"),
+            ("chris.cnc@example.invalid", "Chris CNC"),
+            ("morgan.production@example.invalid", "Morgan Production"),
+        ):
+            if not Users.search([("login", "=", login)], limit=1):
+                Users.create({
+                    "name": name,
+                    "login": login,
+                    "share": False,
+                    "active": True,
+                })
+
     def test_internal_answer_lists_production_blockers(self):
         if "southbrook.mi.check" not in self.env:
             raise unittest.SkipTest(

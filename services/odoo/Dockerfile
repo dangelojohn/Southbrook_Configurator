@@ -24,6 +24,16 @@
 #                in the multi-page PDF. Brings tinycss2 + cssselect2 as
 #                transitive deps but those are pure-python.
 #
+#   PyJWT      — `addons/southbrook_hermes` declares `jwt` in its
+#                external_dependencies and mints/verifies short-lived JWTs
+#                for the /hermes/* and /api/hermes/* proxy routes
+#                (utils/jwt_helper.py). Historically installed by hand on
+#                prod via `pip install --break-system-packages PyJWT`
+#                (volatile across container recreates — see the
+#                `[[hermes_v1_deploy]]` memory). Pinned here so future
+#                recreates don't silently drop it and so the
+#                external_dependencies gate matches reality.
+#
 # Pin versions match what gets installed via `pip install` post-recreate
 # today, so swapping to this image is behaviour-preserving.
 
@@ -34,5 +44,6 @@ RUN pip install --break-system-packages --no-cache-dir \
         Mako==1.3.12 \
         ezdxf==1.4.2 \
         reportlab==4.1.0 \
-        svglib==1.5.1
+        svglib==1.5.1 \
+        PyJWT==2.8.0
 USER odoo

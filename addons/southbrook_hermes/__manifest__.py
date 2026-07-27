@@ -34,11 +34,15 @@ recommendation.
         "southbrook_estimating_website",
     ],
     # PyJWT (`import jwt`) is needed at RUNTIME for any /hermes/* or
-    # /api/hermes/* endpoint that mints or verifies a token, but the helper
-    # in utils/jwt_helper.py degrades to a clear RuntimeError when missing —
-    # so we don't gate install on it. Install in the container before
-    # exposing any of the Hermes controllers: docker exec southbrook-odoo
-    # pip install PyJWT (or bake into the image).
+    # /api/hermes/* endpoint that mints or verifies a token. Declared in
+    # `external_dependencies` so `odoo -i southbrook_hermes` refuses to
+    # install on a host that lacks it instead of degrading to a
+    # RuntimeError at the first /hermes/* request. The sami-odoo image
+    # (services/odoo/Dockerfile) bakes PyJWT==2.8.0 in; bare hosts must
+    # `pip install PyJWT` before install.
+    "external_dependencies": {
+        "python": ["jwt"],
+    },
     "data": [
         "data/fabio_partner.xml",
         "data/ir_config_parameter.xml",
