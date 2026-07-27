@@ -74,3 +74,8 @@ from . import test_template_picker
 # every active template instantiates fully resolved at defaults,
 # galley per-wall fit math, inactive engine-blocked placeholders.
 from . import test_template_catalog
+
+# Kitchen Templates T5 (2026-07-27) — server-side manipulation API:
+# flip/rotate transform canonical (wall, run_seq) only, poses re-derived
+# by auto-arrange; swap/width/move are canonical-only and savepoint-atomic.
+from . import test_layout_manipulation

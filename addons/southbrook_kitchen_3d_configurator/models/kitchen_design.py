@@ -2070,6 +2070,76 @@ class SouthbrookKitchenDesign(models.Model):
             "z_position_in":  z,
         })
 
+    # ── Task 5 (kitchen templates) — layout manipulation API ──────────
+    # Every action rewrites ONLY canonical semantics (wall/run_seq) and
+    # re-derives ALL poses through action_auto_arrange — poses are never
+    # transformed numerically. Savepoint-atomic: a transform that does
+    # not fit raises and leaves the design untouched (the room is never
+    # grown). Named action_flip_layout, NOT "mirror" —
+    # southbrook.design.reconcile owns that word (manufacturing mirror).
+
+    def action_reflow(self):
+        """Thin alias — auto-arrange IS the reflow (never a second one)."""
+        self.ensure_one()
+        return self.action_auto_arrange(sync=True)
+
+    def _transform_layout(self, wall_map, reverse_walls):
+        """Rewrite canonical (wall, run_seq), then re-derive all poses.
+
+        Restores archived canonicals first — the transform must see the
+        full canonical set, exactly like the auto-arrange reset does."""
+        self.ensure_one()
+        try:
+            with self.env.cr.savepoint():
+                ctx = self.with_context(active_test=False)
+                canon = ctx.cabinet_line_ids.filtered(
+                    lambda l: l.layout_role == "canonical")
+                canon.filtered(lambda l: not l.active).write({"active": True})
+                by_wall = {}
+                for line in canon:
+                    by_wall.setdefault(line.wall or "back", []).append(line)
+                for wall, lines in by_wall.items():
+                    seqs = sorted({l.run_seq for l in lines})
+                    remap = (dict(zip(seqs, reversed(seqs)))
+                             if wall in reverse_walls else {})
+                    for line in lines:
+                        line.write({
+                            "wall": wall_map[wall],
+                            "run_seq": remap.get(line.run_seq, line.run_seq),
+                        })
+                return self.action_auto_arrange(sync=True)
+        except kitchen_layout_engine.LayoutCapacityExceeded as e:
+            raise UserError(
+                "The transformed layout does not fit this room (%s). "
+                "Nothing was changed — the room is never grown "
+                "automatically." % e) from e
+
+    def action_flip_layout(self, axis="x"):
+        """Flip left<->right (axis='x') or back<->front (axis='z')."""
+        self.ensure_one()
+        if axis == "x":
+            return self._transform_layout(
+                {"back": "back", "front": "front",
+                 "left": "right", "right": "left"},
+                reverse_walls=("back", "front"))
+        if axis == "z":
+            return self._transform_layout(
+                {"back": "front", "front": "back",
+                 "left": "left", "right": "right"},
+                reverse_walls=("left", "right"))
+        raise UserError("axis must be 'x' or 'z'")
+
+    def action_rotate_layout(self, quarters=1):
+        """Rotate the whole layout clockwise by quarter turns. The room
+        is NEVER resized — a rotation that does not fit raises."""
+        self.ensure_one()
+        cw = {"back": "right", "right": "front",
+              "front": "left", "left": "back"}
+        res = None
+        for _ in range(int(quarters) % 4):
+            res = self._transform_layout(cw, reverse_walls=())
+        return res if res is not None else self.action_reflow()
+
 
 # v19.0.4.22.0 audit P2#9 — Q21 zone lexicon (mirrors PUNCHLIST Q21
 # on sale.order.line). Declared at module scope so search domains
@@ -2396,6 +2466,78 @@ class SouthbrookKitchenDesignLine(models.Model):
                 continue
             label = type_map.get(line.cabinet_type, line.cabinet_type)
             line.position_label = "%s @ X=%.0f\"" % (label, line.x_position_in)
+
+    # ── Task 5 (kitchen templates) — line manipulation API ────────────
+    # Server-side formalization of the client-only _swapSelectedProduct /
+    # _updateSelectedWidth (kitchen_configurator.js) — the client paths
+    # stay; these give templates/tests/RPC one canonical, savepoint-
+    # atomic entry point. Derived lines are ENGINE-owned: manipulating
+    # one directly would be overwritten by the next arrange, so it is
+    # refused instead of silently accepted.
+
+    def _guard_canonical(self):
+        self.ensure_one()
+        if self.layout_role != "canonical":
+            raise UserError(
+                "Derived lines (corners/fillers) are engine-owned — "
+                "adjust the canonical run instead; the engine re-derives "
+                "them on every arrange.")
+
+    def _write_then_rearrange(self, vals):
+        """Write canonical semantics, then re-derive all poses. A layout
+        that no longer fits rolls the whole action back (honesty: the
+        room is never grown)."""
+        self._guard_canonical()
+        try:
+            with self.env.cr.savepoint():
+                self.write(vals)
+                res = self.design_id.action_auto_arrange(sync=True)
+                # The engine "fits" impossible runs by SUPERSEDING
+                # (archiving) what cannot be placed — accepting that
+                # would silently disappear the very cabinet the user
+                # just changed. Refuse instead (raises inside the
+                # savepoint -> the whole action rolls back).
+                if not self.active:
+                    raise UserError(
+                        "That change does not fit this room — the "
+                        "layout engine had to drop this cabinet to lay "
+                        "out the run. Nothing was changed; the room is "
+                        "never grown automatically.")
+                return res
+        except kitchen_layout_engine.LayoutCapacityExceeded as e:
+            raise UserError(
+                "That change does not fit this room (%s). Nothing was "
+                "changed — the room is never grown automatically." % e
+            ) from e
+
+    def action_swap_product(self, product_id):
+        product = self.env["product.product"].browse(int(product_id))
+        product.ensure_one()
+        tmpl = product.product_tmpl_id
+        return self._write_then_rearrange({
+            "product_id": product.id,
+            "price_unit": product.lst_price or tmpl.list_price or 0.0,
+            "cabinet_type": tmpl.southbrook_cabinet_type or self.cabinet_type,
+            "width_in": tmpl.southbrook_width_in or self.width_in,
+            "height_in": tmpl.southbrook_height_in or self.height_in,
+            "depth_in": tmpl.southbrook_depth_in or self.depth_in,
+            "is_unresolved": False,
+        })
+
+    def action_set_width(self, width_in):
+        return self._write_then_rearrange({"width_in": float(width_in)})
+
+    def action_move(self, wall, run_seq):
+        if wall not in ("back", "front", "left", "right"):
+            raise UserError("wall must be back/front/left/right")
+        # `sequence` mirrors run_seq: the engine's auto-assign path (all
+        # cabinets on the back wall) orders by flat INPUT order — which
+        # is this model's _order (sequence, id) — while the manual path
+        # sorts by (run_seq, input idx). Writing both keeps the two
+        # ordering keys agreeing on either path.
+        return self._write_then_rearrange(
+            {"wall": wall, "run_seq": int(run_seq),
+             "sequence": int(run_seq)})
 
 
 # ── v19.0.5.6.12 — Template gallery wizard ────────────────────────────────
