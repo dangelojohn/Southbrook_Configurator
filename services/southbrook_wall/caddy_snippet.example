@@ -1,0 +1,79 @@
+# Southbrook Wall Display — Caddy snippet
+#
+# Drop this into alfacore-caddy's Caddyfile (or import it from a
+# separate file). Implements the routes spec §8.3 + §11.
+#
+# WHAT IT DOES:
+#   - Serves the kiosk HTML from /data/southbrook-wall/ (which the
+#     operator populates via `rsync services/southbrook_wall/wall/
+#     <caddy-data-mount>/southbrook-wall/`).
+#   - Proxies /wall/api/* to southbrook-odoo on the southbrook docker
+#     network — that's where the JSON feeds live
+#     (/southbrook/wall/<station>.json controllers).
+#   - Serves a static fallback at /wall/static/ for graceful degrade
+#     when Odoo is mid-restart or unreachable. A cron drops fresh
+#     snapshots here every 60s (set up separately).
+#
+# OPERATOR INSTALL (one-time):
+#
+#   1. Drop the HTML pages on the QNAP:
+#        rsync -av services/southbrook_wall/wall/ \
+#          /share/CACHEDEV3_DATA/Container/alfacore/data/southbrook-wall/
+#      Or however your alfacore-caddy data volume is bind-mounted.
+#
+#   2. Open alfacore-caddy's Caddyfile and either:
+#        a) PASTE the snippet below verbatim, OR
+#        b) Add `import southbrook_wall` near the top, then put this
+#           snippet's contents in a sibling file named `southbrook_wall`.
+#
+#   3. Inside your site block (or new site block for display.southbrookcabinetry.space):
+#        display.southbrookcabinetry.space {
+#            import southbrook_wall_routes
+#        }
+#
+#   4. Reload Caddy IN-PLACE (per [[qnap_caddyfile_bind_mount_trap]]
+#      use cp overwrite, never mv):
+#        docker exec alfacore-caddy caddy reload --config /etc/caddy/Caddyfile
+#
+#   5. Visit the URL from your shop's LAN:
+#        http://display.southbrookcabinetry.space/wall/shipping
+#      Should render the dock kiosk with live data.
+#
+# IP ALLOWLIST DECISION (spec §7.8) DEFERRED:
+#   The wall feeds are currently `auth='public'` in the addon. Until
+#   you've decided whether to LAN-allowlist or Cloudflare-Access-gate
+#   these routes, anyone who can reach display.southbrookcabinetry.space
+#   can read the SO numbers + customer names. Make that decision
+#   before pointing this at a public hostname. The simplest gate is
+#   adding a `@allowed_ips { remote_ip 10.0.0.0/8 }` matcher and
+#   wrapping the routes with it.
+
+(southbrook_wall_routes) {
+    # Wall kiosk HTML pages (static, served by Caddy from disk).
+    # The /wall/shipping URL resolves to /data/southbrook-wall/shipping/index.html
+    handle_path /wall/shipping* {
+        root * /data/southbrook-wall/shipping
+        try_files {path} {path}/ /index.html
+        file_server
+    }
+
+    # JSON feed — proxied to the Odoo controller. The kiosk JS calls
+    # /wall/api/<station>.json; we map that to /southbrook/wall/<station>.json
+    # on the Odoo backend.
+    handle /wall/api/* {
+        # Strip /wall/api/ prefix, prepend /southbrook/wall/
+        rewrite * /southbrook/wall{path}
+        rewrite /southbrook/wall/wall/api/* /southbrook/wall/{1}
+        reverse_proxy southbrook-odoo:8069 {
+            header_up Host {host}
+            header_up X-Forwarded-For {remote}
+        }
+    }
+
+    # Static-fallback JSON (cron-dropped snapshots). Serves the most
+    # recent dump when Odoo is unreachable.
+    handle_path /wall/static/* {
+        root * /data/southbrook-wall/static
+        file_server
+    }
+}

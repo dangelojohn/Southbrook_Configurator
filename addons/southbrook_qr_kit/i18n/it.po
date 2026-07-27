@@ -1,0 +1,181 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* southbrook_qr_kit
+#
+# W070 (R8.9, 2026-06-27) — Italian (it_IT) translations for the
+# operator-facing surfaces of the QR kit. Sibling to es.po — mirrors
+# the same msgid coverage so both languages reach the operator
+# surfaces (scan UI, truck/POD kiosk, label print wizard).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: 2026-06-27 12:00+0000\n"
+"Last-Translator: Southbrook / OdooIQ\n"
+"Language-Team: it_IT\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#. module: southbrook_qr_kit
+msgid "Print QR Label"
+msgstr "Stampa etichetta QR"
+
+#. module: southbrook_qr_kit
+msgid "Print QR Labels"
+msgstr "Stampa etichette QR"
+
+#. module: southbrook_qr_kit
+msgid "Open Print Preview"
+msgstr "Apri anteprima di stampa"
+
+#. module: southbrook_qr_kit
+msgid "QR Scan Log"
+msgstr "Registro scansioni QR"
+
+#. module: southbrook_qr_kit
+msgid "Last 24h"
+msgstr "Ultime 24 h"
+
+#. module: southbrook_qr_kit
+msgid "Kind"
+msgstr "Tipo"
+
+#. module: southbrook_qr_kit
+msgid "Result"
+msgstr "Risultato"
+
+#. module: southbrook_qr_kit
+msgid "Failed"
+msgstr "Fallito"
+
+#. module: southbrook_qr_kit
+msgid "Identity"
+msgstr "Identità"
+
+#. module: southbrook_qr_kit
+msgid "Cancel"
+msgstr "Annulla"
+
+#. module: southbrook_qr_kit
+msgid "Notes"
+msgstr "Note"
+
+#. module: southbrook_qr_kit
+msgid "Dimensions"
+msgstr "Dimensioni"
+
+#. module: southbrook_qr_kit
+msgid "Contents"
+msgstr "Contenuto"
+
+#. module: southbrook_qr_kit
+msgid "Customer"
+msgstr "Cliente"
+
+#. module: southbrook_qr_kit
+msgid "State"
+msgstr "Stato"
+
+#. module: southbrook_qr_kit
+msgid "Draft"
+msgstr "Bozza"
+
+#. module: southbrook_qr_kit
+msgid "Loading"
+msgstr "In caricamento"
+
+#. module: southbrook_qr_kit
+msgid "Loaded"
+msgstr "Caricato"
+
+#. module: southbrook_qr_kit
+msgid "Roll Out"
+msgstr "Partenza"
+
+#. module: southbrook_qr_kit
+msgid "Rolled Out"
+msgstr "In partenza"
+
+#. module: southbrook_qr_kit
+msgid "Delivered"
+msgstr "Consegnato"
+
+#. module: southbrook_qr_kit
+msgid "Returned"
+msgstr "Reso"
+
+#. module: southbrook_qr_kit
+msgid "Start Loading"
+msgstr "Avvia caricamento"
+
+#. module: southbrook_qr_kit
+msgid "Mark Loaded"
+msgstr "Segna come caricato"
+
+#. module: southbrook_qr_kit
+msgid "Mark Delivered"
+msgstr "Segna come consegnato"
+
+#. module: southbrook_qr_kit
+msgid "Mark Returned"
+msgstr "Segna come reso"
+
+#. module: southbrook_qr_kit
+msgid "Print Truck QR"
+msgstr "Stampa QR del camion"
+
+#. module: southbrook_qr_kit
+msgid "Truck Load"
+msgstr "Carico camion"
+
+#. module: southbrook_qr_kit
+msgid "Truck Loads"
+msgstr "Carichi camion"
+
+#. module: southbrook_qr_kit
+msgid "Shipping Unit"
+msgstr "Unità di spedizione"
+
+#. module: southbrook_qr_kit
+msgid "Shipping Units"
+msgstr "Unità di spedizione"
+
+#. module: southbrook_qr_kit
+msgid "Loaded Units (scanned)"
+msgstr "Unità caricate (scansionate)"
+
+#. module: southbrook_qr_kit
+msgid "Manifested Units"
+msgstr "Unità manifestate"
+
+#. module: southbrook_qr_kit
+msgid "Totals"
+msgstr "Totali"
+
+#. module: southbrook_qr_kit
+msgid "POD"
+msgstr "POD"
+
+#. module: southbrook_qr_kit
+msgid "Oversize"
+msgstr "Fuori misura"
+
+#. module: southbrook_qr_kit
+msgid "Blocked (mismatch)"
+msgstr "Bloccato (non corrisponde)"
+
+#. module: southbrook_qr_kit
+msgid "QR + Provenance"
+msgstr "QR + Provenienza"
+
+#. module: southbrook_qr_kit
+msgid "Internal warehouse QR (scan-to-form)"
+msgstr "QR interno di magazzino (scansiona per aprire la scheda)"
+
+#. module: southbrook_qr_kit
+msgid "Driver POD QR (scan-to-POD-page)"
+msgstr "QR POD autista (scansiona per aprire la pagina POD)"
