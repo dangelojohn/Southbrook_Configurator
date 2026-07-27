@@ -131,7 +131,10 @@ class TestP3AutoRemediate(TransactionCase):
         self.assertTrue(
             info_checks,
             "auto-generated cutlist must leave an audit-note info check")
-        self.assertIn("audit P3", (info_checks[0].message or "").lower(),
+        # NB: assertion target is lower-cased to match the .lower() on the
+        # LHS — the production message uses "audit P3" but the case-folded
+        # comparison must use "audit p3".
+        self.assertIn("audit p3", (info_checks[0].message or "").lower(),
                       "audit note must reference P3 for traceability")
 
     # ------------------------------------------------------------------

@@ -69,8 +69,18 @@ class TestNcrWorkflow(TransactionCase):
         ncr = self._new_ncr()
         ncr.action_quarantine()
         ncr.disposition_reason = "Scrap."
-        # Force a known create_date so the delta is non-zero deterministically.
-        ncr.write({"create_date": datetime.now() - timedelta(hours=4)})
+        # Force a known create_date deterministically. Odoo 19's log_access
+        # field write-path can silently drop create_date overrides via
+        # .write() (field is automatic=True, readonly=True), leaving the
+        # delta in the microseconds → assertGreater(0, 3.0) fails. Bypass
+        # the ORM by writing directly to the column, then invalidate the
+        # cache so the @api.depends recompute reads the new value.
+        old_create = datetime.now() - timedelta(hours=4)
+        self.env.cr.execute(
+            "UPDATE southbrook_ncr SET create_date = %s WHERE id = %s",
+            (old_create, ncr.id),
+        )
+        ncr.invalidate_recordset(["create_date"])
         ncr.action_scrap()
         ncr.invalidate_recordset(["time_to_close_hours"])
         self.assertGreater(ncr.time_to_close_hours, 3.0)
