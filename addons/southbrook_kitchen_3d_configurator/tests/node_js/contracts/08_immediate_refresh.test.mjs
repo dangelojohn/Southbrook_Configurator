@@ -103,9 +103,12 @@ test("_autoSave() applies the server's `placed` engine pose onto state.items (th
     // reload.
     assert.notEqual(itemsAfter, itemsBefore);
 
-    // The back-wall item was not in `placed` — its pose is unaffected.
+    // The back-wall item was not in `placed` — its stored pose is
+    // unaffected. C2/C5 (2026-07-26): a multi-wall design skips
+    // packRow for every row (server-authoritative geometry), so the
+    // fixture's stored x=50 survives instead of packing to 0.
     const back = itemByKey(itemsAfter, "back-1");
-    assert.equal(back.x_position_in, 0);
+    assert.equal(back.x_position_in, 50);
     assert.equal(back.wall, "back");
 });
 

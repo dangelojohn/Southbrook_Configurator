@@ -71,9 +71,14 @@ test("packRow (via _recomputeLayoutFromItems on hydrate) leaves a non-back-wall 
     assert.equal(left.x_position_in, 999);
     assert.equal(left.wall, "left");
 
-    // Legacy back-wall packing must still work exactly as before: the
-    // sole back-wall item packs to x=0 (cursor starts at 0).
-    assert.equal(back.x_position_in, 0);
+    // C2/C5 (2026-07-26) — this design is MULTI-WALL (it has a left
+    // item), so geometry is server-owned end-to-end and packRow is
+    // skipped for EVERY row, back wall included: repacking the back run
+    // from x=0 client-side would shove it into the engine's reserved
+    // corner cell. The stored x therefore survives untouched. (A
+    // single-back-wall design still packs exactly as before — locked
+    // by the other contracts in this suite.)
+    assert.equal(back.x_position_in, 50);
 });
 
 test("_saveDesign applies the server's `placed` poses onto matching state.items by layout_key", async () => {
@@ -99,10 +104,12 @@ test("_saveDesign applies the server's `placed` poses onto matching state.items 
     assert.equal(left.z_position_in, 12);
     assert.equal(left.rotation_deg, 90);
 
-    // The back-wall item was not in `placed` — its pose (already
-    // packed to 0 by the earlier hydrate) must be unaffected.
+    // The back-wall item was not in `placed` — its stored pose must be
+    // unaffected. C2/C5 (2026-07-26): the design is multi-wall, so the
+    // hydrate-time recompute no longer repacks the back row either
+    // (server-authoritative mode) — the fixture's stored x=50 survives.
     const back = itemByKey(h.component.state.items, "back-1");
-    assert.equal(back.x_position_in, 0);
+    assert.equal(back.x_position_in, 50);
     assert.equal(back.wall, "back");
 });
 

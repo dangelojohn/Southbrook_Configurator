@@ -454,6 +454,18 @@ class SouthbrookKitchenConfigurator extends Component {
     // `_refreshLayout()` (called by every later room/filler/alignment
     // edit) knows to stop regenerating for the rest of this session —
     // see the guard at the top of `_refreshLayout`.
+    // C2 — the single source of truth for turning a server line-dict
+    // (load_design_lines / save_design's post-relaid `lines`) into a
+    // state.items entry. `name` mirrors `product_name` — every other
+    // item-producing path (/layout, _addCabinetFromProduct) sets `name`
+    // and a few UI spots (the detail-panel header, "Moved X to Y‴"
+    // toasts) read `state.selected.name` directly rather than falling
+    // back to `product_name`. Shared by _hydrateFromDesign and
+    // _applyRelaidResult so both land items in the exact same shape.
+    _lineToItem(line) {
+        return { ...line, name: line.product_name };
+    }
+
     async _hydrateFromDesign() {
         try {
             const resp = await rpc(
@@ -503,10 +515,7 @@ class SouthbrookKitchenConfigurator extends Component {
             // falling back to `product_name`. /load_design_lines only
             // emits `product_name`; alias it here so a hydrated
             // session's selected-cabinet panel isn't blank.
-            this.state.items = lines.map(line => ({
-                ...line,
-                name: line.product_name,
-            }));
+            this.state.items = lines.map(line => this._lineToItem(line));
             if (this.state.items.length) {
                 this.state.selected = this.state.items[0];
             }
@@ -898,7 +907,29 @@ class SouthbrookKitchenConfigurator extends Component {
         } else {
             this.notification.add(`Added ${product.name}`, { type: "success" });
         }
-        this._queueAutoSave();
+        // C2 — a cabinet landing on a non-back wall (or added to a
+        // design that already spans 2+ walls) may complete an inside
+        // corner. save_design only runs the corner-resolution engine
+        // (design.action_auto_arrange) when 2+ walls are in play, so an
+        // extra immediate save here when that's not yet the case is
+        // harmless — but waiting out the full 3s debounce for the case
+        // where it DOES apply is exactly the "corner never appears"
+        // symptom this fixes. Skips the debounce entirely (an immediate
+        // save already persists everything the debounce would have).
+        // Guarded on designId the same way every other side-channel
+        // write in this file is (_savePinnedPosition, _removeSelectedCabinet)
+        // — nothing server-side to save into yet for a brand-new,
+        // never-saved design.
+        const designAlreadyMultiWall = (this.state.items || []).some(
+            it => ((it.wall || "back") !== "back")
+                || it.cabinet_type === "corner"
+        );
+        if (this.state.designId
+                && (newItem.wall !== WALLS.BACK || designAlreadyMultiWall)) {
+            this._saveDesign();
+        } else {
+            this._queueAutoSave();
+        }
     }
 
     // Total inches consumed by the longest cabinet row (max of base
@@ -1353,6 +1384,46 @@ class SouthbrookKitchenConfigurator extends Component {
         this._recomputeLayoutFromItems();
     }
 
+    // C2 — shared by both save paths (_saveDesign and _autoSave), same
+    // reasoning as _applyServerPlacements above (PR4.1): a corner-
+    // resolution pass can be triggered by either an explicit Save or a
+    // debounced auto-save (e.g. dragging a cabinet onto a second wall),
+    // so both must react identically or the two paths drift again.
+    //
+    // When save_design's corner-resolution pass (controllers/main.py
+    // C2) ran — because the design now spans 2+ walls, or because it
+    // cleaned up stale derived corner lines — `result.lines` carries
+    // the authoritative post-save state (same shape as
+    // load_design_lines). The server, not the client's pre-save guess,
+    // now owns this design's geometry, so state.items is REPLACED
+    // wholesale rather than patched. `_recomputeLayoutFromItems()`
+    // recomputes counts/price/validation but — per its own multiWall
+    // guard — will not repack: repacking from x=0 would shove the
+    // back-wall cabinets straight into the corner cell the server just
+    // reserved.
+    //
+    // `result.layout_warning` surfaces a plain-English reason the
+    // corner engine couldn't resolve (the run doesn't physically fit
+    // the wall) — the design itself is still saved, since
+    // action_auto_arrange is savepoint-atomic and only rolls itself
+    // back on failure.
+    _applyRelaidResult(result) {
+        if (result && result.relaid && result.lines) {
+            const selectedKey = this.state.selected
+                && this.state.selected.layout_key;
+            const items = result.lines.map(line => this._lineToItem(line));
+            this.state.items = items;
+            const stillSelected = selectedKey
+                && items.some(it => it.layout_key === selectedKey);
+            if (!stillSelected) this.state.selected = null;
+            this._recomputeLayoutFromItems();
+        }
+        if (result && result.layout_warning) {
+            this.notification.add(result.layout_warning,
+                { type: "warning", sticky: true });
+        }
+    }
+
     async _saveDesign() {
         // PR2.5a (Gap 2) — same rationale as the _queueAutoSave() guard:
         // a failed hydration means state doesn't reflect the saved
@@ -1389,6 +1460,9 @@ class SouthbrookKitchenConfigurator extends Component {
             // needed. See _applyServerPlacements() for the shared
             // logic (also used by _autoSave() — PR4.1).
             this._applyServerPlacements(result.placed);
+            // C2 — apply any corner-resolution relay + surface a
+            // layout_warning, if the server sent either.
+            this._applyRelaidResult(result);
             // Task #48 — quiet, non-sticky toast on the happy path.
             // Previous format ("Saved: ${name}") leaked implementation
             // detail into the message; the rep already sees the design
@@ -1552,6 +1626,11 @@ class SouthbrookKitchenConfigurator extends Component {
             // _saveDesign(), and previously never got the engine's
             // wall pose applied client-side.
             this._applyServerPlacements(result.placed);
+            // C2 — same as _saveDesign; see _applyRelaidResult doc
+            // comment. A drag onto a second wall routes through
+            // _queueAutoSave() -> here, so this path must react to a
+            // corner-resolution relay too.
+            this._applyRelaidResult(result);
         } catch (e) {
             // Silent on auto-save: manual save will surface errors. Log
             // for diagnostics only.

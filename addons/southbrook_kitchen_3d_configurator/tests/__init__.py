@@ -47,3 +47,10 @@ from . import test_wall_placement_engine
 # design.line through action_create_quotation onto sale.order.line, plus
 # the narrow sale.order.line -> mrp.bom.line mapping seam.
 from . import test_geo_b3_line_dims
+
+# v19.0.5.20.0 — L-shaped-kitchen multi-defect blocker regression pins:
+# C1 (zone compute never fired — truthy default shadowed the backfill
+# guard), C3 (existing corner cells not reserved via wall_start_offsets),
+# C4 (engine's centre-convention poses persisted without converting to
+# the anchor convention), C8 (corner lines omitted `zone`).
+from . import test_zone_corner_l_shape_fixes

@@ -582,7 +582,7 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     wall's low end is there) so it is placed standalone in its cell and both
     adjoining runs are capped. Handles an L, a U, or a full G-shape.
 
-    Returns {"cabinets", "placements", "corners", "inserted"}.
+    Returns {"cabinets", "assigned", "placements", "corners", "inserted"}.
     """
     assigned = (auto_assign_walls(cabinets, room, wall_order) if auto_assign
                 else [dict(c) for c in cabinets])
@@ -750,5 +750,13 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                      worst["wall"]))
         raise LayoutCapacityExceeded(cap, req, detail=detail, outside=outside)
 
-    return {"cabinets": final, "placements": placements, "corners": corners,
+    # "assigned" — every input cabinet's post-distribution wall/run_seq,
+    # INCLUDING the cabinets a corner replaced (which "cabinets" omits).
+    # The ORM caller must persist wall/run_seq for the replaced-and-
+    # archived cabinets too: if it doesn't, a later reset-and-restore
+    # resurrects them with their PRE-distribution wall, reconstructing a
+    # different (possibly overfull) run than the one this call resolved
+    # — the auto-arrange idempotence break (2026-07-26).
+    return {"cabinets": final, "assigned": assigned,
+            "placements": placements, "corners": corners,
             "inserted": inserted, "removed_ids": sorted(removed_ids)}
