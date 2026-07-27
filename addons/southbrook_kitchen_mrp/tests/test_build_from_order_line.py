@@ -22,6 +22,11 @@ class TestBuildFromOrderLine(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Opt out of southbrook_mrp_pm's SO->MO production-approval gate;
+        # this suite builds MOs from synthetic SOs without exercising
+        # the approval workflow. See southbrook_mrp_pm/models/mrp_production.py.
+        cls.env = cls.env(context={
+            **cls.env.context, "bypass_production_approval": True})
         cls.Package = cls.env["sb.production.package"]
         cls.Product = cls.env["product.product"]
         cls.Tmpl = cls.env["product.template"]

@@ -30,6 +30,12 @@ class TestGoldenPathAllFlagsOn(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Opt out of southbrook_mrp_pm's SO->MO production-approval gate;
+        # this suite builds synthetic SO->MO chains for the golden-path
+        # smoke without exercising the approval workflow. See
+        # southbrook_mrp_pm/models/mrp_production.py.
+        cls.env = cls.env(context={
+            **cls.env.context, "bypass_production_approval": True})
         cls.api = SouthbrookConfiguratorAPI()
         cls.Engine = cls.env["southbrook.mi.engine"]
         cls.Check = cls.env["southbrook.mi.check"]

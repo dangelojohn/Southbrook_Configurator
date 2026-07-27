@@ -325,6 +325,18 @@ class MrpProduction(models.Model):
         # BEFORE create — we can't introspect self because it doesn't
         # exist yet. Two backlink paths: explicit sale_line_id and the
         # origin string falling through to a name lookup.
+        #
+        # Test-isolation bypass: sibling addons (southbrook_kitchen_mrp,
+        # southbrook_project_mrp, southbrook_premium_orchestration, the
+        # manufacturing-intelligence + workcenter/tools addons, etc.)
+        # build MOs in their own test scaffolding without exercising the
+        # approval workflow. Those tests can opt out of this gate by
+        # propagating `bypass_production_approval=True` on the env
+        # context in their `setUpClass`. Production code paths never
+        # set this flag, so the gate stays enforced everywhere it
+        # matters.
+        if self.env.context.get("bypass_production_approval"):
+            return super().create(vals_list)
         SaleOrder = self.env["sale.order"].sudo()
         SaleLine = self.env["sale.order.line"].sudo()
         for vals in vals_list:

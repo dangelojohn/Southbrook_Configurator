@@ -41,6 +41,12 @@ class TestFullFlow(TransactionCase):
         cls.env["ir.config_parameter"].sudo().set_param(
             "southbrook.mo_availability_gate.enabled", "0",
         )
+        # Opt out of southbrook_mrp_pm's SO->MO production-approval gate;
+        # this suite exercises action_confirm() and direct MO creation
+        # off synthetic SOs without going through the approval workflow.
+        # See southbrook_mrp_pm/models/mrp_production.py.
+        cls.env = cls.env(context={
+            **cls.env.context, "bypass_production_approval": True})
         cls.partner = cls.env["res.partner"].create({
             "name": "Full Flow Test Customer",
         })
@@ -103,7 +109,12 @@ class TestFullFlow(TransactionCase):
                 "product_uom_qty": 1.0,
             })],
         })
-        so.action_confirm()
+        # The setUpClass cls.env context-rebind doesn't always propagate to
+        # mid-test SO recordsets in v19 (the per-test transaction can reset
+        # env context). Apply the bypass explicitly on the action_confirm
+        # call site — same mechanism the R1+R2+PR#25 helpers use elsewhere.
+        # See southbrook_mrp_pm/models/sale_order.py::_check_production_approval_gate.
+        so.with_context(bypass_production_approval=True).action_confirm()
 
         Task = self.env["project.task"]
         task = Task.search([("x_southbrook_sale_order_id", "=", so.id)])
