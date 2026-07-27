@@ -23,9 +23,21 @@ class TestOsPublication(TransactionCase):
         pub = self.env["southbrook.os.publication"].publish("2026-06")
         self.assertEqual(pub.calendar_key, "2026-06")
         self.assertTrue(pub.build_hash)
-        self.assertEqual(len(pub.section_snapshot_ids), 2)
-        for snap in pub.section_snapshot_ids:
+        # publish() snapshots EVERY section in the DB — including the
+        # canonical post_init_hook seeds (~14 records). Filter to the
+        # slugs this test created so the assertion is robust to seed
+        # growth. Sanity-check the total still matches the live section
+        # count at publish time.
+        own_slugs = {self.s1.slug, self.s2.slug}
+        own_snaps = pub.section_snapshot_ids.filtered(
+            lambda s: s.slug in own_slugs)
+        self.assertEqual(len(own_snaps), 2)
+        for snap in own_snaps:
             self.assertEqual(snap.section_version, 1)
+        self.assertEqual(
+            len(pub.section_snapshot_ids),
+            self.env["southbrook.os.section"].search_count([]),
+        )
 
     def test_publish_with_same_content_returns_existing_pub(self):
         first = self.env["southbrook.os.publication"].publish("2026-06")

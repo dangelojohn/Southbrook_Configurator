@@ -41,7 +41,28 @@ class TestAttributeGenerator(TransactionCase):
 
 @tagged("post_install", "-at_install", "southbrook", "southbrook_os")
 class TestCutSpecGenerator(TransactionCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # The generator graceful-skips when southbrook.cut.spec isn't
+        # installed (southbrook_os doesn't depend on southbrook_plm).
+        # When PLM IS present, we need an active spec for the generator
+        # to emit the rows the assertion looks for — the PLM seed
+        # (cut_spec_nf14_seed) provides one on a normal install, but
+        # tests run in isolated transactions and noupdate seeds aren't
+        # guaranteed. Idempotently ensure an active spec exists.
+        CutSpec = cls.env.get("southbrook.cut.spec")
+        cls._cut_spec_available = CutSpec is not None
+        if cls._cut_spec_available and not CutSpec.search(
+                [("active", "=", True)], limit=1):
+            # Field defaults populate every geometric constant (box_th,
+            # door_reveal, etc.) so the generator can read non-None
+            # values straight out of create.
+            CutSpec.create({"name": "Test Cut Spec (fixture)"})
+
     def test_cut_spec_generator_emits_active_values(self):
+        if not self._cut_spec_available:
+            self.skipTest("southbrook.cut.spec model not installed")
         result = self.env["southbrook.os.generators"].generate_cut_spec()
         section = self.env["southbrook.os.section"].search(
             [("slug", "=", "06_cut_spec.generated")], limit=1)

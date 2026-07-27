@@ -13,7 +13,10 @@ class TestOsSection(TransactionCase):
         })
         self.assertEqual(section.version, 1)
         self.assertEqual(section.source, "canonical")
-        self.assertIn("<h1>", section.body_html)
+        # The `toc` markdown extension emits `<h1 id="...">` (auto-anchor
+        # slug), not a bare `<h1>`. Assert against the open-tag prefix so
+        # the test tolerates whichever extension set the renderer ships.
+        self.assertIn("<h1", section.body_html)
         self.assertIn("Hello", section.body_html)
 
     def test_slug_is_unique(self):
