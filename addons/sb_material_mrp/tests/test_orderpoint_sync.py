@@ -62,7 +62,11 @@ class TestOrderpointSync(TransactionCase):
             ("product_id", "=", comp.id), ("warehouse_id", "=", wh.id)])
         self.assertEqual(len(op), 1)
         self.assertEqual(op.product_max_qty, 8.0)
-        self.assertEqual(op.product_min_qty, 0.0)  # untouched -- not this task's job
+        # Fork-1 Task 1 (2026-07-27 size-aware-trigger plan): MIN is now
+        # demand-driven too (was 0.0/"untouched" under the old MAX-only
+        # contract) -- same rollup as MAX here (no material set, case 1
+        # pass-through, so MIN == the raw 8.0 units of open-MO demand).
+        self.assertEqual(op.product_min_qty, 8.0)
 
     def test_sync_is_idempotent_and_refreshes_existing_max(self):
         comp = self.env["product.product"].create(
@@ -208,3 +212,73 @@ class TestOrderpointSync(TransactionCase):
         op = self.env["stock.warehouse.orderpoint"].search([
             ("product_id", "=", comp.id), ("warehouse_id", "=", wh.id)])
         self.assertFalse(op)
+
+    # ------------------------------------------------------------------
+    # Fork-1 Task 1 (2026-07-27 size-aware-trigger plan) -- MIN is now
+    # demand-driven, via the renamed `action_sb_sync_orderpoints` (the old
+    # `action_sb_sync_orderpoint_max` name is kept as a delegating alias,
+    # exercised below). The plan's illustrative tests used a
+    # `_cabinet_with_open_mo(code_suffix=..., incompatible_uom=..., with_
+    # yield=...)` signature; the file's real fixture is
+    # `_cabinet_with_open_mo(self, comp, qty_per_cab=..., mo_qty=...)`
+    # (no code_suffix/incompatible_uom/with_yield switches), so these
+    # tests are adapted to it -- the incompatible-uom/no-yield case is
+    # built inline the same way `test_max_skipped_when_uom_incompatible_
+    # and_no_yield` above does.
+    # ------------------------------------------------------------------
+
+    def test_sync_sets_min_from_open_mo_demand(self):
+        comp = self.env["product.product"].create(
+            {"name": "Comp OPMIN1", "is_storable": True, "purchase_ok": True})
+        self._cabinet_with_open_mo(comp, qty_per_cab=4.0, mo_qty=2.0)  # 8.0 units
+        wh = self.env["stock.warehouse"].search(
+            [("company_id", "=", self.env.company.id)], limit=1)
+        comp.product_tmpl_id.action_sb_sync_orderpoints(warehouse_ids=wh)
+        op = self.env["stock.warehouse.orderpoint"].search([
+            ("product_id", "=", comp.id), ("warehouse_id", "=", wh.id)])
+        self.assertEqual(len(op), 1)
+        self.assertGreater(op.product_min_qty, 0.0)
+        self.assertGreaterEqual(op.product_max_qty, op.product_min_qty)
+
+    def test_min_skipped_when_no_conversion_and_no_yield(self):
+        # incompatible UoM (component's own UoM shares no reference with
+        # the material's canonical m2 demand unit) + no vendor
+        # uom_yield_qty recorded -> orderpoint MIN (and MAX) skipped --
+        # honesty, never a fabricated MIN. Built inline like
+        # `test_max_skipped_when_uom_incompatible_and_no_yield` since the
+        # fixture has no incompatible_uom/with_yield switches; no
+        # pre-existing orderpoint here so the honest outcome is "created
+        # nothing" (before == after == 0).
+        fam = self.env["material.family"].create(
+            {"name": "OPYMIN0", "code": "opymin0_test"})
+        mat = self.env["southbrook.kitchen.material"].create({
+            "name": "OPYMIN0 Mat", "code": "opymin0_mat", "family_id": fam.id,
+            "density": 0.68, "weight_source": "density_volume", "thickness_mm": 19.05,
+        })
+        comp = self.env["product.product"].create(
+            {"name": "Comp OPYMIN0", "is_storable": True, "purchase_ok": True})
+        comp.product_tmpl_id.material_id = mat.id
+        self._cabinet_with_open_mo(comp, qty_per_cab=7.5, mo_qty=1.0)  # 7.5 m2, no yield
+        wh = self.env["stock.warehouse"].search(
+            [("company_id", "=", self.env.company.id)], limit=1)
+        domain = [("product_id", "=", comp.id), ("warehouse_id", "=", wh.id)]
+        before = self.env["stock.warehouse.orderpoint"].search_count(domain)
+        comp.product_tmpl_id.action_sb_sync_orderpoints(warehouse_ids=wh)
+        after = self.env["stock.warehouse.orderpoint"].search_count(domain)
+        self.assertEqual(before, after)
+        self.assertEqual(before, 0)
+
+    def test_legacy_max_alias_still_works(self):
+        # Backcompat: the old name still callable, and now also sets MIN
+        # (it delegates to action_sb_sync_orderpoints).
+        comp = self.env["product.product"].create(
+            {"name": "Comp OPALIAS", "is_storable": True, "purchase_ok": True})
+        self._cabinet_with_open_mo(comp, qty_per_cab=3.0, mo_qty=1.0)  # 3.0 units
+        wh = self.env["stock.warehouse"].search(
+            [("company_id", "=", self.env.company.id)], limit=1)
+        comp.product_tmpl_id.action_sb_sync_orderpoint_max(warehouse_ids=wh)
+        op = self.env["stock.warehouse.orderpoint"].search([
+            ("product_id", "=", comp.id), ("warehouse_id", "=", wh.id)])
+        self.assertEqual(len(op), 1)
+        self.assertGreater(op.product_min_qty, 0.0)
+        self.assertGreaterEqual(op.product_max_qty, op.product_min_qty)

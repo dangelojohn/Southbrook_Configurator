@@ -170,25 +170,43 @@ class ProductTemplate(models.Model):
         ratio = float_round(canonical_total / yield_qty, precision_digits=4)
         return ratio, True
 
-    def action_sb_sync_orderpoint_max(self, warehouse_ids=None):
+    def action_sb_sync_orderpoints(self, warehouse_ids=None):
         """Find-or-create a native stock.warehouse.orderpoint per warehouse
-        for this material component product, and set its MAX from the
-        open-MO demand rollup. NATIVE CONFIG ASSISTED, not a bespoke
-        reorder engine: this only ever writes product_max_qty (and creates
-        the orderpoint row with native defaults -- trigger='auto',
-        product_min_qty=0.0 -- when none exists). product_min_qty,
-        trigger, and route_id are left exactly as a human configured them
-        on every subsequent call.
+        for this material component product, and set BOTH its MIN and its
+        MAX from the open-MO demand rollup (size-aware trigger, Fork-1
+        Task 1). NATIVE CONFIG ASSISTED, not a bespoke reorder engine:
+        this writes `product_min_qty` and `product_max_qty` (and creates
+        the orderpoint row with native defaults -- trigger='auto' -- when
+        none exists). `trigger` and `route_id` are left exactly as a human
+        configured them on every subsequent call.
+
+        Contract (supersedes the old MAX-only contract -- `product_min_qty`
+        is NO LONGER "never touched"; see
+        docs/superpowers/specs/2026-07-27-sizeaware-trigger-design.md and
+        docs/superpowers/plans/2026-07-27-sizeaware-trigger.md Task 1):
+        - `product_min_qty` = the converted open-MO demand rollup, computed
+          ONCE per product via the existing ladder (native UoM conversion
+          via `_sb_demand_qty_in_uom` -> `uom_yield_qty` CEIL -> skip+log).
+          This is what makes the native procurement TRIGGER size-aware --
+          the native scheduler compares on-hand/virtual qty against this
+          MIN, so a bigger open-MO demand now genuinely lowers the
+          reorder threshold instead of only raising the MAX ceiling.
+        - `product_max_qty` = the existing MAX derivation (CEIL of the
+          same rollup), clamped to be `>= product_min_qty` (MIN<=MAX
+          invariant) -- unchanged in spirit from the prior MAX-only sync,
+          just reusing the single rollup computed above instead of a
+          second call.
 
         Skips (creates nothing) when the rollup is 0.0 -- no phantom
         orderpoints for products with no current open-MO demand signal.
 
-        I-2 fix (final review, 2026-07-26): also skips -- leaving any
-        existing orderpoint's MAX untouched -- when the demand cannot be
-        honestly expressed in this product's own UoM (no common
-        dimensional reference and no product.supplierinfo.uom_yield_qty
-        recorded). See `_sb_open_mo_material_demand_for_orderpoint_max`.
-        Never fabricates a dimensionally-wrong MAX."""
+        I-2 fix (final review, 2026-07-26), now governing BOTH min and
+        max: skips -- leaving any existing orderpoint's MIN/MAX untouched
+        -- when the demand cannot be honestly expressed in this product's
+        own UoM (no common dimensional reference and no
+        product.supplierinfo.uom_yield_qty recorded). See
+        `_sb_open_mo_material_demand_for_orderpoint_max`. Never fabricates
+        a dimensionally-wrong MIN or MAX."""
         warehouses = warehouse_ids or self.env["stock.warehouse"].search(
             [("company_id", "in", self.env.companies.ids)])
         Orderpoint = self.env["stock.warehouse.orderpoint"]
@@ -197,18 +215,22 @@ class ProductTemplate(models.Model):
             rollup, resolved = tmpl._sb_open_mo_material_demand_for_orderpoint_max()
             if not resolved:
                 _logger.warning(
-                    "sb_material_mrp: skipping orderpoint MAX sync for "
+                    "sb_material_mrp: skipping orderpoint MIN/MAX sync for "
                     "%s -- open-MO demand (%.4f canonical units) has no "
                     "common UoM reference with %s and no "
                     "product.supplierinfo.uom_yield_qty is recorded; "
-                    "leaving MAX untouched rather than writing a "
+                    "leaving MIN/MAX untouched rather than writing a "
                     "dimensionally-wrong number (Phase-2b I-2 fix).",
                     tmpl.display_name, rollup, tmpl.uom_id.name,
                 )
                 continue
             if rollup <= 0.0:
                 continue
-            target_max = math.ceil(rollup)
+            # Single rollup drives both MIN (the raw converted demand) and
+            # MAX (its CEIL, clamped >= MIN -- trivially true since
+            # ceil(x) >= x, the clamp is defensive against FP edge cases).
+            target_min = rollup
+            target_max = max(math.ceil(rollup), target_min)
             variant = tmpl.product_variant_id
             for wh in warehouses:
                 op = Orderpoint.search([
@@ -217,13 +239,17 @@ class ProductTemplate(models.Model):
                     ("company_id", "=", wh.company_id.id),
                 ], limit=1)
                 if op:
-                    op.product_max_qty = max(target_max, op.product_min_qty)
+                    op.write({
+                        "product_min_qty": target_min,
+                        "product_max_qty": max(target_max, target_min),
+                    })
                 else:
                     op = Orderpoint.create({
                         "product_id": variant.id,
                         "location_id": wh.lot_stock_id.id,
                         "warehouse_id": wh.id,
                         "company_id": wh.company_id.id,
+                        "product_min_qty": target_min,
                         "product_max_qty": target_max,
                     })
                 touched |= op
@@ -238,6 +264,14 @@ class ProductTemplate(models.Model):
                 "sticky": False,
             },
         }
+
+    def action_sb_sync_orderpoint_max(self, warehouse_ids=None):
+        """Backcompat alias -- delegates to `action_sb_sync_orderpoints`,
+        which now sets BOTH product_min_qty and product_max_qty (Fork-1
+        Task 1). Kept under the old name for existing callers/docs/tests
+        (e.g. the auto-confirm-threshold flow) that predate the min+max
+        sync."""
+        return self.action_sb_sync_orderpoints(warehouse_ids)
 
     def action_sb_set_route_buy(self):
         """Add the native Buy route to these products so the native
