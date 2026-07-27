@@ -1487,6 +1487,10 @@ class SouthbrookKitchenDesign(models.Model):
     # room_length_mm equivalents from the design brief (3600×3000×2400 mm
     # etc.) are converted to nearest round US kitchen dimensions
     # (12'/10'/8') because Southbrook's shop floor cuts to inches.
+    # DEPRECATED (templates T3, 2026-07-27): superseded by data-driven
+    # southbrook.kitchen.template + action_instantiate. Kept ONLY because
+    # test_track_b_end_to_end still exercises it; the picker no longer
+    # consults it. Remove once track-b re-points to templates.
     _KITCHEN_TEMPLATE_PRESETS = {
         "empty": {
             "name":           "Empty Room",
@@ -2403,6 +2407,26 @@ class SouthbrookKitchenDesignTemplatePicker(models.TransientModel):
     _name = "kitchen.design.template.picker"
     _description = "Kitchen Design Template Picker"
 
+    # Task 3 (kitchen templates): the picker is now DATA-driven — pick a
+    # southbrook.kitchen.template + the parametric knobs (count / module
+    # width / appliance sizes), preview, confirm -> action_instantiate ->
+    # open the configurator. UX ordering per user directive: room dims
+    # live on the design/top frame; here shape (template) leads, then the
+    # cabinet selections. Legacy `preset` kept ONLY for compat callers.
+    _COMPAT_PRESET_CODES = {
+        # reconciled against the T4 catalog codes at data-authoring time
+        "empty": None,
+        "l_shape": "L-10X8",
+        "u_shape": "U-10X8X10",
+        "galley": "GAL-10",
+    }
+
+    template_id = fields.Many2one(
+        "southbrook.kitchen.template", string="Kitchen Shape / Template",
+        domain=[("active", "=", True)],
+        help="Prebuilt sample kitchen to start from. Shapes whose minimum "
+             "room dimensions don't fit your room won't instantiate — the "
+             "room is never grown silently.")
     preset = fields.Selection(
         selection=[
             ("empty",   "Empty Room · Blank Canvas"),
@@ -2410,18 +2434,34 @@ class SouthbrookKitchenDesignTemplatePicker(models.TransientModel):
             ("u_shape", "U-Shaped Kitchen"),
             ("galley",  "Galley Kitchen"),
         ],
-        string="Layout Preset",
-        required=True,
-        default="l_shape",
-        help="Pick a starting layout. 'Empty' just seeds room dimensions; "
-             "the shaped presets also seed a starter cabinet run so you "
-             "iterate from a working design instead of an empty canvas.",
+        string="Layout Preset (legacy)",
+        help="Deprecated compat field — maps onto template codes via "
+             "_COMPAT_PRESET_CODES. New UI uses template_id.",
     )
-    preset_description = fields.Text(
-        string="Description",
-        compute="_compute_preset_description",
-        readonly=True,
-    )
+    cabinet_count = fields.Integer(
+        string="Number of Cabinets", default=0,
+        help="0 = template default. Live-clamped to what fits the room "
+             "with the chosen module width and appliance sizes.")
+    module_width_in = fields.Selection(
+        [("18", '18"'), ("21", '21"'), ("24", '24"'), ("30", '30"')],
+        string="Cabinet Size", default="24", required=True)
+    range_width_in = fields.Selection(
+        [("0", "No range"), ("30", '30"'), ("36", '36"'), ("48", '48"')],
+        string="Range / Stove", default="30")
+    fridge_width_in = fields.Selection(
+        [("0", "No fridge"), ("30", '30"'), ("33", '33"'), ("36", '36"')],
+        string="Refrigerator", default="36")
+    dishwasher_width_in = fields.Selection(
+        [("0", "No dishwasher"), ("24", '24"')],
+        string="Dishwasher", default="24")
+    count_max = fields.Integer(
+        string="Max Cabinets", compute="_compute_fit", readonly=True)
+    fit_summary = fields.Text(
+        string="Fit", compute="_compute_fit", readonly=True)
+    template_preview = fields.Html(
+        compute="_compute_fit", sanitize=False, readonly=True,
+        help="Server-generated top-view SVG of the template — never user "
+             "input, hence sanitize=False is safe.")
     partner_id = fields.Many2one(
         "res.partner",
         string="Customer (optional)",
@@ -2430,30 +2470,75 @@ class SouthbrookKitchenDesignTemplatePicker(models.TransientModel):
              "showroom demo.",
     )
 
-    @api.depends("preset")
-    def _compute_preset_description(self):
-        Design = self.env["southbrook.kitchen.design"]
+    def _appliance_widths(self):
+        self.ensure_one()
+        out = {}
+        for atype, raw in (("range", self.range_width_in),
+                           ("fridge", self.fridge_width_in),
+                           ("dishwasher", self.dishwasher_width_in)):
+            if raw and raw != "0":
+                out[atype] = float(raw)
+        return out
+
+    @api.depends("template_id", "cabinet_count", "module_width_in",
+                 "range_width_in", "fridge_width_in", "dishwasher_width_in")
+    def _compute_fit(self):
+        from markupsafe import Markup
         for rec in self:
-            spec = Design._get_preset_layout(rec.preset) if rec.preset else None
-            rec.preset_description = spec["description"] if spec else ""
+            rec.count_max = 0
+            rec.fit_summary = False
+            rec.template_preview = False
+            if not rec.template_id:
+                continue
+            fit = rec.template_id.parametric_fit(
+                rec.cabinet_count or None,
+                float(rec.module_width_in or "24"),
+                rec._appliance_widths())
+            rec.count_max = fit.get("n_max", 0)
+            rec.fit_summary = fit["message"] if not fit["ok"] else (
+                "%d cabinet(s) at %g\" fit this %g\" room (max %d)." % (
+                    fit["count"], fit["module_width_in"],
+                    rec.template_id.default_room_width_in, fit["n_max"]))
+            rec.template_preview = Markup(
+                rec.template_id._generate_thumbnail_svg())
+
+    @api.onchange("template_id", "cabinet_count", "module_width_in",
+                  "range_width_in", "fridge_width_in", "dishwasher_width_in")
+    def _onchange_parametrics(self):
+        # Selection widgets can't grey options in a transient — clamping +
+        # fit_summary IS the spec's "constrain or flag" (never grow room).
+        for rec in self:
+            if rec.template_id and rec.cabinet_count and \
+                    rec.count_max and rec.cabinet_count > rec.count_max:
+                rec.cabinet_count = rec.count_max
 
     def action_create(self):
-        """Materialise a new southbrook.kitchen.design from the picked
-        preset and open the 3D configurator on it. Handles the whole
-        onboarding transition in a single click.
-        """
+        """Instantiate the chosen template (or a plain empty design) and
+        open the 3D configurator. Data-driven — the legacy preset dict is
+        no longer consulted by this path (compat maps preset -> code)."""
         self.ensure_one()
-        Design = self.env["southbrook.kitchen.design"]
-        spec = Design._get_preset_layout(self.preset)
-        if not spec:
-            raise UserError("Please pick a template before continuing.")
-
-        design_vals = {
-            "name":  spec["name"],
-            "state": "draft",
-        }
-        if self.partner_id:
-            design_vals["partner_id"] = self.partner_id.id
-        design = Design.create(design_vals)
-        design._apply_kitchen_template(self.preset)
+        template = self.template_id
+        if not template and self.preset and self.preset != "empty":
+            code = self._COMPAT_PRESET_CODES.get(self.preset)
+            template = code and self.env["southbrook.kitchen.template"].search(
+                [("code", "=", code)], limit=1)
+            if code and not template:
+                raise UserError(
+                    "Legacy preset '%s' maps to template code %s, which is "
+                    "not loaded. Pick a template explicitly." % (
+                        self.preset, code))
+        if not template:
+            # empty room — plain draft design, no template
+            design = self.env["southbrook.kitchen.design"].create({
+                "name": "New Kitchen Design",
+                "state": "draft",
+                "partner_id": self.partner_id.id if self.partner_id else False,
+            })
+            return design.action_open_configurator()
+        design = template.action_instantiate(
+            partner_id=self.partner_id.id if self.partner_id else False,
+            cabinet_count=self.cabinet_count or None,
+            module_width_in=float(self.module_width_in or "24"),
+            appliance_widths=self._appliance_widths(),
+        )
         return design.action_open_configurator()

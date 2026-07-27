@@ -347,3 +347,43 @@ class SouthbrookKitchenTemplateResolve(models.Model):
                     "corner geometry is engine-derived" % len(corner_slots)
                     if corner_slots else "")))
         return design
+
+
+class SouthbrookKitchenTemplateThumbnail(models.Model):
+    _inherit = "southbrook.kitchen.template"
+
+    def _generate_thumbnail_svg(self):
+        """Server-generated top-view SVG (floor slots only) for the picker
+        preview / shape dropdown. Pure string building from template data —
+        no user input ever enters this markup (safe for sanitize=False)."""
+        self.ensure_one()
+        W = self.default_room_width_in or 120.0
+        D = self.default_room_depth_in or 96.0
+        s = 200.0 / max(W, D)
+        out = ['<svg xmlns="http://www.w3.org/2000/svg" '
+               'viewBox="0 0 %.0f %.0f">' % (W * s, D * s),
+               '<rect width="%.0f" height="%.0f" fill="#F4EFE7" '
+               'stroke="#5E5346"/>' % (W * s, D * s)]
+        cursors = {"back": 0.0, "front": 0.0, "left": 0.0, "right": 0.0}
+        dpx = 24.0 * s
+        for slot in self.line_ids.sorted(lambda l: (l.wall, l.run_seq)):
+            if slot.cabinet_type == "wall":
+                continue
+            w = (slot.nominal_width_in
+                 or self.default_module_width_in or 24.0) * s
+            c = cursors[slot.wall]
+            cursors[slot.wall] = c + w
+            if slot.wall == "back":
+                x, y, rw, rh = c, 0.0, w, dpx
+            elif slot.wall == "front":
+                x, y, rw, rh = c, D * s - dpx, w, dpx
+            elif slot.wall == "left":
+                x, y, rw, rh = 0.0, c, dpx, w
+            else:
+                x, y, rw, rh = W * s - dpx, c, dpx, w
+            fill = ("#C28840" if slot.cabinet_type == "appliance"
+                    else "#5E8FBE")
+            out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" '
+                       'fill="%s" opacity="0.85"/>' % (x, y, rw, rh, fill))
+        out.append("</svg>")
+        return "".join(out)

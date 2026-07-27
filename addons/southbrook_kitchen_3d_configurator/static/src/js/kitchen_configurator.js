@@ -640,6 +640,18 @@ class SouthbrookKitchenConfigurator extends Component {
         }
     }
 
+    // ─── Templates (T3): top-frame entry to the four-dropdown picker ────────────
+    async _openTemplatePicker() {
+        // v19 doAction REQUIRES explicit views (memory: doaction_views_required)
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            name: "Start from Template",
+            res_model: "kitchen.design.template.picker",
+            views: [[false, "form"]],
+            target: "new",
+        });
+    }
+
     // ─── Room controls ──────────────────────────────────────────────────────────
     async _changeRoom(field, raw) {
         const v = parseFloat(raw);
@@ -1911,6 +1923,12 @@ SouthbrookKitchenConfigurator.template = xml`
                t-att-value="state.room.height_in"
                t-on-change="(ev) => this._changeRoom('height_in', ev.target.value)"/>
       </label>
+      <!-- Templates T3 (user directive): the template entry lives in the
+           TOP FRAME beside the room dimensions — dims first, then shape
+           + cabinet selections (the four-dropdown picker dialog). -->
+      <button class="o_sbk_btn o_sbk_btn_template" type="button"
+              title="Start from a prebuilt sample kitchen"
+              t-on-click="_openTemplatePicker">Start from Template</button>
     </div>
     <!-- Task #48 — Customer picker (top-bar).
          Hidden entirely for portal users — Agent A's default_get
