@@ -511,13 +511,30 @@ class SouthbrookKitchenDesign(models.Model):
             # interactive flow), RESPECT that arrangement and just resolve
             # corners; otherwise auto-distribute a flat list across walls.
             manual = any((c.get("wall") or "back") != "back" for c in cabs)
+            # M1 (2026-07-27) — rules-as-data: feed active junction rules
+            # (southbrook.placement.rule, southbrook_estimating) to the
+            # pure engine. The engine picks the corner cabinet whose
+            # per-leg wall consumption fits this room (asymmetric blind
+            # corners included) and tags the node with the rule's SKU;
+            # with no rules (or none fitting) it falls back to the legacy
+            # square + _CORNER_SKU below, so behavior degrades safely.
+            Rule = self.env.get("southbrook.placement.rule")
+            corner_rules = (
+                Rule.sudo().search([
+                    ("anchor_class", "=", "junction"),
+                ]).engine_dicts() if Rule is not None else None)
             r = kitchen_layout_engine.resolve_and_layout(
                 cabs, room,
                 auto_assign=not manual,
+                corner_rules=corner_rules,
                 zone_layout=SaleOrder._ZONE_LAYOUT,
                 worktop_cursor=SaleOrder._WORKTOP_CURSOR,
                 worktop_y=SaleOrder._WORKTOP_Y_FLOOR,
             )
+            for diag in r.get("corner_diagnostics") or ():
+                _logger.info("[auto-arrange] design=%s corner=%s/%s: %s",
+                             design.id, diag["corner"], diag["layer"],
+                             diag["reason"])
             finals = {c["id"]: c for c in r["cabinets"]}
             places = {p["id"]: p for p in r["placements"]}
 
@@ -576,7 +593,10 @@ class SouthbrookKitchenDesign(models.Model):
                 # corner node dict IS the "cab" here (it carries its own
                 # width_mm).
                 anchor = kitchen_layout_engine.anchor_pose_mm(node, place)
-                code = self._CORNER_SKU.get(node["layer"], "SB-CORNER")
+                # M1 — a rule-resolved node carries the winning rule's
+                # SKU; _CORNER_SKU stays the legacy-fallback mapping.
+                code = (node.get("sku")
+                        or self._CORNER_SKU.get(node["layer"], "SB-CORNER"))
                 tmpl = self.env["product.template"].sudo().search(
                     [("default_code", "=", code)], limit=1)
                 variant = False
@@ -723,10 +743,22 @@ class SouthbrookKitchenDesign(models.Model):
                     "layout_key %r names unknown corner %r — skipping",
                     design.id, dl.id, key, corner_name)
                 continue
+            # M2 (2026-07-27) — PER-LEG reservation. The corner's persisted
+            # anchor pose means: rot 0/180 → width_in spans the X axis and
+            # depth_in spans Z; rot 90/270 → width spans Z, depth spans X.
+            # Each wall of the pair is offset by the corner's extent along
+            # THAT wall's axis, so an asymmetric blind corner (45" along
+            # its host wall, 24" of the other) reserves 45/24 — not 45/45.
+            # Symmetric corners reduce to the old single-width behavior.
             width_mm = (dl.width_in or 0) * MM
+            depth_mm = (dl.depth_in or 0) * MM
+            rot = int(round(dl.rotation_deg or 0)) % 360
+            ext_x = width_mm if rot in (0, 180) else depth_mm
+            ext_z = depth_mm if rot in (0, 180) else width_mm
             for w in walls:
+                leg = ext_x if w in ("back", "front") else ext_z
                 wall_start_offsets[(w, layer)] = max(
-                    wall_start_offsets.get((w, layer), 0), width_mm)
+                    wall_start_offsets.get((w, layer), 0), leg)
 
         cabs = []
         for dl in design.cabinet_line_ids:

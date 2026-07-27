@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M1 "rules-as-data" seed — 09-rule-engine-spec.md §6-7.
+
+  MUST load AFTER data/product_templates.xml: the seeder resolves
+  product.template records by default_code search (see the docstring
+  on _seed_default_rules in models/placement_rule.py for why this is a
+  search, not a ref()) and needs SB-CORNER to already exist.
+
+  noupdate="0": re-running this data file on -u must stay idempotent
+  (the seeder skips any corner_type_id/tier pair that already exists)
+  without clobbering runtime edits an estimator makes to sequence or
+  payload afterwards — _seed_default_rules only CREATEs missing rows,
+  it never overwrites an existing one.
+
+  Why a <function> instead of <record> elements: two of the three
+  seed rules' products (SB-CORNER-BLIND / SB-WALL-CORNER) are minted
+  by the sibling southbrook_configurator_ux module, which this addon
+  does not depend on and which may not be installed in every database
+  this module loads into (including this module's own test runs). A
+  <record eval="ref(...)"> would hard-fail install in that case. The
+  model-level seeder resolves each product by default_code at runtime
+  and falls back to the in-module SB-CORNER template when the sibling
+  module's templates aren't present — see models/placement_rule.py
+  for the full rationale. This mirrors the existing
+  southbrook.estimating.template_code / assign_codes() pattern already
+  used by data/template_code_assign.xml in this module.
+-->
+<odoo noupdate="0">
+    <function model="southbrook.placement.rule" name="_seed_default_rules"/>
+</odoo>
