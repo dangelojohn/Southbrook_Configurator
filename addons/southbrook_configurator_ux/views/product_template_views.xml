@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="product_template_form_inherit_onshape" model="ir.ui.view">
+    <field name="name">product.template.form.inherit.southbrook.onshape</field>
+    <field name="model">product.template</field>
+    <field name="inherit_id" ref="product.product_template_only_form_view"/>
+    <field name="priority">18</field>
+    <field name="arch" type="xml">
+      <xpath expr="//notebook/page[@name='general_information']" position="inside">
+        <separator string="CAD &amp; Engineering Links"/>
+        <group name="onshape_cad_group">
+          <field name="x_onshape_cad_url"
+                 widget="url"
+                 string="Onshape CAD URL"
+                 placeholder="https://cad.onshape.com/documents/..."/>
+        </group>
+      </xpath>
+    </field>
+  </record>
+</odoo>

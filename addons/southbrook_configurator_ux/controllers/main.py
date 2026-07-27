@@ -123,11 +123,36 @@ _REF_SHEETS = ("Instructions", "REF_CATEGORIES", "REF_ATTRIBUTES",
 _SKU_ATTR_NAMES = ("Width", "Series", "Finish")
 
 
+# P4 — Re-sharded "Other" by manufacturing meaning. The pre-audit
+# grouping dropped nine attributes — including the BoM-routing
+# Drawer Construction — into a flat "Other" sink. The new grouping
+# surfaces the manufacturing-critical "Construction" group above the
+# novelty Add-ons (Lighting, Interior Storage), and pulls Family
+# into Size & Layout because it is structural. No attribute or option
+# value is removed; only group titles and per-group membership change.
+#
+# Empty groups are filtered out at render time (see /state endpoint
+# group_payload loop), so a template that doesn't expose Frame Style
+# (e.g. wall cabinets) won't show an empty Construction box.
 ATTRIBUTE_GROUPS = [
-    ("Size & Layout",         ["Width", "Door Count"]),
+    # Structural — what the cabinet IS.
+    ("Size & Layout",         ["Width", "Door Count", "Family"]),
+    # Manufacturing-critical Construction — what determines routing,
+    # joinery, and the cut spec. Sits above any novelty.
+    ("Construction",          ["Frame Style", "Door Overlay", "Drawer Construction"]),
+    # Series + box material + door style still belong together (channel
+    # pricelist + box-material-by-series rule both key on this trio).
     ("Series & Materials",    ["Series", "Box Material", "Door Style"]),
+    # Materials & Finish — the per-species + per-pull-finish premium
+    # surface, plus the door edge profile that affects machining time.
+    ("Materials & Finish",    ["Wood Species", "Pull Finish", "Door Edge Profile"]),
+    # Visible finish + symmetry + gables (kept name to minimise churn).
     ("Finish & Construction", ["Finish", "Hinge Side", "Finished Sides", "Gables"]),
-    ("Hardware & Add-ons",    ["Handle", "Accessories"]),
+    # Hardware — Drawer Slide (P2) sits alongside Handle + Accessories.
+    ("Hardware & Add-ons",    ["Drawer Slide", "Handle", "Accessories"]),
+    # Novelty Add-ons — Lighting and Interior Storage. Splitting these
+    # off prevents them from masking the structural Construction items.
+    ("Add-ons",               ["Lighting", "Interior Storage"]),
 ]
 
 
@@ -283,6 +308,15 @@ class SouthbrookConfiguratorAPI(http.Controller):
         currency = ((website and website.currency_id)
                     or request.env.company.currency_id)
 
+        # P6 — completeness payload: chosen chips grouped by section,
+        # the explicit list of required-but-missing attributes, and a
+        # boolean the UI consults to enable / disable the Add-to-Quote
+        # CTA. Server-side single source of truth so the UI is purely
+        # a renderer.
+        completeness = self._build_completeness_payload(
+            tmpl, session, group_payload, attributes,
+        )
+
         return {
             "ok": True,
             "product": {
@@ -302,6 +336,78 @@ class SouthbrookConfiguratorAPI(http.Controller):
             "groups": group_payload,
             "attributes": attributes,
             "selected_value_ids": selected,
+            "chosen_chips": completeness["chosen_chips"],
+            "required_missing": completeness["required_missing"],
+            "add_to_quote_enabled": completeness["add_to_quote_enabled"],
+        }
+
+    # ------------------------------------------------------------------
+    # P6 — completeness payload
+    # ------------------------------------------------------------------
+    def _build_completeness_payload(self, tmpl, session, groups, attributes):
+        """Return chosen chips (grouped by P4 section) + the explicit
+        list of REQUIRED unsatisfied attribute names + a boolean for
+        the Add-to-Quote enable state.
+
+        The audit pinned the 17/18 -> name-the-one-missing case as the
+        load-bearing acceptance — so we emit the missing attribute by
+        name, not just count.
+        """
+        # Index: attribute_id -> (attribute_name, is_required)
+        attr_meta = {}
+        for line in tmpl.attribute_line_ids:
+            attr_meta[line.attribute_id.id] = {
+                "name": line.attribute_id.name,
+                "required": bool(getattr(line, "required", False)),
+            }
+
+        # Index: attribute_id -> group_title (per P4 grouping).
+        attr_id_to_group = {}
+        for g in groups:
+            for aid in g.get("attribute_ids", []):
+                attr_id_to_group[aid] = g["title"]
+
+        # Picked values by attribute.
+        picked_by_attr = {}
+        if session:
+            for v in session.value_ids:
+                picked_by_attr.setdefault(v.attribute_id.id, []).append(v)
+
+        # Build the chips list — grouped, deterministic order.
+        chosen_chips = []
+        for g in groups:
+            for aid in g.get("attribute_ids", []):
+                values = picked_by_attr.get(aid) or []
+                meta = attr_meta.get(aid)
+                if not meta or not values:
+                    continue
+                for val in values:
+                    chosen_chips.append({
+                        "group_title": g["title"],
+                        "attribute_id": aid,
+                        "attribute_name": meta["name"],
+                        "value_id": val.id,
+                        "value_name": val.name,
+                    })
+
+        # Required-but-unsatisfied.
+        required_missing = []
+        for aid, meta in attr_meta.items():
+            if not meta["required"]:
+                continue
+            if not picked_by_attr.get(aid):
+                required_missing.append({
+                    "attribute_id": aid,
+                    "attribute_name": meta["name"],
+                    "group_title": attr_id_to_group.get(aid, "Other"),
+                })
+        # Stable order — alphabetical by attribute_name for UX.
+        required_missing.sort(key=lambda r: r["attribute_name"])
+
+        return {
+            "chosen_chips": chosen_chips,
+            "required_missing": required_missing,
+            "add_to_quote_enabled": not required_missing,
         }
 
     # ------------------------------------------------------------------
@@ -537,15 +643,85 @@ class SouthbrookConfiguratorAPI(http.Controller):
                     break
         disabled_ids = sorted(refined_disabled)
 
+        # P2 — Soft-Close derivation. When a brand-aware Drawer Slide is
+        # picked AND the legacy "Accessories: Soft-Close" +$15 line is
+        # still in the session, the audit asks us to suppress the +$15
+        # (no double charge) and surface a derived badge instead.
+        price = float(session.price or 0.0)
+        weight = float(getattr(session, "weight", 0.0) or 0.0)
+        soft_close_derived, sc_offset = self._p2_softclose_derivation(session)
+        if soft_close_derived and sc_offset:
+            price = max(0.0, price - sc_offset[0])
+            weight = max(0.0, weight - sc_offset[1])
+
+        # P6 — completeness payload on every /select tick so the UI
+        # can keep the chosen-chips summary and the missing-attributes
+        # checklist in sync with each pick. Server is the single source
+        # of truth for "ready to submit?".
+        tmpl = session.product_tmpl_id
+        select_groups = self._build_group_payload_for_template(tmpl)
+        completeness = self._build_completeness_payload(
+            tmpl, session, select_groups, attributes={},
+        )
+
         return {
             "ok": True,
             "selected_value_ids": session.value_ids.ids,
-            "price": float(session.price or 0.0),
-            "weight": float(getattr(session, "weight", 0.0) or 0.0),
+            "price": price,
+            "weight": weight,
             "disabled_value_ids": disabled_ids,
             "live_sku": self._compute_sku_from_session(session),
+            "soft_close_derived": bool(soft_close_derived),
+            "chosen_chips": completeness["chosen_chips"],
+            "required_missing": completeness["required_missing"],
+            "add_to_quote_enabled": completeness["add_to_quote_enabled"],
             "warnings": [],
         }
+
+    def _build_group_payload_for_template(self, tmpl):
+        """Compute the same group_payload list /state builds, given a
+        template. Reusable from /select so completeness is consistent."""
+        all_attr_ids = {a.attribute_id.id: a.attribute_id.name
+                        for a in tmpl.attribute_line_ids}
+        groups = []
+        used = set()
+        for title, names in ATTRIBUTE_GROUPS:
+            ids = [aid for aid, nm in all_attr_ids.items() if nm in names]
+            if ids:
+                groups.append({"title": title, "attribute_ids": ids})
+                used.update(ids)
+        leftover = [aid for aid in all_attr_ids if aid not in used]
+        if leftover:
+            groups.append({"title": "Other", "attribute_ids": leftover})
+        return groups
+
+    # ------------------------------------------------------------------
+    # P2 — Soft-Close derivation helper.
+    # Returns (derived_bool, (price_offset, weight_offset)) — offset is
+    # the amount to subtract from the displayed price/weight when both
+    # a soft-close slide and the legacy +$15 Accessories pick are
+    # present. The seed module is the single source of truth for which
+    # slide values are soft-close.
+    # ------------------------------------------------------------------
+    _SOFTCLOSE_LEGACY_OFFSET = (15.0, 0.0)
+
+    def _p2_softclose_derivation(self, session):
+        if not session or not session.value_ids:
+            return False, None
+        Seed = request.env["southbrook.configurator_ux.drawer_slide_seed"]
+        slide_is_sc = Seed.is_soft_close_slide_picked(session.value_ids)
+        has_legacy_pick = any(
+            v.attribute_id.name == "Accessories" and v.name == "Soft-Close"
+            for v in session.value_ids
+        )
+        if slide_is_sc and has_legacy_pick:
+            return True, self._SOFTCLOSE_LEGACY_OFFSET
+        if slide_is_sc:
+            # Slide is soft-close but legacy pick absent — badge still
+            # derives (UI shows "Soft-Close" as a derived chip), no
+            # price adjustment needed.
+            return True, None
+        return False, None
 
     # ------------------------------------------------------------------
     # Live SKU composer — shared between /select and /commit.
@@ -563,6 +739,33 @@ class SouthbrookConfiguratorAPI(http.Controller):
     # default_code (P4 gap #3 fix) so the variant carries a code from
     # the moment of creation rather than blanking.
     # ------------------------------------------------------------------
+    # P5 — Lossless SKU grammar extensions. The legacy 3-segment grammar
+    # (SB-{Width}-{Series}-{Finish}) collided whenever two configs
+    # differed only in drawer construction or slide brand. The audit
+    # named this gap: a sales-rep demo that picked a Dovetail box and
+    # one that picked a Plywood box generated the same default_code,
+    # masking the downstream variant divergence.
+    #
+    # The extension appends three optional segments — drawer count,
+    # drawer construction code, slide model code — only when present.
+    # Backwards-compat: a non-drawer cabinet's SKU still ends at the
+    # legacy 3-segment form, so any external system that grepped on
+    # SB-24I-CON-WHI still matches. Each segment is short (2–6 chars)
+    # and case-stable.
+    _DRAWER_CONSTRUCTION_CODES = {
+        "Melamine Particleboard":   "MP",
+        "5/8 in Plywood (Routed)":  "PR",
+        "Dovetail Solid Hardwood":  "DT",
+        "Metal (Blum Legrabox)":    "BX",
+    }
+    _SLIDE_CODES = {
+        "King Slide K2832 21\" Soft-Close":  "KS21SC",
+        "King Slide 3032 18\" Ball-Bearing": "KS18BB",
+        "Blum MOVENTO 450":                  "BMV450",
+        "Hettich Actro 5D 500":              "HA5500",
+        "Salice Progressa+ (PR-602728)":     "SPP602",
+    }
+
     def _compute_sku_from_session(self, session):
         # Resolve picked values by attribute name. session.value_ids
         # holds the global product.attribute.value records, so we
@@ -582,7 +785,77 @@ class SouthbrookConfiguratorAPI(http.Controller):
         # If Width (first slot) isn't picked, no SKU yet.
         if parts[0] == "XXX":
             return "—"
-        return f"SB-{'-'.join(parts)}"
+
+        # P5 — Optional extension segments. Append only when present so
+        # the legacy 3-segment form is a strict prefix.
+        extensions = []
+
+        # Drawer count from a literal Drawer Count attribute OR derived
+        # from the Drawer Construction value name (e.g. "3-Drawer Stack").
+        drawer_count = self._p5_extract_drawer_count(picked_by_attr_name)
+        if drawer_count:
+            extensions.append(f"{drawer_count}DR")
+
+        # Drawer construction (joinery style) — DT / MP / PR / BX. Falls
+        # back to a substring match on common joinery keywords before
+        # using a generic first-3-alnum truncation. The substring layer
+        # exists because real catalog names typically wrap the joinery
+        # in parentheses (e.g. "3-Drawer Stack (Dovetail)") and a naive
+        # truncation collapses both Dovetail and Plywood variants to
+        # "3DR", silently re-colliding on the P5 acceptance.
+        construction_val = picked_by_attr_name.get("Drawer Construction")
+        if construction_val:
+            code = self._DRAWER_CONSTRUCTION_CODES.get(construction_val.name)
+            if not code:
+                name_lower = (construction_val.name or "").lower()
+                joinery_keywords = (
+                    ("dovetail", "DT"),
+                    ("plywood", "PR"),
+                    ("particleboard", "MP"),
+                    ("melamine", "MP"),
+                    ("legrabox", "BX"),
+                    ("metal", "BX"),
+                )
+                for needle, label in joinery_keywords:
+                    if needle in name_lower:
+                        code = label
+                        break
+            if not code:
+                code = "".join(
+                    c for c in (construction_val.name or "") if c.isalnum()
+                )[:3].upper() or "XX"
+            extensions.append(code)
+
+        # Drawer slide model — KS21SC / BMV450 / etc.
+        slide_val = picked_by_attr_name.get("Drawer Slide")
+        if slide_val:
+            code = self._SLIDE_CODES.get(slide_val.name)
+            if not code:
+                code = "".join(
+                    c for c in (slide_val.name or "") if c.isalnum()
+                )[:6].upper() or "XXXXXX"
+            extensions.append(code)
+
+        head = f"SB-{'-'.join(parts)}"
+        if extensions:
+            return head + "-" + "-".join(extensions)
+        return head
+
+    def _p5_extract_drawer_count(self, picked_by_attr_name):
+        explicit = picked_by_attr_name.get("Drawer Count")
+        if explicit:
+            try:
+                return int("".join(c for c in (explicit.name or "")
+                                   if c.isdigit())[:1] or "0")
+            except (TypeError, ValueError):
+                pass
+        construction = picked_by_attr_name.get("Drawer Construction")
+        if construction:
+            name = (construction.name or "").lower()
+            for n in range(9, 0, -1):
+                if f"{n}-drawer" in name or f"{n} drawer" in name:
+                    return n
+        return 0
 
     # ------------------------------------------------------------------
     # /commit — materialise variant + add to user's draft sale.order.

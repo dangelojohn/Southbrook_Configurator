@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  P2 — Brand-aware Drawer Slide attribute.
+
+  Seeds the Drawer Slide attribute + 5 values + per-template attribute
+  lines on every drawer cabinet. Idempotent: re-running this addon's
+  -u is a no-op once the schema is in place. Backfills price_extra +
+  weight_extra so the live recalc badges reflect the chosen brand.
+-->
+<odoo noupdate="0">
+  <function model="southbrook.configurator_ux.drawer_slide_seed"
+            name="seed_drawer_slide_attribute"/>
+</odoo>
