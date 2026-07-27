@@ -684,6 +684,87 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             "design_name": design.display_name,
         }
 
+    # T7 (kitchen templates) — engine-routed room resize. The naive
+    # /layout generator above is a single-wall fill: calling it on a
+    # SAVED design's room resize regenerates (and on save, replaces)
+    # the canonical multi-wall layout. This route is the honest path:
+    # write the dims, re-derive every pose through action_auto_arrange
+    # (corner engine included), and hand back the same line emission
+    # load_design_lines uses. A resize the cabinets can't fit REVERTS
+    # the dims and reports ROOM_TOO_SMALL — the room is never left in a
+    # non-fitting state.
+    @http.route(
+        "/southbrook_kitchen/configurator/rearrange",
+        type="jsonrpc", auth="user", methods=["POST"],
+    )
+    def rearrange(self, design_id, room=None):
+        design = request.env["southbrook.kitchen.design"].browse(
+            int(design_id or 0)).exists()
+        if not design:
+            return {"error": "Design not found", "error_code": "NOT_FOUND"}
+        try:
+            design.check_access("write")
+        except Exception:
+            return {"error": "You don't have write access to this design.",
+                    "error_code": "ACCESS_DENIED"}
+        prev_room = {
+            "width_in": design.room_width_in,
+            "depth_in": design.room_depth_in,
+            "height_in": design.room_height_in,
+        }
+        pre_active_ids = design.cabinet_line_ids.filtered(
+            lambda l: l.layout_role == "canonical").ids
+        if room:
+            design.write({
+                "room_width_in": float(
+                    room.get("width_in") or prev_room["width_in"]),
+                "room_depth_in": float(
+                    room.get("depth_in") or prev_room["depth_in"]),
+                "room_height_in": float(
+                    room.get("height_in") or prev_room["height_in"]),
+            })
+        try:
+            design.action_auto_arrange(sync=False)
+            # T5 lesson — the engine "fits" impossible runs by ARCHIVING
+            # cabinets, it does not raise. pre_active_ids only holds
+            # lines that were ACTIVE going in (already-substituted
+            # corner leads are not in it), so any of them inactive now
+            # means this resize FORCED a drop: refuse it.
+            dropped = request.env["southbrook.kitchen.design.line"] \
+                .with_context(active_test=False) \
+                .browse(pre_active_ids).filtered(lambda l: not l.active)
+            if room and dropped:
+                raise LayoutCapacityExceeded(
+                    0, 0, detail="%d cabinet(s) would be dropped" %
+                    len(dropped))
+        except LayoutCapacityExceeded as e:
+            # arrange rolled ITSELF back (its own savepoint) — the dims
+            # write above is ours to revert (never persist a resize the
+            # cabinets don't fit). Then re-arrange at the ORIGINAL dims
+            # (they fit before, so this is a restore, best-effort).
+            design.write({
+                "room_width_in": prev_room["width_in"],
+                "room_depth_in": prev_room["depth_in"],
+                "room_height_in": prev_room["height_in"],
+            })
+            try:
+                design.action_auto_arrange(sync=False)
+            except LayoutCapacityExceeded:
+                pass
+            return {"error": "That room size doesn't fit the current "
+                             "cabinets (%s). The room was not changed — "
+                             "remove a cabinet first." % e,
+                    "error_code": "ROOM_TOO_SMALL",
+                    "room": prev_room}
+        return {
+            "lines": self._serialize_design_lines(design),
+            "room": {
+                "width_in": design.room_width_in,
+                "depth_in": design.room_depth_in,
+                "height_in": design.room_height_in,
+            },
+        }
+
     @http.route(
         "/southbrook_kitchen/configurator/save_position",
         type="jsonrpc", auth="user", methods=["POST"],

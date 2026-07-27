@@ -278,10 +278,33 @@ class SouthbrookKitchenConfigurator extends Component {
             this.state.loading = false;
         });
 
+        // T7 — auto-save first-action gate. Programmatic refreshes
+        // (hydration, template instantiation echo, prop-driven
+        // recomputes) must NEVER auto-save over a saved design before
+        // the rep has actually touched anything: save_design is a
+        // full-replace writer. Every genuine user mutation calls
+        // _markUserAction() to open the gate. (Undo/redo deferred —
+        // investigation E-f: the gate is the safe half.)
+        this._userActed = false;
+
         onMounted(() => {
             // 24e — scene bring-up is <KitchenCanvas>'s job. Parent
             // only wires window-scoped keyboard shortcuts here.
             window.addEventListener("keydown", this._onKeyDown);
+            // T7 — read-only automation/diagnostics hook. Deep-copied
+            // snapshot with a FIXED key contract; never a mutation
+            // surface.
+            window.__sbk = Object.assign(window.__sbk || {}, {
+                getLayout: () => (this.state.items || []).map(it => ({
+                    id:            it.id || null,
+                    sku:           it.default_code || null,
+                    wall:          it.wall || "back",
+                    x_position_in: it.x_position_in || 0,
+                    width_in:      it.width_in || 0,
+                    cabinet_type:  it.cabinet_type || "base",
+                    is_filler:     it.cabinet_type === "filler",
+                })),
+            });
         });
 
         onWillUnmount(() => {
@@ -294,7 +317,17 @@ class SouthbrookKitchenConfigurator extends Component {
                 this._autoSaveTimer = null;
             }
             window.removeEventListener("keydown", this._onKeyDown);
+            if (window.__sbk) {
+                delete window.__sbk.getLayout;   // T7 — hook dies with us
+            }
         });
+    }
+
+    // T7 — flips the auto-save gate open. Called by every GENUINE user
+    // mutation entry point (add/drop, drag end, remove, width/swap,
+    // room change, wall select) and nowhere else.
+    _markUserAction() {
+        this._userActed = true;
     }
 
     // ─── Odoo data ──────────────────────────────────────────────────────────────
@@ -653,17 +686,76 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // ─── Room controls ──────────────────────────────────────────────────────────
+    // T7 — a SAVED (hydrated) design's room resize routes through the
+    // engine (`/rearrange` → action_auto_arrange, corners included),
+    // never the naive single-wall /layout generator, which would
+    // regenerate — and on the next save REPLACE — the canonical
+    // multi-wall layout. Fresh unsaved sessions keep /layout unchanged.
+    async _rearrangeOnServer() {
+        try {
+            const res = await rpc(
+                "/southbrook_kitchen/configurator/rearrange",
+                { design_id: this.state.designId, room: this.state.room },
+            );
+            if (res && res.error_code === "ROOM_TOO_SMALL") {
+                if (res.room) {
+                    this.state.room = { ...this.state.room, ...res.room };
+                }
+                this.notification.add(res.error, { type: "warning" });
+                return false;
+            }
+            if (res && res.error) {
+                this.notification.add(res.error, { type: "danger" });
+                return false;
+            }
+            const lines = (res && res.lines) || [];
+            const selKey = this.state.selected
+                && this.state.selected.layout_key;
+            this.state.items = lines.map(line => this._lineToItem(line));
+            this.state.selected = selKey
+                ? (this.state.items.find(i => i.layout_key === selKey)
+                   || null)
+                : null;
+            if (res && res.room) {
+                this.state.room = { ...this.state.room, ...res.room };
+            }
+            this._recomputeLayoutFromItems();
+            return true;
+        } catch (e) {
+            console.warn(
+                "[SouthbrookKitchenConfigurator] rearrange failed:", e);
+            this.notification.add(
+                "Room resize failed — nothing was changed.",
+                { type: "danger" });
+            return false;
+        }
+    }
+
+    _usesEngineResize() {
+        return !!(this.state.designId && this._hydratedFromDesign);
+    }
+
     async _changeRoom(field, raw) {
         const v = parseFloat(raw);
         if (!Number.isFinite(v)) return;
+        this._markUserAction();
         const min = { width_in: 12, depth_in: 12, height_in: 84 };
         this.state.room[field] = Math.max(min[field] || 12, v);
+        if (this._usesEngineResize()) {
+            await this._rearrangeOnServer();   // persists server-side; no auto-save needed
+            return;
+        }
         await this._refreshLayout({ force: true });   // room resize regenerates, saved designs included
         this._queueAutoSave();    // D5
     }
 
     async _stretchWidth(delta) {
+        this._markUserAction();
         this.state.room.width_in = Math.max(12, this.state.room.width_in + delta);
+        if (this._usesEngineResize()) {
+            await this._rearrangeOnServer();
+            return;
+        }
         await this._refreshLayout({ force: true });   // room resize regenerates, saved designs included
         this._queueAutoSave();    // D5
     }
@@ -686,6 +778,7 @@ class SouthbrookKitchenConfigurator extends Component {
         const allowed = ["split", "left", "right", "scribe"];
         const v = (value || "").toLowerCase();
         if (!allowed.includes(v)) return;
+        this._markUserAction();   // T7 gate
         this.state.fillerStrategy = v;
         await this._refreshLayout();
         this._queueAutoSave();
@@ -701,6 +794,7 @@ class SouthbrookKitchenConfigurator extends Component {
         const allowed = ["fixed_gap", "to_ceiling", "to_soffit"];
         const v = (value || "").toLowerCase();
         if (!allowed.includes(v)) return;
+        this._markUserAction();   // T7 gate
         this.state.wallCabTopAlignment = v;
         await this._refreshLayout();
         this._queueAutoSave();
@@ -714,6 +808,7 @@ class SouthbrookKitchenConfigurator extends Component {
         if (this._hydratedFromDesign) return;
         const v = parseFloat(rawValue);
         if (!Number.isFinite(v) || v < 36 || v > 144) return;
+        this._markUserAction();   // T7 gate
         this.state.soffitHeightIn = v;
         // Only re-emit if the alignment actually consults soffit.
         if (this.state.wallCabTopAlignment === "to_soffit") {
@@ -727,6 +822,7 @@ class SouthbrookKitchenConfigurator extends Component {
     async _applySnapHint() {
         const hint = this.state.summary && this.state.summary.snap_hint;
         if (!hint || !hint.target_width) return;
+        this._markUserAction();   // T7 gate
         this.state.room.width_in = hint.target_width;
         await this._refreshLayout();
         this._queueAutoSave();
@@ -839,6 +935,7 @@ class SouthbrookKitchenConfigurator extends Component {
     _onProductDragEnd(_ev) {
         this.state.draggedProduct = null;
         this.state.dragHover      = false;
+        this._canvasApi?.clearDragGhost?.();   // T7 ghost
     }
 
     // Allow drop on the canvas wrapper. preventDefault is mandatory or
@@ -849,7 +946,11 @@ class SouthbrookKitchenConfigurator extends Component {
         ev.dataTransfer.dropEffect = "copy";
         if (!this.state.dragHover) {
             this.state.dragHover = true;
-            }
+        }
+        // T7 — ghost preview: translucent stand-in at the hovered
+        // wall's run end. Visual affordance only — the drop still goes
+        // through the existing server-side placement.
+        this._canvasApi?.updateDragGhost?.(ev);
     }
 
     _onCanvasDragLeave(ev) {
@@ -857,12 +958,14 @@ class SouthbrookKitchenConfigurator extends Component {
         // (children fire dragleave when crossing internal elements).
         if (ev.currentTarget && ev.currentTarget.contains(ev.relatedTarget)) return;
         this.state.dragHover = false;
+        this._canvasApi?.clearDragGhost?.();   // T7 ghost
     }
 
     _onCanvasDrop(ev) {
         ev.preventDefault();
         this.state.dragHover     = false;
         this.state.draggedProduct = null;
+        this._canvasApi?.clearDragGhost?.();   // T7 ghost
         let pid = null;
         try {
             const raw = ev.dataTransfer.getData("application/x-sbk-product");
@@ -915,6 +1018,7 @@ class SouthbrookKitchenConfigurator extends Component {
     // then sorts-by-x and re-packs contiguously: visual semantic is
     // "where in the run order does this go". `null` = append at end.
     _addCabinetFromProduct(product, targetX = null, wallOverride = null) {
+        this._markUserAction();   // T7 gate
         const type = product.cabinet_type || "base";
         // PR3.0 — y/z field-semantics migration: y_position_in is the
         // canonical mount-height/elevation field, z_position_in is the
@@ -992,11 +1096,17 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.items = [...(this.state.items || []), newItem];
         this.state.selected = newItem;
         this._recomputeLayoutFromItems();
-        // Room width may now be short. Auto-extend so the new cabinet
-        // is visible (no scrolling around an off-canvas insert).
+        // T7 — NO silent room growth (the spec's "54->60->84" defect):
+        // an overflowing run gets an honest warning, never a mutated
+        // room. The server-side validators flag the overflow too.
         const required = this._currentRunWidthIn();
         if (required > this.state.room.width_in) {
-            this.state.room.width_in = Math.ceil(required / 6) * 6;
+            this.notification.add(
+                `Run needs ${Math.ceil(required)}″ — room is ` +
+                `${this.state.room.width_in}″. Remove a cabinet or ` +
+                `widen the room.`,
+                { type: "warning" }
+            );
         }
         // D14 — Drop UX feedback: tell the rep WHERE it landed when
         // they used drop-positioning (vs the bare "Added X" toast).
@@ -1104,6 +1214,7 @@ class SouthbrookKitchenConfigurator extends Component {
         if (!sel || !sel.layout_key) return;
         const idx = this.state.items.findIndex(it => it.layout_key === sel.layout_key);
         if (idx < 0) return;
+        this._markUserAction();   // T7 gate
         this.state.items[idx].width_in = v;
         sel.width_in = v;
         this._recomputeLayoutFromItems();
@@ -1122,6 +1233,7 @@ class SouthbrookKitchenConfigurator extends Component {
         if (!sel || !sel.layout_key) return;
         const idx = this.state.items.findIndex(it => it.layout_key === sel.layout_key);
         if (idx < 0) return;
+        this._markUserAction();   // T7 gate
         const oldItem = this.state.items[idx];
         // Preserve position + layout_key + current width (user may have
         // dialed in a custom width; swapping product shouldn't reset it).
@@ -1141,6 +1253,7 @@ class SouthbrookKitchenConfigurator extends Component {
 
     // Remove the selected cabinet entirely.
     _removeSelectedCabinet() {
+        this._markUserAction();   // T7 gate
         const sel = this.state.selected;
         // F14 — see the identical guard comment in _updateSelectedWidth.
         if (!sel || !sel.layout_key) return;
@@ -1761,6 +1874,10 @@ class SouthbrookKitchenConfigurator extends Component {
         // a full-replace writer. See the catch branch in
         // _hydrateFromDesign() for the full rationale.
         if (this._hydrationFailed) return;
+        // T7 — first-action gate: until the rep genuinely touches the
+        // design (_markUserAction), programmatic refresh paths must not
+        // schedule a full-replace save over a saved/template design.
+        if (!this._userActed) return;
         if (this._autoSaveTimer) {
             clearTimeout(this._autoSaveTimer);
             this._autoSaveTimer = null;
@@ -1871,6 +1988,7 @@ class SouthbrookKitchenConfigurator extends Component {
     // state — no placement / save / render path reads state.activeWall
     // yet (PR2/PR3/PR4), so straight-kitchen behaviour is unchanged.
     _onWallSelect(wall) {
+        this._markUserAction();   // T7 gate
         this.state.activeWall = wall;
     }
 
@@ -2545,6 +2663,7 @@ SouthbrookKitchenConfigurator.prototype._onCanvasSelect = function (item) {
     this.state.selected = item;
 };
 SouthbrookKitchenConfigurator.prototype._onCanvasMove = function ({ item, x_position_in, pinnable }) {
+    this._markUserAction();   // T7 gate
     if (pinnable) {
         item.pinned = true;
         this._savePinnedPosition(item);
@@ -2559,7 +2678,14 @@ SouthbrookKitchenConfigurator.prototype._onCanvasMove = function ({ item, x_posi
 SouthbrookKitchenConfigurator.prototype._onCanvasResize = function (newWidthIn, inFlight) {
     this.state.room.width_in = newWidthIn;
     if (!inFlight) {
-        this._refreshLayout({ force: true }).then(() => this._queueAutoSave());
+        this._markUserAction();   // T7 gate
+        // T7 — saved designs re-derive through the engine, never the
+        // single-wall /layout generator (see _rearrangeOnServer).
+        if (this._usesEngineResize()) {
+            this._rearrangeOnServer();
+        } else {
+            this._refreshLayout({ force: true }).then(() => this._queueAutoSave());
+        }
     }
 };
 // Depth-axis counterpart of _onCanvasResize. The front-wall puller
@@ -2576,7 +2702,13 @@ SouthbrookKitchenConfigurator.prototype._onCanvasResize = function (newWidthIn, 
 SouthbrookKitchenConfigurator.prototype._onCanvasResizeDepth = function (newDepthIn, inFlight) {
     this.state.room.depth_in = newDepthIn;
     if (!inFlight) {
-        this._refreshLayout({ force: true }).then(() => this._queueAutoSave());
+        this._markUserAction();   // T7 gate
+        // T7 — same engine routing as the width puller above.
+        if (this._usesEngineResize()) {
+            this._rearrangeOnServer();
+        } else {
+            this._refreshLayout({ force: true }).then(() => this._queueAutoSave());
+        }
     }
 };
 SouthbrookKitchenConfigurator.prototype._onCanvasViewChange = function (key) {

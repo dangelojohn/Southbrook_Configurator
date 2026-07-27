@@ -88,3 +88,8 @@ from . import test_corner_repair
 # Kitchen Templates T6 (2026-07-27) — total_cabinets excludes fillers;
 # filler_count carries the strips; price semantics unchanged.
 from . import test_totals_filler_exclusion
+
+# Kitchen Templates T7 (2026-07-27) — the /rearrange model seam: room
+# resize re-derives through the engine; impossible shrinks are
+# detectable (raise OR archive) and revertible.
+from . import test_rearrange_route

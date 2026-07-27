@@ -171,6 +171,10 @@ export class KitchenCanvas extends Component {
                     // PR4b — sibling to computeDropX: which wall the HTML5
                     // drop landed on (null when the ray misses every wall).
                     computeDropWall: (ev) => this._computeDropWall(ev),
+                    // T7 — drag ghost preview (visual affordance only;
+                    // placement math stays server-side).
+                    updateDragGhost: (ev) => this._updateDragGhost(ev),
+                    clearDragGhost:  ()   => this._clearDragGhost(),
                 });
             }
         });
@@ -228,6 +232,7 @@ export class KitchenCanvas extends Component {
     }
 
     _buildScene(props) {
+        this._clearDragGhost();   // T7 — never survive a rebuild
         const { THREE, scene } = this.T;
         if (!scene) return;
         const room = props.room || {};
@@ -323,6 +328,81 @@ export class KitchenCanvas extends Component {
             mesh.material.emissive.setHex(hex);
             mesh.material.emissiveIntensity = intensity;
         }
+    }
+
+    // ── T7 — drag ghost preview ─────────────────────────────────────
+    // ONE translucent box at the hovered wall's run end while a catalog
+    // product is dragged over the canvas. Extends the wall hover soft-
+    // glow with a concrete "it would land about here" affordance. NO
+    // placement math is duplicated: the box parks at the end of the
+    // hovered wall's current run (max along + width); the real pose
+    // still comes from the server-side engine on drop.
+    _updateDragGhost(ev) {
+        const THREE = this.T.THREE;
+        const prod = this.props.draggedProduct;
+        if (!THREE || !this.T.scene || !this.T.activeCamera || !prod) {
+            this._clearDragGhost();
+            return;
+        }
+        this.T.raycaster.setFromCamera(
+            this._ndcFromEvent(ev), this.T.activeCamera);
+        const wall = this._raycastWall(this.T.raycaster);
+        if (!wall) {
+            this._clearDragGhost();
+            return;
+        }
+        if (wall !== this.T.hoverWall) {
+            this.T.hoverWall = wall;
+            this._applyWallHighlight();
+        }
+        const room = this.props.room || {};
+        const roomW = room.width_in || 12, roomD = room.depth_in || 24;
+        const isUpper = prod.cabinet_type === "wall";
+        const w = prod.width_in  || 24;
+        const h = prod.height_in || (isUpper ? 30 : 34.5);
+        const d = prod.depth_in  || (isUpper ? 12 : 24);
+        const alongOf = (it) => (wall === "back" || wall === "front")
+            ? (it.x_position_in || 0) : (it.z_position_in || 0);
+        const runEnd = (this.props.items || [])
+            .filter(it => (it.wall || "back") === wall
+                && (it.cabinet_type === "wall") === isUpper)
+            .reduce((m, it) => Math.max(m, alongOf(it) + (it.width_in || 0)), 0);
+        let y = 0;
+        if (isUpper) {
+            const anyUpper = (this.props.items || []).find(
+                it => it.cabinet_type === "wall");
+            y = (anyUpper && anyUpper.y_position_in) || 54;
+        }
+        // Centre-of-box position per wall (axis-aligned; side walls
+        // swap width/depth so the box hugs the wall).
+        let cx, cz, gw = w, gd = d;
+        if (wall === "back")       { cx = runEnd + w / 2; cz = d / 2; }
+        else if (wall === "front") { cx = runEnd + w / 2; cz = roomD - d / 2; }
+        else if (wall === "left")  { gw = d; gd = w; cx = d / 2; cz = runEnd + w / 2; }
+        else                       { gw = d; gd = w; cx = roomW - d / 2; cz = runEnd + w / 2; }
+        if (!this.T.ghostMesh) {
+            const geo = new THREE.BoxGeometry(1, 1, 1);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x1866D4, transparent: true, opacity: 0.35,
+                depthWrite: false,
+            });
+            this.T.ghostMesh = new THREE.Mesh(geo, mat);
+            this.T.ghostMesh.renderOrder = 999;
+            this.T.scene.add(this.T.ghostMesh);
+        }
+        this.T.ghostMesh.scale.set(gw * IN, h * IN, gd * IN);
+        this.T.ghostMesh.position.set(
+            cx * IN, (y + h / 2) * IN, cz * IN);
+        this.T.ghostMesh.visible = true;
+    }
+
+    _clearDragGhost() {
+        const g = this.T.ghostMesh;
+        if (!g) return;
+        this.T.scene && this.T.scene.remove(g);
+        if (g.geometry) g.geometry.dispose();
+        if (g.material) g.material.dispose();
+        this.T.ghostMesh = null;
     }
 
     _updateLaneVisibility(props) {

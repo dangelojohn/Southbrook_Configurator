@@ -121,40 +121,56 @@ test("puller commit passes force:true to _refreshLayout", async () => {
         "both pullers must pierce the hydration guard with force:true");
 });
 
-test("forced regen on a hydrated design regenerates and drops hydration", async () => {
+// T7 (kitchen templates) — SUPERSEDES the 2026-07-27 "forced regen"
+// pin above for SAVED designs: a hydrated design's puller commit now
+// routes through the ENGINE (`/rearrange` -> action_auto_arrange,
+// corners included), never the naive single-wall /layout generator,
+// which regenerated — and on the next save REPLACED — the canonical
+// multi-wall layout. Hydration semantics are KEPT (nothing was
+// regenerated; the server re-derived poses for the same canonicals).
+test("puller commit on a hydrated design routes through /rearrange (engine), not /layout", async () => {
     let layoutCalls = 0;
+    let rearrangeCalls = 0;
+    const LINE = {
+        id: 1, product_id: 1, layout_key: "b-1",
+        product_name: "Base 24", cabinet_type: "base",
+        width_in: 24, height_in: 34.5, depth_in: 24,
+        x_position_in: 0, y_position_in: 0, z_position_in: 0,
+        rotation_deg: 0, wall: "back", price: 100,
+    };
     const h = await mountConfigurator({
         actionParams: { design_id: 4242 },
         rpcRoutes: {
             "/southbrook_kitchen/configurator/load_design_lines": () => ({
                 room: { width_in: 120, depth_in: 96, height_in: 96 },
                 design_name: "saved design",
-                lines: [{
-                    id: 1, product_id: 1, layout_key: "b-1",
-                    product_name: "Base 24", cabinet_type: "base",
-                    width_in: 24, height_in: 34.5, depth_in: 24,
-                    x_position_in: 0, y_position_in: 0, z_position_in: 0,
-                    rotation_deg: 0, wall: "back", price: 100,
-                }],
+                lines: [LINE],
             }),
             "/southbrook_kitchen/configurator/layout": () => {
                 layoutCalls += 1;
                 return { items: [], summary: {}, warnings: [] };
+            },
+            "/southbrook_kitchen/configurator/rearrange": () => {
+                rearrangeCalls += 1;
+                return {
+                    lines: [{ ...LINE, z_position_in: 6 }],
+                    room: { width_in: 120, depth_in: 72, height_in: 96 },
+                };
             },
         },
     });
     // Sanity: hydration succeeded and the guard is armed.
     assert.equal(h.component._hydratedFromDesign, true,
         "fixture must start hydrated");
-    h.component._queueAutoSave = () => {};
 
     h.component._onCanvasResizeDepth(72, false);
-    // _refreshLayout awaits the /layout rpc; flush microtasks.
     await new Promise((r) => setTimeout(r, 0));
-    assert.equal(layoutCalls, 1,
-        "puller commit on a hydrated design must hit /layout (regenerate)");
-    assert.equal(h.component._hydratedFromDesign, false,
-        "successful forced regen must drop hydration semantics");
-    assert.equal(h.component.state.hydratedFromDesign, false,
-        "reactive mirror must drop too (re-enables F12 controls)");
+    assert.equal(rearrangeCalls, 1,
+        "puller commit on a hydrated design must hit /rearrange (engine)");
+    assert.equal(layoutCalls, 0,
+        "the single-wall /layout generator must NOT run for saved designs");
+    assert.equal(h.component._hydratedFromDesign, true,
+        "engine reroute keeps hydration semantics — nothing regenerated");
+    assert.equal(h.component.state.items[0].z_position_in, 6,
+        "items re-hydrate from the engine's returned lines");
 });
