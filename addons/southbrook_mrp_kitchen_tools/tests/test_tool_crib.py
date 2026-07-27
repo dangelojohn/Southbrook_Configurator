@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Commit-2 tests: tool crib basics + uniqueness + workcenter linkage."""
+import uuid
+
 from odoo.exceptions import ValidationError
 from odoo.tests import TransactionCase, tagged
 
@@ -22,9 +24,14 @@ class TestToolCrib(TransactionCase):
         self.assertEqual(crib.code, "UTEST-BASIC")
 
     def test_code_unique_constraint(self):
-        self._new_crib("UTEST-DUP")
-        with self.assertRaises(Exception):
-            self._new_crib("UTEST-DUP", "duplicate")
+        # Dynamic code prevents cross-run + cross-class collisions on the
+        # UNIQUE(code) constraint; savepoint wrapper isolates the expected
+        # IntegrityError from the outer TransactionCase transaction so
+        # rollback stays clean.
+        code = f"UTEST-DUP-{uuid.uuid4().hex[:8]}"
+        self._new_crib(code)
+        with self.assertRaises(Exception), self.env.cr.savepoint():
+            self._new_crib(code, "duplicate")
 
     def test_workcenter_linkage_m2m(self):
         wc = self.Workcenter.create({
