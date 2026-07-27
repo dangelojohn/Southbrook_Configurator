@@ -961,10 +961,27 @@ class QrScanController(http.Controller):
             return {"ok": False, "result": "invalid_signature",
                     "error": "Forged or tampered QR code."}
 
-        # Resolve kind handler
+        # Resolve kind handler.
+        #
+        # NB(v19): `resolve_kind` returns either the literal ``False``
+        # (kind is not registered) or the env-bound AbstractModel handler
+        # (kind IS registered). In Odoo 19 every AbstractModel is an
+        # EMPTY recordset and `bool(empty_recordset)` is False, so a
+        # plain ``if not handler:`` check incorrectly treats a registered
+        # handler as missing — see memory note
+        # [odoo19_abstract_model_falsy_recordset]. The "trolley" kind
+        # added in W071 is the first handler exercised through this
+        # `/sb/qr/scan` _dispatch path (every other kind — loc / pick /
+        # lot / ship / truck — has its own dedicated endpoint that
+        # never touches `resolve_kind`), which is why the latent bug
+        # only surfaced as the W071 trolley-bind test failure
+        # (`AssertionError ... "No handler for kind 'trolley'"`). The
+        # `is False` discriminator is unambiguous: it fires only when
+        # `resolve_kind` explicitly returned the sentinel, never when
+        # it returned a real (empty) AbstractModel recordset.
         Kind = env["southbrook.qr.kind"]
         handler = Kind.resolve_kind(parsed["kind"])
-        if not handler:
+        if handler is False:
             Log.create({**log_vals, "result": "unknown_kind",
                         "error_message": parsed["kind"]})
             return {"ok": False, "result": "unknown_kind",
