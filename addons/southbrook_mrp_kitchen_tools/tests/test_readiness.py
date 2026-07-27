@@ -10,6 +10,11 @@ class TestWorkorderToolReadiness(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Bypass southbrook_premium_orchestration's MO availability gate —
+        # this class confirms MOs from BoMs without seeding stock quants.
+        cls.env["ir.config_parameter"].sudo().set_param(
+            "southbrook.mo_availability_gate.enabled", "0",
+        )
         cls.Asset = cls.env["southbrook.tool.asset"]
         cls.Crib = cls.env["southbrook.tool.crib"]
         cls.Product = cls.env["product.product"]
