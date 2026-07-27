@@ -47,8 +47,19 @@ class MrpWorkorderTrolley(models.Model):
     Field name uses the `x_sbk_` prefix per project memory's "studio-safe"
     convention (avoids clashes with native or third-party fields and
     keeps the addon-owned namespace visible at a glance in the form).
+
+    Mixes in ``mail.thread`` because v19's ``mrp.workorder`` does NOT
+    inherit it by default — and ``action_sbk_bind_trolley`` below calls
+    ``self.message_post(...)`` to record the bind/re-bind audit trail
+    (mirrored onto the picking which already has chatter). Without this
+    shim the message_post call raises AttributeError at runtime and the
+    W071 trolley-bind test (`test_21_bind_writes_field_and_posts_chatter`)
+    asserts that ``wo.message_ids`` grows after the bind — which only
+    works if mail.thread is mixed in here. Delegation-inheritance pattern
+    keeps the change scoped to this addon and avoids forking native mrp.
     """
-    _inherit = "mrp.workorder"
+    _name = "mrp.workorder"
+    _inherit = ["mrp.workorder", "mail.thread"]
 
     x_sbk_trolley_id = fields.Many2one(
         "stock.picking",
