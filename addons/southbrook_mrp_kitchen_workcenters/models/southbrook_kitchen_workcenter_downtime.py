@@ -355,13 +355,25 @@ class SouthbrookKitchenWorkcenterDowntime(models.Model):
             # 'todo' activity type — every Odoo install has it. Activity
             # deadline is TODAY because that is the JTBD ("notified at
             # downtime time, not at kanban-turn-red").
-            try:
-                todo_type = self.env.ref(
-                    "mail.mail_activity_data_todo",
-                    raise_if_not_found=False,
-                )
-                if todo_type and planner:
-                    wo.activity_schedule(
+            #
+            # R3 prod-bug fix (2026-06-30): mrp.workorder is NOT a
+            # mail.activity.mixin target in v19 CE — calling
+            # `wo.activity_schedule(...)` raised AttributeError on
+            # every overlap, and the prior broad `except Exception`
+            # swallowed it silently so NO planner was ever notified.
+            # Schedule on the parent MO (mrp.production), which DOES
+            # inherit mail.activity.mixin. Per scoping doc §6, this
+            # path is fail-loud — we keep a narrow try/except so a
+            # single bad WO doesn't abort the cron loop, but the
+            # exception is logged at WARNING (not silently swallowed)
+            # so future regressions surface in the log scrape.
+            todo_type = self.env.ref(
+                "mail.mail_activity_data_todo",
+                raise_if_not_found=False,
+            )
+            if todo_type and planner and wo.production_id:
+                try:
+                    wo.production_id.activity_schedule(
                         act_type_xmlid="mail.mail_activity_data_todo",
                         summary=_("Reschedule review — WC %s downtime")
                                 % (wc.name or "?"),
@@ -369,11 +381,15 @@ class SouthbrookKitchenWorkcenterDowntime(models.Model):
                         user_id=planner.id,
                         date_deadline=fields.Date.context_today(self),
                     )
-            except Exception:  # noqa: BLE001
-                _logger.exception(
-                    "W069: scheduling activity on WO %s failed "
-                    "(non-fatal)", wo.id,
-                )
+                except Exception as exc:  # noqa: BLE001
+                    _logger.warning(
+                        "W069: activity_schedule on MO %s (WO %s) "
+                        "failed: %s -- planner %s NOT notified of "
+                        "downtime overlap; investigate (was a silent "
+                        "prod regression before R3 2026-06-30).",
+                        wo.production_id.id, wo.id, exc,
+                        planner.id,
+                    )
         _logger.info(
             "W069: downtime %s notified planner of %d affected WO(s) "
             "at WC %s", self.id, len(affected), wc.name or "?",
