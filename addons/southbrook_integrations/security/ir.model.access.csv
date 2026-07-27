@@ -12,4 +12,4 @@ access_iot_label_printer_manager,access.iot.label.printer.manager,model_southbro
 access_iot_label_log_user,access.iot.label.log.user,model_southbrook_integrations_iot_label_log,southbrook_integrations.group_integrations_user,1,0,0,0
 access_iot_label_log_manager,access.iot.label.log.manager,model_southbrook_integrations_iot_label_log,southbrook_integrations.group_integrations_manager,1,1,1,1
 access_mi_tiles_user,access.mi.tiles.user,model_southbrook_integrations_mi_tiles,southbrook_integrations.group_integrations_user,1,0,0,0
-access_mi_tiles_manager,access.mi.tiles.manager,model_southbrook_integrations_mi_tiles,southbrook_integrations.group_integrations_manager,1,0,0,0
+access_mi_tiles_manager,access.mi.tiles.manager,model_southbrook_integrations_mi_tiles,southbrook_integrations.group_integrations_manager,1,1,1,1

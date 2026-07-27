@@ -96,7 +96,11 @@ class SouthbrookCmmsBreakdownAlert(models.Model):
                 "severity": severity,
                 "res_model": "southbrook.cmms.breakdown_alert",
                 "res_id": self.id,
-                "summary": impact_summary,
+                # NO impact_summary on the bus — the alerts channel is a
+                # guessable string channel (sb_cc_alerts_<cid>) that Odoo does
+                # NOT per-user authorize, so a cross-company subscriber would
+                # get the breakdown detail in cleartext. The client re-fetches
+                # the summary by res_id through the ACL-checked ORM.
                 "company_id": company_id,
             },
         )

@@ -17,9 +17,10 @@ class TestSeedIntegrity(TransactionCase):
         growth in southbrook_hardware_brands.xml.
         """
         Brand = self.env["southbrook.hardware.brand"]
+        n = Brand.search_count([])
         self.assertGreaterEqual(
-            Brand.search_count([]), 39,
-            "Expected at least 39 brand records, got a different count",
+            n, 39,
+            f"Expected at least 39 brand records, got {n} — a brand was dropped",
         )
 
     def test_marathon_aligned_additions_present(self):

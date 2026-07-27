@@ -119,6 +119,15 @@ class SouthbrookNcr(models.Model):
         tracking=True,
     )
     disposition_reason = fields.Text(string="Disposition Reason", tracking=True)
+    opened_at = fields.Datetime(
+        string="Opened At",
+        default=fields.Datetime.now,
+        readonly=True,
+        tracking=True,
+        help="When the NCR was raised — the SLA start for time-to-close. A "
+             "writable field rather than the magic create_date (which v19 "
+             "silently refuses to overwrite and is a DB-transaction timestamp).",
+    )
     closed_at = fields.Datetime(string="Closed At", readonly=True, tracking=True)
     time_to_close_hours = fields.Float(
         string="Time to Close (h)",
@@ -159,12 +168,15 @@ class SouthbrookNcr(models.Model):
                 vals["responsible_user_id"] = self.env.user.id
         return super().create(vals_list)
 
-    @api.depends("create_date", "closed_at")
+    @api.depends("opened_at", "closed_at")
     def _compute_time_to_close_hours(self):
         for rec in self:
-            if rec.create_date and rec.closed_at:
-                delta = rec.closed_at - rec.create_date
-                rec.time_to_close_hours = delta.total_seconds() / 3600.0
+            start = rec.opened_at or rec.create_date
+            if start and rec.closed_at:
+                delta = rec.closed_at - start
+                # Clamp: app-server (closed_at) vs DB-server (create_date
+                # fallback) clock skew can otherwise yield a small negative.
+                rec.time_to_close_hours = max(0.0, delta.total_seconds() / 3600.0)
             else:
                 rec.time_to_close_hours = 0.0
 
@@ -194,12 +206,26 @@ class SouthbrookNcr(models.Model):
                     )
                 )
 
+    def write(self, vals):
+        # Governance: the transition graph + mandatory-disposition gate live
+        # in _ensure_transition, which is only called from the action buttons.
+        # Without this, a user with write access could raw-write
+        # state='released' via call_kw — skipping quarantine, the disposition
+        # reason, and closed_at (no audit trail). Route every state change
+        # through the guard; the guarded actions set _ncr_state_ok to bypass
+        # the re-check (they already validated).
+        if "state" in vals and not self.env.context.get("_ncr_state_ok"):
+            for rec in self:
+                if vals["state"] != rec.state:
+                    rec._ensure_transition(vals["state"])
+        return super().write(vals)
+
     def _apply_state(self, target_state, message):
         self._ensure_transition(target_state)
         vals = {"state": target_state}
         if target_state in TERMINAL_STATES:
             vals["closed_at"] = fields.Datetime.now()
-        self.write(vals)
+        self.with_context(_ncr_state_ok=True).write(vals)
         for rec in self:
             rec.message_post(body=message)
 
@@ -216,6 +242,14 @@ class SouthbrookNcr(models.Model):
         self._apply_state("scrap", _("NCR disposition: Scrap."))
 
     def action_release(self):
+        # A "use-as-is" release ships a known-defective part. For a CRITICAL
+        # (potentially safety-relevant) NCR, require Quality-Manager sign-off.
+        mgr = "southbrook_quality.group_southbrook_quality_manager"
+        for rec in self:
+            if rec.severity == "critical" and not self.env.user.has_group(mgr):
+                raise UserError(_(
+                    "Use-as-is release of a CRITICAL NCR (%s) requires a "
+                    "Quality Manager sign-off.", rec.name))
         self._apply_state("released", _("NCR Released (use-as-is)."))
 
     def action_cancel(self):

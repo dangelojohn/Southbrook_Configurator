@@ -386,8 +386,10 @@ class ProjectTask(models.Model):
         ],
         string="Production Release",
         compute="_compute_southbrook_production_release",
+        # store=True → searchable via the indexed column; the custom search=
+        # did a full-table search([]).filtered() and is removed (see the note
+        # on manufacturing_readiness_state).
         store=True,
-        search="_search_southbrook_production_release_state",
         readonly=True,
     )
     southbrook_production_release_reason = fields.Char(
@@ -501,8 +503,10 @@ class ProjectTask(models.Model):
         ],
         string="Install Readiness",
         compute="_compute_southbrook_install_readiness",
+        # store=True → searchable via the indexed column; the custom search=
+        # did a full-table search([]).filtered() and is removed (see the note
+        # on manufacturing_readiness_state).
         store=True,
-        search="_search_southbrook_install_readiness_state",
         readonly=True,
     )
     southbrook_install_readiness_reason = fields.Char(
@@ -626,8 +630,11 @@ class ProjectTask(models.Model):
         [("ready", "Ready"), ("review", "Review"), ("blocked", "Blocked")],
         string="Readiness Decision",
         compute="_compute_manufacturing_readiness",
-        store=True,
-        search="_search_manufacturing_readiness_state")
+        # store=True makes the column directly searchable; a custom search=
+        # here forced search([]).filtered() over the whole task table on every
+        # filter click (the most-used filter in the module), discarding the
+        # index. Removed — the stored column handles all operators natively.
+        store=True)
     manufacturing_waterfall_summary = fields.Text(
         string="Waterfall Readiness",
         compute="_compute_manufacturing_readiness")
@@ -2202,7 +2209,7 @@ class ProjectTask(models.Model):
         for task in self:
             workcenters = task.production_ids.mapped(
                 "workorder_ids.workcenter_id")
-            requests = Request
+            requests = Request.browse()
             lines = []
             for wc in workcenters.sorted("name"):
                 equipment = Equipment.search([("workcenter_id", "=", wc.id)])

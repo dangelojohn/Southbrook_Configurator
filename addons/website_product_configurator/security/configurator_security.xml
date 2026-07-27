@@ -12,4 +12,48 @@
             eval="[(4, ref('product_configurator.group_product_configurator'))]"
         />
     </record>
+
+    <!--
+      SECURITY: the two implied_ids grants above give public/portal users the
+      internal group_product_configurator, which carries a full 1,1,1,1 CRUD
+      ACL on product.config.session / .custom.value / .bookmark. The base
+      product_configurator module only ships a PORTAL-READ ir.rule on the
+      session, leaving write/create/unlink unruled and public users unruled
+      entirely — so via raw /web/dataset/call_kw a visitor could read/modify/
+      mass-unlink EVERY buyer's config session. These rules scope all four
+      operations to the requester's own records. The controllers sudo() their
+      legitimate work, so these rules only constrain direct RPC access.
+    -->
+    <record id="rule_config_session_public_portal" model="ir.rule">
+        <field name="name">Config Session: public/portal own only (all ops)</field>
+        <field name="model_id" ref="product_configurator.model_product_config_session"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_public')), (4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_config_session_custom_value_public_portal" model="ir.rule">
+        <field name="name">Config Session Custom Value: public/portal own only</field>
+        <field name="model_id" ref="product_configurator.model_product_config_session_custom_value"/>
+        <field name="domain_force">[('cfg_session_id.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_public')), (4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_config_bookmark_public" model="ir.rule">
+        <field name="name">Config Bookmark: public users own only (realizes "public gets none")</field>
+        <field name="model_id" ref="product_configurator.model_product_config_bookmark"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_public'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
 </odoo>

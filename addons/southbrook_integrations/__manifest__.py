@@ -3,7 +3,7 @@
     "name": "Southbrook Integrations",
     "summary": "Homag simulator + 3PL ASN + MCP-into-Odoo scaffold + "
                "IoT label printers (no EDI, no SSO - descoped to v2)",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry / OdooIQ",
     "category": "Manufacturing/Integrations",
@@ -23,6 +23,11 @@
         "security/ir.model.access.csv",
         "data/ir_sequence.xml",
         "data/iot_label_printers.xml",
+        "data/mi_tiles.xml",
+        # Seed MCP tools — was omitted, so the /integrations/mcp/v1/invoke
+        # endpoint 404'd for every documented tool (headline feature shipped
+        # empty). The referenced sibling models are all in the dep list.
+        "data/mcp_tools.xml",
         "views/homag_session_views.xml",
         "views/asn_3pl_views.xml",
         "views/mcp_tool_views.xml",

@@ -57,6 +57,14 @@ MIN_SAMPLE_THRESHOLD = 5      # below this, no factor is applied (pass-through)
 BLEND_FULL_TRUST_AT = 20      # at/above this, the raw median is used at full weight
 SAMPLE_SATURATION = 40        # sample_count that saturates the confidence sample-term
 CALIB_WINDOW_DAYS = 120       # rolling window keeps factors responsive to process change
+
+# --- delivery confidence (§8.A) ---
+DELIVERY_MIN_SAMPLE = 20      # below this: forced wide range + quality 'low'
+BASE_SPREAD_DAYS = 6.0        # deliberately wide default for a cold tenant
+MIN_SPREAD_DAYS = 0.5         # floor — never promise false precision even at high N
+SHRINK_K = 40.0              # controls how fast the range tightens with sample count
+ACCURACY_WINDOW_DEFAULT = 3   # "within N days" tolerance for the accuracy claim
+WORK_MINUTES_PER_DAY = 8 * 60  # calendar-day conversion for remaining-work spread
 # Coarse operation-category keyword map — keeps scope keys low-cardinality so
 # sample size accumulates quickly. Used by BOTH capture and the scheduler so the
 # factor a WO is learned under is the factor it is later scheduled with.
@@ -480,6 +488,154 @@ class OiqSchedulingIntelligence(models.AbstractModel):
             return 0.0, 0, []
         on_time = len(mos.filtered(lambda m: m.date_finished <= m.date_deadline))
         return 100.0 * on_time / len(mos), len(mos), []
+
+    # ==================================================================
+    # Delivery confidence (§8.A) — the customer-facing promise
+    # ==================================================================
+    def estimate_delivery(self, production):
+        """Build (or refresh) an oiq.delivery.estimate for an MO: a completion
+        RANGE + quality label + defensible accuracy claim. Read-only vs MRP."""
+        company = production.company_id
+        slot = self._get_or_compute_slot(production)
+        predicted_point = (slot.predicted_complete if slot
+                           else self._naive_completion(production))
+
+        cohort_key, observations = self._cohort_observations(production)
+        ratios = observations.mapped("ratio")
+        sample_count = len(ratios)
+        if sample_count >= DELIVERY_MIN_SAMPLE:
+            p10, p50, p90 = self._percentiles(ratios, [10, 50, 90])
+        else:
+            p10, p50, p90 = 0.75, 1.0, 1.6   # day-1 honesty floor, not thin-data derived
+
+        remaining_days = self._remaining_work_days(production)
+        raw_low = remaining_days * max(0.0, p50 - p10)
+        raw_high = remaining_days * max(0.0, p90 - p50)
+        shrink = 1.0 / (1.0 + sample_count / SHRINK_K)
+        low_spread = max(MIN_SPREAD_DAYS, min(BASE_SPREAD_DAYS, raw_low * (0.4 + 0.6 * shrink)))
+        high_spread = max(MIN_SPREAD_DAYS, min(BASE_SPREAD_DAYS, raw_high * (0.4 + 0.6 * shrink)))
+        completion_start = predicted_point - timedelta(days=low_spread)
+        completion_end = predicted_point + timedelta(days=high_spread)
+
+        hist_acc, window_days = self._backtest_accuracy(company, cohort_key)
+        audit = self.env["oiq.factory.audit"].search(
+            [("company_id", "=", company.id), ("state", "=", "complete")],
+            order="date desc", limit=1)
+        readiness = audit.readiness_level if audit else 0
+        quality = self._quality_label(sample_count, hist_acc, readiness)
+
+        vals = {
+            "production_id": production.id,
+            "completion_start": completion_start,
+            "completion_end": completion_end,
+            "prediction_quality": quality,
+            "accuracy_window_days": window_days,
+            "sample_count": sample_count,
+            "basis_text": self._basis_text(
+                cohort_key, sample_count, quality, hist_acc, window_days, readiness),
+        }
+        if hist_acc is not None:
+            vals["historical_accuracy_pct"] = hist_acc
+
+        Est = self.env["oiq.delivery.estimate"]
+        existing = Est.search([("production_id", "=", production.id)], limit=1)
+        if existing:
+            existing.write(vals)
+            return existing
+        return Est.create(vals)
+
+    def _quality_label(self, sample_count, hist_acc, readiness_level):
+        if readiness_level < 4 or sample_count < DELIVERY_MIN_SAMPLE:
+            return "low"
+        if hist_acc is not None and hist_acc >= 80 and sample_count >= 100:
+            return "high"
+        return "med"
+
+    def _get_or_compute_slot(self, production):
+        Slot = self.env["oiq.schedule.slot"]
+        slot = Slot.search([("production_id", "=", production.id)],
+                           order="run_id desc, seq desc", limit=1)
+        if slot:
+            return slot
+        # No shadow slot yet — compute one inline if the MO is schedulable.
+        if production.state in ("confirmed", "progress"):
+            self.shadow_schedule(production.company_id, 30)
+            slot = Slot.search([("production_id", "=", production.id)],
+                               order="run_id desc, seq desc", limit=1)
+        return slot
+
+    def _naive_completion(self, production):
+        return fields.Datetime.now() + timedelta(
+            minutes=self._remaining_work_days(production) * WORK_MINUTES_PER_DAY)
+
+    def _remaining_work_days(self, production):
+        cal_map = self._load_calibration_factors(production.company_id)
+        total_min = 0.0
+        for wo in production.workorder_ids:
+            if wo.state == "done":
+                continue
+            cal_min, _conf = self._calibrated_duration(wo, cal_map)
+            total_min += cal_min
+        return total_min / WORK_MINUTES_PER_DAY if total_min else MIN_SPREAD_DAYS
+
+    def _cohort_observations(self, production):
+        Obs = self.env["oiq.completion.observation"]
+        company = production.company_id
+        family = self._product_family(production.product_id)
+        obs = Obs.search([("company_id", "=", company.id),
+                          ("product_family", "=", family)]) if family else Obs
+        if len(obs) < DELIVERY_MIN_SAMPLE:   # widen to company-wide
+            obs = Obs.search([("company_id", "=", company.id)])
+        return family or "company-wide", obs
+
+    def _percentiles(self, values, pcts):
+        s = sorted(values)
+        n = len(s)
+        out = []
+        for p in pcts:
+            if n == 1:
+                out.append(s[0])
+                continue
+            idx = (p / 100.0) * (n - 1)
+            lo = int(idx)
+            frac = idx - lo
+            hi = min(lo + 1, n - 1)
+            out.append(s[lo] + (s[hi] - s[lo]) * frac)
+        return out
+
+    def _backtest_accuracy(self, company, cohort_key):
+        Est = self.env["oiq.delivery.estimate"]
+        past = Est.search([
+            ("company_id", "=", company.id),
+            ("production_id.state", "=", "done"),
+        ])
+        if not past:
+            return None, ACCURACY_WINDOW_DEFAULT
+        for window in (3, 5, 7):
+            hits = 0
+            for est in past:
+                mid = est.completion_start + (est.completion_end - est.completion_start) / 2
+                actual = est.production_id.date_finished
+                if actual and abs((actual - mid).days) <= window:
+                    hits += 1
+            pct = round(100.0 * hits / len(past), 1)
+            if pct >= 70 or window == 7:
+                return pct, window
+        return None, ACCURACY_WINDOW_DEFAULT
+
+    def _basis_text(self, cohort_key, sample_count, quality, hist_acc, window_days, readiness):
+        parts = [
+            f"Prediction quality: {quality} (Readiness Level {readiness}).",
+            f"Cohort '{cohort_key}' with {sample_count} completion observations.",
+        ]
+        if hist_acc is not None:
+            parts.append(
+                f"Historical accuracy: {hist_acc}% within {window_days} days.")
+        else:
+            parts.append(
+                "No completed-order history yet — range is deliberately wide until "
+                "the factory accrues calibration data.")
+        return " ".join(parts)
 
     # ==================================================================
     # Shadow scheduling engine (§6) — read-only vs MRP

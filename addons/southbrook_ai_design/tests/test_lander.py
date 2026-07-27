@@ -119,6 +119,16 @@ class TestLander(TransactionCase):
         with self.assertRaises(UserError):
             project.consume_gemini_analysis("not a dict")
 
+    def test_consume_revalidates_payload(self):
+        """M3 regression: consume_gemini_analysis re-runs the validator, so a
+        payload that skips analyze()'s _validate (e.g. a wrong schema version)
+        is still rejected rather than landed with unclamped dimensions."""
+        project = self._new_project()
+        bad = self._baseline_payload()
+        bad["schema"] = "not-the-real-schema-version"
+        with self.assertRaises(UserError):
+            project.consume_gemini_analysis(bad)
+
     # ------------------------------------------------------------------
     # End-to-end DoD — analyze_photo() with the mock backend
     # ------------------------------------------------------------------

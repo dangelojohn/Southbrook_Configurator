@@ -156,9 +156,16 @@ def propose_recommendation(env, intent: str, payload: dict, summary: str,
     },
 )
 def draft_customer_email(env, order_id, subject, body):
-    order = env["sale.order"].sudo().browse(order_id)
+    # SECURITY: run as the acting user and enforce write access on THIS order
+    # (not sudo). The tool declares scope="own_order" but previously sudo-browsed
+    # any order_id with no check — an LLM (steerable via prompt-injection planted
+    # in an order thread Fabio reads) could post a note onto ANY order in the DB.
+    # Mirrors post_internal_note / send_spec_pdf_email.
+    order = env["sale.order"].browse(order_id)
     if not order.exists():
         return {"error": "order_not_found"}
+    order.check_access_rights("write")
+    order.check_access_rule("write")
     # Trim + truncate subject to 1-256 chars
     subject_clean = (subject or "").strip()[:256]
     # Trim + truncate body to 1-2000 chars

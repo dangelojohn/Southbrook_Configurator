@@ -35,10 +35,18 @@ class ProductConfigSession(models.Model):
 
     def remove_inactive_config_sessions(self):
         check_date = fields.Datetime.now() - timedelta(days=3)
-        sessions_to_remove = self.search(
+        # Exclude saved/bookmarked sessions: a session referenced by an active
+        # product.config.bookmark (or flagged is_saved) is the "My
+        # Configurations" contract — deleting it here would cascade-delete the
+        # buyer's saved bookmark (session_id ondelete=cascade). The base
+        # product_configurator GC (_gc_draft_sessions) still needs the same
+        # exclusion upstream. sudo() to run with the cron's intended rights.
+        sessions_to_remove = self.sudo().search(
             [
                 ("write_date", "<", check_date),
                 ("state", "=", "draft"),
+                ("has_active_bookmark", "=", False),
+                ("is_saved", "=", False),
             ]
         )
         if sessions_to_remove:

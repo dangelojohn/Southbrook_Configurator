@@ -52,3 +52,44 @@ class TestDealerACL(HttpCase):
     def test_anonymous_blocked(self):
         resp = self.url_open("/my/dealer/orders", allow_redirects=False)
         self.assertIn(resp.status_code, (301, 302, 303, 401, 403))
+
+    # ------------------------------------------------------------------
+    # C1/C2 — object-level auth on the export routes (IDOR)
+    # ------------------------------------------------------------------
+    def _make_owned_package(self, partner):
+        """A production package traced to `partner`'s own sale order."""
+        product = self.env["product.product"].create({
+            "name": "IDOR test cab", "type": "consu", "is_storable": True})
+        self.env["mrp.bom"].create({
+            "product_tmpl_id": product.product_tmpl_id.id, "product_qty": 1.0})
+        order = self.env["sale.order"].create({
+            "partner_id": partner.id,
+            "order_line": [(0, 0, {
+                "product_id": product.id, "product_uom_qty": 1.0})]})
+        mo = self.env["mrp.production"].create({
+            "product_id": product.id, "product_qty": 1.0})
+        pkg = self.env["sb.production.package"].generate_from_mo(
+            mo, 600, 720, 580, "base", 2, 0, soft_close=True)
+        pkg.sale_order_line_id = order.order_line[0].id
+        return pkg
+
+    def test_dealer_cannot_export_another_partners_package(self):
+        """C1/C2: a dealer must NOT be able to KD-export a package belonging
+        to a different customer's order (enumerating pkg ids)."""
+        victim = self.env["res.partner"].create({
+            "name": "Victim Co", "channel": "dealer"})
+        pkg = self._make_owned_package(victim)
+        self.authenticate("dealer.joe@example.com", "dealer-strong-pw")
+        resp = self.url_open(
+            f"/my/dealer/production-package/{pkg.id}/kd",
+            allow_redirects=False)
+        self.assertIn(resp.status_code, (400, 403, 404))
+        self.assertNotIn("southbrook.kd_flatpack", resp.text)
+
+    def test_dealer_can_export_own_package(self):
+        """Positive: the owning dealer CAN export their own package."""
+        pkg = self._make_owned_package(self.dealer_partner)
+        self.authenticate("dealer.joe@example.com", "dealer-strong-pw")
+        resp = self.url_open(f"/my/dealer/production-package/{pkg.id}/kd")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("southbrook.kd_flatpack", resp.text)

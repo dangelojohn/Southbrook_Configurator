@@ -18,6 +18,7 @@ class ProductTemplate(models.Model):
     x_hardware_category = fields.Selection(
         HARDWARE_CATEGORIES,
         string="Hardware Category",
+        index=True,
         help="Sets which slot in the hardware-resolution map this SKU "
              "occupies. Leave blank for non-hardware products.",
     )
@@ -25,6 +26,7 @@ class ProductTemplate(models.Model):
         comodel_name="southbrook.hardware.brand",
         string="Brand",
         ondelete="restrict",
+        index=True,
     )
     x_marathon_sku = fields.Char(
         string="Marathon SKU",

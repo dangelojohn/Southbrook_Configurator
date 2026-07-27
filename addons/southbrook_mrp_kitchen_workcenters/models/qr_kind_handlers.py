@@ -14,7 +14,7 @@ Handlers shipped here:
   shift    → southbrook.shift.handover
 """
 from odoo import _, api, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 class AsbuiltQrKind(models.AbstractModel):
@@ -289,12 +289,26 @@ class DefectQrKind(models.AbstractModel):
             defect_type = params["defect_type"]
         # The controller sets request.qr_parsed_ident on dispatch
         # so downstream handlers see the defect_type carried in ident.
-        elif request and hasattr(request, "qr_parsed_ident"):
-            defect_type = request.qr_parsed_ident
+        # `request` is a LocalProxy — accessing it (even `bool(request)`)
+        # raises RuntimeError("object is not bound") when there is no HTTP
+        # context (handler called directly / from tests / internally), so
+        # guard the access rather than let it crash.
+        else:
+            try:
+                defect_type = getattr(request, "qr_parsed_ident", None)
+            except RuntimeError:
+                defect_type = None
         if not defect_type:
             raise UserError(_(
                 "Defect-type QR is missing the defect_type encoded "
                 "in the QR ident."))
+        # M2: recording a defect is a STAFF action. The `defect` kind is
+        # stateless (get_record returns an empty recordset → NO check_access
+        # runs), and the create below is sudo'd — so without this a portal
+        # (share=True) user holding a signed, never-expiring defect payload
+        # (embedded on the auth=user defect-sheet) could mint superuser NCRs.
+        if self.env.user.share:
+            raise AccessError(_("Only staff may record a defect."))
         # Caller-supplied workorder_id wins; else look at scan context.
         wo_id = (params or {}).get("workorder_id")
         context_resolved = False
@@ -316,9 +330,21 @@ class DefectQrKind(models.AbstractModel):
         }
         if wo_id:
             try:
-                vals["x_sbk_workorder_id"] = int(wo_id)
+                wo_id_int = int(wo_id)
             except (TypeError, ValueError):
-                pass
+                wo_id_int = None
+            # IDOR guard: only attribute the NCR to a work order the caller may
+            # actually access. `params["workorder_id"]` was previously trusted
+            # as-is, letting a caller pin a fabricated 'fail' NCR onto ANY WO id.
+            if wo_id_int:
+                wo = self.env["mrp.workorder"].browse(wo_id_int).exists()
+                if wo:
+                    try:
+                        wo.check_access("read")
+                        vals["x_sbk_workorder_id"] = wo_id_int
+                    except AccessError:
+                        if not context_resolved:
+                            raise
         new_ncr = self.env["southbrook.mi.check"].sudo().create(vals)
         # If we auto-filled WO from context, post a chatter note so the
         # inspector knows which scan was used.

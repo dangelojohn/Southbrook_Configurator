@@ -88,8 +88,17 @@ class SouthbrookApiKey(models.Model):
         return record.user_id
 
     def action_revoke(self, reason="user_revoked"):
+        # group_user has read-only ACL on this model (create/write are removed
+        # to close the key-forgery priv-esc), so the revoke write is done under
+        # sudo — but only after confirming the caller owns the key (or is an
+        # admin). Without this ownership check, sudo would let any user revoke
+        # anyone's key (fleet-wide DoS).
         for record in self:
-            record.write({
+            if (not self.env.su
+                    and record.user_id.id != self.env.user.id
+                    and not self.env.user.has_group("base.group_system")):
+                raise AccessError(_("You may only revoke your own API keys."))
+            record.sudo().write({
                 "revoked_at": fields.Datetime.now(),
                 "revoked_reason": reason,
             })

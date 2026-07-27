@@ -10,7 +10,7 @@ import json
 import logging
 from typing import Any, Callable, Dict, Optional
 
-from odoo import _, http
+from odoo import _, fields, http
 from odoo.exceptions import (
     AccessDenied, AccessError, MissingError, UserError, ValidationError,
 )
@@ -73,6 +73,39 @@ def _cors_preflight() -> http.Response:
 
 def _hash_key(cleartext: str) -> str:
     return "sha256:" + hashlib.sha256(cleartext.encode("utf-8")).hexdigest()
+
+
+def _analyze_quota_ok() -> bool:
+    """Global daily cap + kill-switch on the paid photo-analysis (AI) path.
+
+    Each `POST .../photos` triggers `analyze_photo` (a paid AI call). A valid
+    (or, absent F1's fix, forged) key could otherwise drive unbounded AI spend.
+    Cross-worker ceiling via `ir.config_parameter southbrook_api.max_daily_
+    analyses` (default 500); 0 = hard kill-switch. Best-effort counter (the
+    config-param RMW can under-count under concurrency, acceptable for a cost
+    bound). Mirrors southbrook_room_capture / southbrook_room_chat.
+    """
+    ICP = request.env["ir.config_parameter"].sudo()
+    try:
+        cap = int(ICP.get_param("southbrook_api.max_daily_analyses", "500"))
+    except (TypeError, ValueError):
+        cap = 500
+    if cap <= 0:
+        return False
+    today = fields.Date.to_string(fields.Date.context_today(request.env.user))
+    stamp = ICP.get_param("southbrook_api.analysis_date", "")
+    if stamp != today:
+        count = 0
+    else:
+        try:
+            count = int(ICP.get_param("southbrook_api.analysis_count", "0"))
+        except (TypeError, ValueError):
+            count = 0
+    if count >= cap:
+        return False
+    ICP.set_param("southbrook_api.analysis_date", today)
+    ICP.set_param("southbrook_api.analysis_count", str(count + 1))
+    return True
 
 
 # ----------------------------------------------------------------------
@@ -183,13 +216,13 @@ class SouthbrookApi(http.Controller):
         'service running but DB unreachable' from 'service down', without
         leaking anything an unauthenticated caller shouldn't see.
         """
-        db_name = request.env.cr.dbname if request.env and request.env.cr else None
+        # The DB name is deliberately NOT returned — an unauthenticated caller
+        # doesn't need it, and it aids dbfilter/database-manager targeting.
         return _json({
             "status": "ok",
             "service": "southbrook_api",
             "api_version": "v1",
             "schema_version": SCHEMA_VERSION,
-            "db": db_name,
         })
 
     # ==================================================================
@@ -346,6 +379,14 @@ class SouthbrookApi(http.Controller):
         except Exception:                                       # noqa: BLE001
             return _error("invalid_image",
                           "Photo is not a readable image.", 422)
+
+        # Global daily cost cap / kill-switch on the paid AI analysis this
+        # upload triggers — checked before persisting the attachment so an
+        # over-cap request doesn't leave orphan photos.
+        if not _analyze_quota_ok():
+            return _error("rate_limited",
+                          "Daily analysis capacity reached; "
+                          "please try again later.", 429)
 
         attachment = request.env["ir.attachment"].sudo().create({
             "name": file_storage.filename or "photo.jpg",
@@ -573,7 +614,10 @@ class SouthbrookApi(http.Controller):
         if not project:
             return _error("project_not_found", "Project not found.", 404)
         partner = request.env.user.partner_id
-        if project.partner_id != partner:
+        # Explicit `partner and ...` guard: if BOTH the API user and the
+        # project have an empty partner_id, `empty != empty` is False and the
+        # check would pass, exposing partnerless projects to partnerless users.
+        if not partner or project.partner_id != partner:
             _logger.warning(
                 "API ACL: user %s (partner %s) attempted to access "
                 "project %s owned by partner %s — denied.",

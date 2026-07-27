@@ -28,8 +28,11 @@ class TestW042AsbuiltLotSnapshot(TransactionCase):
 
     def _make_mo_with_lot(self):
         """Find or build an MO that carries a lot_producing_id."""
+        # v19 renamed mrp.production.lot_producing_id → lot_producing_ids
+        # (Many2many). The module's asbuilt code already uses the plural; the
+        # test still used the removed singular.
         mo = self.Production.search(
-            [("lot_producing_id", "!=", False)], limit=1,
+            [("lot_producing_ids", "!=", False)], limit=1,
         )
         if mo:
             return mo
@@ -51,7 +54,7 @@ class TestW042AsbuiltLotSnapshot(TransactionCase):
             "name": "W042-TEST-LOT",
             "company_id": self.env.company.id,
         })
-        mo.lot_producing_id = lot.id
+        mo.lot_producing_ids = [(6, 0, [lot.id])]
         return mo
 
     def test_auto_snapshot_when_unset(self):
@@ -61,7 +64,7 @@ class TestW042AsbuiltLotSnapshot(TransactionCase):
         ab = self.Asbuilt.create({"production_id": mo.id})
         try:
             self.assertEqual(
-                ab.lot_id, mo.lot_producing_id,
+                ab.lot_id, mo.lot_producing_ids[:1],
                 "W042: asbuilt.lot_id should auto-stamp from "
                 "MO.lot_producing_id",
             )
@@ -94,7 +97,7 @@ class TestW042AsbuiltLotSnapshot(TransactionCase):
 
     def test_no_lot_no_crash(self):
         mo = self.Production.search(
-            [("lot_producing_id", "=", False)], limit=1,
+            [("lot_producing_ids", "=", False)], limit=1,
         )
         if not mo:
             self.skipTest("no MO without lot_producing_id available")

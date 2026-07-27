@@ -161,14 +161,26 @@ class ExecDashboardSnapshot(models.Model):
         ncr_count_7d = 0
         critical_open = 0
         if ncr_model is not None:
-            ncr_count_7d = ncr_model.sudo().search_count([
-                ("create_date", ">=", seven_days_ago),
-            ])
-            crit_domain = [("state", "in", ("open", "new", "in_progress"))]
+            # Company-scope both NCR counts (every other KPI is company-scoped).
+            # Without this, the FPY numerator counted ALL companies' NCRs against
+            # company A's MO denominator (understating/zeroing FPY), and Tile 9's
+            # critical-NCR count leaked other companies' data.
+            ncr_company = (
+                [("company_id", "=", company_id)]
+                if "company_id" in ncr_model._fields else []
+            )
+            ncr_count_7d = ncr_model.sudo().search_count(
+                [("create_date", ">=", seven_days_ago)] + ncr_company
+            )
+            # southbrook.ncr.state is draft/quarantine/rework/scrap/released/
+            # cancelled — the old open/new/in_progress values matched nothing,
+            # so the "Critical NCRs Open" tile was permanently 0. "Open" = the
+            # non-terminal states.
+            crit_domain = [("state", "in", ("draft", "quarantine", "rework"))]
             # Only filter on severity if the field exists
             if "severity" in ncr_model._fields:
                 crit_domain.append(("severity", "=", "critical"))
-            critical_open = ncr_model.sudo().search_count(crit_domain)
+            critical_open = ncr_model.sudo().search_count(crit_domain + ncr_company)
         fpy = 100.0
         if mo_count_7d:
             fpy = (1.0 - (float(ncr_count_7d) / float(mo_count_7d))) * 100.0
@@ -202,7 +214,8 @@ class ExecDashboardSnapshot(models.Model):
             )
             if wip_rec:
                 # Try common field names, fall back to 0.0
-                for fname in ("wip_value", "total_value", "value", "amount"):
+                for fname in ("total_wip_value", "wip_value", "total_value",
+                              "value", "amount"):
                     if fname in wip_rec._fields:
                         wip_value = float(wip_rec[fname] or 0.0)
                         break
@@ -222,10 +235,14 @@ class ExecDashboardSnapshot(models.Model):
             ("type", "in", ("bank", "cash")),
         ])
         cash_position = 0.0
+        # Dedupe accounts — two bank/cash journals can share one
+        # default_account_id, which would otherwise be summed twice.
+        seen_accounts = set()
         for journal in bank_journals:
             accounts = journal.default_account_id
-            if not accounts:
+            if not accounts or accounts.id in seen_accounts:
                 continue
+            seen_accounts.add(accounts.id)
             self.env.cr.execute(
                 """
                 SELECT COALESCE(SUM(balance), 0.0)
@@ -296,8 +313,12 @@ class ExecDashboardSnapshot(models.Model):
 
     @api.model
     def get_or_create_today(self):
-        """Return the latest snapshot for the active company (creating if
-        no snapshot exists in the last 5 minutes)."""
+        """Return the id of the latest snapshot for the active company
+        (creating one if none exists in the last 5 minutes).
+
+        Returns an int id (not a recordset) so the OWL client's `orm.call`
+        gets a JSON-serialisable value it can pass straight to `orm.read`.
+        """
         company = self.env.company
         recent_cutoff = fields.Datetime.now() - timedelta(minutes=5)
         existing = self.search(
@@ -309,5 +330,5 @@ class ExecDashboardSnapshot(models.Model):
             limit=1,
         )
         if existing:
-            return existing
-        return self.create({"company_id": company.id})
+            return existing.id
+        return self.create({"company_id": company.id}).id

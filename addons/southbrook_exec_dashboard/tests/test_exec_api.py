@@ -8,7 +8,11 @@ from odoo.tests.common import HttpCase, tagged
 class TestExecApiReturnsJson(HttpCase):
 
     def test_exec_api_returns_json(self):
-        # Authenticate as admin so the portal-session branch fires
+        # The endpoint is now gated to the executive group — grant it to admin.
+        exec_group = self.env.ref(
+            "southbrook_exec_dashboard.group_southbrook_exec_dashboard_user")
+        self.env.ref("base.user_admin").write(
+            {"group_ids": [(4, exec_group.id)]})
         self.authenticate("admin", "admin")
         response = self.url_open("/exec/morning", data={})
         self.assertEqual(
@@ -29,3 +33,17 @@ class TestExecApiReturnsJson(HttpCase):
         # bottleneck is a nested dict
         self.assertIn("workcenter", body["bottleneck"])
         self.assertIn("load_pct", body["bottleneck"])
+
+    def test_exec_api_forbids_non_exec_user(self):
+        """A logged-in internal user NOT in the executive group must not read
+        the company-financials payload (regression C1)."""
+        self.env["res.users"].create({
+            "name": "Plain Employee",
+            "login": "plain_emp_exec_test",
+            "password": "plain_emp_exec_test",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        self.authenticate("plain_emp_exec_test", "plain_emp_exec_test")
+        response = self.url_open("/exec/morning", data={})
+        self.assertEqual(response.status_code, 403,
+                         f"expected 403, got {response.status_code}")

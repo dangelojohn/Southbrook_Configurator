@@ -6,7 +6,7 @@ One route: POST /southbrook/api/order/<order_id>/room/chat.
 Mirrors addons/southbrook_room_capture/controllers/main.py exactly:
   * ownership resolved via `_SouthbrookOrderAccessMixin._southbrook_resolve_order`
     (AccessError -> forbidden, MissingError -> not_found);
-  * type="json", auth="user", methods=["POST"];
+  * type="jsonrpc", auth="user", methods=["POST"];
   * handlers return plain dicts, success shape {"ok": True, ...},
     error shape {"error": "<code>", "detail": "<msg>"};
   * per-user in-process sliding-window rate limiter, own config namespace.
@@ -88,7 +88,7 @@ class SouthbrookRoomChatApi(_SouthbrookOrderAccessMixin, http.Controller):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/chat",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -108,10 +108,16 @@ class SouthbrookRoomChatApi(_SouthbrookOrderAccessMixin, http.Controller):
 
         Agent = request.env["southbrook.room.chat.agent"].sudo()
         try:
-            result = Agent.handle_turn(order_id, message, reset=bool(reset))
+            # `_handle_turn` is deliberately private (leading underscore) so it
+            # is NOT RPC-dispatchable via call_kw — the ONLY way in is through
+            # this route, which has already enforced order-ownership and the
+            # rate limit above. A public entry point would let any authenticated
+            # portal user call it directly against an arbitrary order_id,
+            # bypassing both gates (it runs sudo internally). See REVIEW_REPORT H2.
+            result = Agent._handle_turn(order_id, message, reset=bool(reset))
         except Exception as exc:  # noqa: BLE001 — never 500, never leak
             _logger.warning(
-                "southbrook_room_chat: handle_turn raised for order %s: %s",
+                "southbrook_room_chat: _handle_turn raised for order %s: %s",
                 order_id, exc,
             )
             return {"error": "upstream_error", "detail": "AI room chat failed."}

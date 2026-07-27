@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 from odoo.exceptions import ValidationError
-from odoo.tests import TransactionCase, tagged
+import json
+
+from odoo.tests import HttpCase, TransactionCase, tagged
 from psycopg2 import IntegrityError
 from odoo.tools import mute_logger
 
@@ -115,3 +117,49 @@ class TestCommandException(TransactionCase):
         self.Exc._scan_and_materialize()
         after = self.Exc.with_context(active_test=False).search_count([])
         self.assertEqual(before, after, "re-scan must upsert, not duplicate")
+
+
+@tagged("post_install", "-at_install", "southbrook_command_center")
+class TestCommandCenterAuth(HttpCase):
+    """The bootstrap route serves factory-health/flow and (via
+    get_or_create_today) writes the exec snapshot — it must reject callers who
+    are not internal Central Command members (regression for the missing route
+    group gate)."""
+
+    def _bootstrap(self):
+        return self.url_open(
+            "/command_center/bootstrap",
+            data=json.dumps({"jsonrpc": "2.0", "method": "call", "params": {}}),
+            headers={"Content-Type": "application/json"},
+        )
+
+    def test_non_member_is_forbidden(self):
+        self.env["res.users"].create({
+            "name": "CC Plain User",
+            "login": "cc_plain_user",
+            "password": "cc_plain_user",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        self.authenticate("cc_plain_user", "cc_plain_user")
+        resp = self._bootstrap()
+        body = json.loads(resp.text)
+        # jsonrpc surfaces the AccessError as an error envelope (no result).
+        self.assertIn("error", body)
+        self.assertNotIn("result", body)
+
+    def test_cc_member_is_allowed(self):
+        self.env["res.users"].create({
+            "name": "CC Member",
+            "login": "cc_member",
+            "password": "cc_member",
+            "group_ids": [(6, 0, [
+                self.env.ref("base.group_user").id,
+                self.env.ref(
+                    "southbrook_command_center.group_command_center_user").id,
+            ])],
+        })
+        self.authenticate("cc_member", "cc_member")
+        resp = self._bootstrap()
+        body = json.loads(resp.text)
+        self.assertIn("result", body)
+        self.assertIn("factory_health", body["result"])

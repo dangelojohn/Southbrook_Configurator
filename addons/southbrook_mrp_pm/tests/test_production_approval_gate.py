@@ -92,15 +92,22 @@ class TestProductionApprovalGate(TransactionCase):
     # 1 — Block without approval
     # ------------------------------------------------------------------
     def test_so_blocked_without_approval(self):
+        # The W009 gate deliberately moved OFF action_confirm (it deadlocked:
+        # action_request_production requires state=='sale', so you could never
+        # approve before confirming) ONTO MO creation (mrp.production.create).
+        # So confirming an unapproved manufactured order now SUCCEEDS, but
+        # creating its manufacturing orders is what's blocked.
         order = self._make_order()
         self.assertEqual(order.production_approval_state, "none")
-        with self.assertRaises(UserError) as cm:
-            order.action_confirm()
-        # Error message must name the offending product so the user can
-        # tell which line is blocked.
-        self.assertIn(self.mfg_product.display_name, str(cm.exception))
-        # Order must still be in draft — confirm rolled back.
-        self.assertEqual(order.state, "draft")
+        order.action_confirm()
+        self.assertEqual(order.state, "sale")
+        # The gate fires at MO creation instead.
+        with self.assertRaises(UserError):
+            order.action_send_to_production()
+        # No MO may exist for the unapproved order.
+        self.assertFalse(
+            self.Mrp.search([("origin", "=", order.name)]),
+            "No manufacturing order may exist for an unapproved order.")
 
     # ------------------------------------------------------------------
     # 2 — Pass with approval
@@ -118,20 +125,55 @@ class TestProductionApprovalGate(TransactionCase):
     def test_so_bypass_with_manager_flag(self):
         order = self._make_order()
         manager = self._make_sales_manager()
-        # Manager flips the bypass.
+        # Manager flips the bypass (allowed by the write-guard for managers).
         order.with_user(manager).write({
             "force_production_release": True,
         })
-        # State still 'none', but bypass cleared the gate.
+        # State still 'none', but bypass clears the MO-create gate.
         self.assertEqual(order.production_approval_state, "none")
         self.assertTrue(order.force_production_release)
         order.action_confirm()
         self.assertEqual(order.state, "sale")
-        # The bypass must have been logged into chatter for audit.
+        # Bypass lets MO creation through despite state=='none'...
+        mos = order.action_send_to_production()
+        self.assertTrue(mos, "Force-released order should create MOs.")
+        # ...and it must leave an audit trail in chatter at the gate.
         messages = order.message_ids.mapped("body")
-        self.assertTrue(any("bypassed" in (m or "").lower()
+        self.assertTrue(any("bypass" in (m or "").lower()
                             for m in messages),
                         "Bypass must leave an audit trail in chatter")
+
+    def test_state_laundering_blocked_for_non_approver(self):
+        """F1 regression: a non-approver with write access to their own order
+        cannot RPC-write production_approval_state straight to 'approved'
+        (views gate the button; the write-guard gates call_kw)."""
+        salesman = self._make_sales_user("w009_launder")
+        order = self._make_order()
+        order.user_id = salesman  # own the order so the record rule allows write
+        with self.assertRaises(AccessError):
+            order.with_user(salesman).write(
+                {"production_approval_state": "approved"})
+
+    def test_force_release_self_grant_blocked_for_non_manager(self):
+        """F1 regression: a non-manager cannot self-grant the bypass flag."""
+        salesman = self._make_sales_user("w009_bypass")
+        order = self._make_order()
+        order.user_id = salesman
+        with self.assertRaises(AccessError):
+            order.with_user(salesman).write({"force_production_release": True})
+
+    def test_approve_action_requires_approver_group(self):
+        """F1b regression: action_approve_production is approver-only in the
+        method body, not just the view button."""
+        salesman = self._make_sales_user("w009_approve")
+        order = self._make_order()
+        order.user_id = salesman
+        # Reach 'pending' via the (open) request action, then a non-approver
+        # must not be able to approve.
+        order.action_confirm()
+        order.with_user(salesman).action_request_production()
+        with self.assertRaises(AccessError):
+            order.with_user(salesman).action_approve_production()
 
     # ------------------------------------------------------------------
     # 4 — Bypass is group-gated on the view + gate stays effective

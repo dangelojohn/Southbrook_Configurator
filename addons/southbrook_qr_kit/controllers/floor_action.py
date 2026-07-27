@@ -142,6 +142,9 @@ class FloorActionController(http.Controller):
             return _plain("Rate limit exceeded. Try again shortly.",
                           status=429)
         Kind = env["southbrook.floor.action.kind"]
+        # resolve_kind returns a falsy (empty) AbstractModel recordset on
+        # a hit, or literal False on a miss — test the False sentinel, not
+        # truthiness (AbstractModel-falsy trap).
         handler = Kind.resolve_kind(action)
         # NB(v19): `resolve_kind` returns the literal ``False`` sentinel
         # when the action slug is not registered, OR the env-bound
@@ -207,7 +210,7 @@ class FloorActionController(http.Controller):
             body_or_resp = "<!DOCTYPE html>\n" + str(body_or_resp)
         return _html(body_or_resp)
 
-    @http.route("/sb/floor/<string:action>/submit", type="json",
+    @http.route("/sb/floor/<string:action>/submit", type="jsonrpc",
                 auth="public", methods=["POST"], csrf=False)
     def floor_submit(self, action=None, **body):
         """Process the kind's submission. JSON in, JSON out.
@@ -224,6 +227,8 @@ class FloorActionController(http.Controller):
             return {"ok": False, "error":
                     "Rate limit exceeded. Try again shortly."}
         Kind = env["southbrook.floor.action.kind"]
+        # AbstractModel-falsy trap: hit → falsy empty recordset, miss →
+        # literal False. Test the sentinel, not truthiness.
         handler = Kind.resolve_kind(action)
         # See identical note above on floor_render — `is False` is the
         # only correct discriminator against the v19 AbstractModel

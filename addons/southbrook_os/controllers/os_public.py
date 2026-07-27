@@ -11,18 +11,31 @@ class OsPublicController(http.Controller):
     @http.route("/southbrook/os.json", type="http", auth="public",
                 website=False, methods=["GET"], csrf=False)
     def os_json(self, **kw):
+        # PUBLIC endpoint — expose ONLY sections whose canonical `audience:`
+        # frontmatter includes "public" (today that is just 00_charter). Every
+        # other section is audience-scoped INTERNAL content: partner tiers
+        # (01_company), production control (05_production), PLM (06_plm), and —
+        # most sensitively — systems topology (20_systems_topology: container
+        # names, deploy paths, co-tenant list = infra recon). A bare search([])
+        # here leaked the entire internal knowledge base to anonymous callers.
+        # Do NOT widen this filter without re-auditing canonical/*.md tags.
         sections = request.env["southbrook.os.section"].sudo().search(
-            [], order="slug")
-        Pub = request.env["southbrook.os.publication"].sudo()
-        calendar_key = datetime.date.today().strftime("%Y-%m")
-        publication = Pub.publish(calendar_key)
+            [("audience_tags", "ilike", "public")], order="slug")
+        # Read-only: serve the latest EXISTING publication for provenance
+        # metadata only. Building publications is the cron/OSRO job
+        # (os_generators.generate_all) — an anonymous GET must never create
+        # rows (that was write-amplification + a TOCTOU IntegrityError→500 on
+        # the UNIQUE(calendar_key, build_hash) constraint).
+        publication = request.env["southbrook.os.publication"].sudo().search(
+            [], order="calendar_key desc, built_at desc, id desc", limit=1)
         payload = {
             "tenant": "southbrook",
             "publication": {
                 "calendar_key": publication.calendar_key,
                 "build_hash": publication.build_hash,
-                "built_at": publication.built_at.isoformat(),
-            },
+                "built_at": publication.built_at.isoformat()
+                    if publication.built_at else None,
+            } if publication else None,
             "sections": [
                 {
                     "slug": s.slug,

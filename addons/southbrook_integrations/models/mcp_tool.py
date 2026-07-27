@@ -75,6 +75,26 @@ class SouthbrookIntegrationsMcpTool(models.Model):
         "Tool name must be unique within the MCP registry.",
     )
 
+    # Models a tool may NEVER target — reading these over the MCP bridge would
+    # expose signing secrets / credential hashes / the user table regardless of
+    # who holds the key. Defense-in-depth on top of the (now non-sudo) ACL read.
+    _BLOCKED_MODELS = (
+        "ir.config_parameter",
+        "ir.mail_server",
+        "res.users",
+        "res.users.apikeys",
+        "southbrook.api.key",
+        "ir.model.data",
+    )
+
+    @api.constrains("model_id")
+    def _check_model_not_blocked(self):
+        for tool in self:
+            if tool.model_name in self._BLOCKED_MODELS:
+                raise UserError(_(
+                    "Model '%s' cannot be exposed as an MCP tool (it carries "
+                    "secrets or credentials).") % tool.model_name)
+
     # ------------------------------------------------------------------
     # Invocation
     # ------------------------------------------------------------------
@@ -84,8 +104,9 @@ class SouthbrookIntegrationsMcpTool(models.Model):
         ``mcp_call_log``.
 
         Args (``args_json``):
-            ``{"limit": 50, "offset": 0, "extra_domain": [...]}``
-            All optional. ``extra_domain`` is AND-ed onto ``domain_json``.
+            ``{"limit": 50, "offset": 0}`` — both optional and clamped. A
+            wire-supplied domain is deliberately NOT accepted (see below); the
+            tool's own ``domain_json`` is the only scope.
 
         Raises:
             ``UserError`` if disabled, model missing, domain/fields invalid.
@@ -101,6 +122,7 @@ class SouthbrookIntegrationsMcpTool(models.Model):
                 status = "rate_limited"  # treated as 403 by caller
                 Log.create({
                     "tool_id": self.id,
+                    "user_id": self.env.uid,
                     "args_json": args_json or "{}",
                     "result_size": 0,
                     "latency_ms": 0,
@@ -117,14 +139,22 @@ class SouthbrookIntegrationsMcpTool(models.Model):
                 except json.JSONDecodeError as exc:
                     raise UserError(_("Invalid args JSON: %s") % exc) from exc
             domain = self._parse_domain()
-            extra = args.get("extra_domain") or []
-            if extra:
-                domain = domain + list(extra)
+            # SECURITY: a caller-supplied `extra_domain` was concatenated onto
+            # the curated domain and run under sudo — a boolean-oracle to
+            # exfiltrate non-whitelisted fields and reshape query semantics.
+            # The tool's own domain_json is the ONLY scope; wire-supplied
+            # domains are not accepted.
             field_names = self._parse_fields()
             self._validate_read_fields_exist(field_names)
-            limit = int(args.get("limit", 50))
-            offset = int(args.get("offset", 0))
-            Target = self.env[self.model_name].sudo()
+            # Clamp paging so a single call can't demand an unbounded read.
+            limit = max(1, min(int(args.get("limit", 50)), 500))
+            offset = max(0, int(args.get("offset", 0)))
+            # NO sudo: the read runs as the invoking principal so record rules,
+            # model ACL and company scoping apply. Reading under sudo turned the
+            # endpoint into "read anything a curated tool names" regardless of
+            # the caller's rights (portal user → all payroll wages; a manager →
+            # ir.config_parameter secrets).
+            Target = self.env[self.model_name]
             records = Target.search(domain, limit=limit, offset=offset)
             rows = records.read(field_names) if field_names \
                 else records.read()
@@ -132,6 +162,7 @@ class SouthbrookIntegrationsMcpTool(models.Model):
             latency_ms = int((time.time() - started) * 1000)
             Log.create({
                 "tool_id": self.id,
+                "user_id": self.env.uid,
                 "args_json": args_json or "{}",
                 "result_size": result_size,
                 "latency_ms": latency_ms,
@@ -150,6 +181,7 @@ class SouthbrookIntegrationsMcpTool(models.Model):
             latency_ms = int((time.time() - started) * 1000)
             Log.create({
                 "tool_id": self.id,
+                "user_id": self.env.uid,
                 "args_json": args_json or "{}",
                 "result_size": result_size,
                 "latency_ms": latency_ms,

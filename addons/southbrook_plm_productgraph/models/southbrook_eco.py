@@ -107,11 +107,19 @@ class SouthbrookEco(models.Model):
             f"{(self.title or _('untitled')).strip()[:200]}"
         )
         try:
-            release = self.env["pg.release"].create({
-                "ebom_id": self.pg_ebom_id.id,
-                "release_reason": reason,
-            })
-            release.action_execute_release()
+            # Savepoint so a DB-LEVEL failure (IntegrityError etc. from
+            # action_execute_release) rolls back ONLY the pg.release and leaves
+            # the cursor usable. Without it, a DB error poisons the cursor, the
+            # message_post below then also fails, and the whole transaction —
+            # INCLUDING the authoritative ECO apply from super() — rolls back,
+            # defeating this method's "failures DO NOT roll back the ECO"
+            # contract. (2026-07-11 review.)
+            with self.env.cr.savepoint():
+                release = self.env["pg.release"].create({
+                    "ebom_id": self.pg_ebom_id.id,
+                    "release_reason": reason,
+                })
+                release.action_execute_release()
         except Exception as exc:
             _logger.exception(
                 "southbrook_plm_productgraph: pg.release failed for ECO %s",

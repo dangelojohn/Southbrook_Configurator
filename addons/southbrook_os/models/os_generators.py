@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+import datetime
 import hashlib
 
 from odoo import api, fields, models
@@ -167,6 +168,11 @@ class OsGenerators(models.AbstractModel):
         for fn in ("generate_catalog", "generate_attributes",
                    "generate_cut_spec", "generate_work_centers"):
             results.append(getattr(self, fn)())
+        # Build the dated publication snapshot HERE, in the authenticated cron
+        # context — so the public read-only endpoint (os_public.py) never has
+        # to write. Idempotent per (calendar_key, build_hash).
+        calendar_key = datetime.date.today().strftime("%Y-%m")
+        self.env["southbrook.os.publication"].publish(calendar_key)
         return results
 
     # ------------------------------------------------------------------

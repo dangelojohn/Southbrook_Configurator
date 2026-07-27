@@ -103,9 +103,16 @@ class SouthbrookCmmsMtbfMttrReport(models.Model):
                 start = req.request_date
                 end = req.close_date or fields.Date.context_today(rec)
                 if start and end:
-                    delta_days = (end - start).total_seconds() / 86400.0 if hasattr(end, "total_seconds") else (end - start).days
-                    # request_date / close_date are Date in v19; convert to hours via days * 24.
-                    downtime_h += max(0.0, delta_days) * 24.0
+                    # Clamp the outage to the report window. A still-open request
+                    # (end=today) on a BACK-DATED report otherwise counted
+                    # downtime past as_of_date, exceeding period_hours and forcing
+                    # runtime/MTBF to 0.
+                    start = max(start, period_start)
+                    end = min(end, rec.as_of_date)
+                    if end >= start:
+                        # request_date / close_date are Date in v19; days * 24 h.
+                        delta_days = (end - start).days
+                        downtime_h += max(0.0, delta_days) * 24.0
             rec.breakdown_count = len(requests)
             rec.total_downtime_hours = downtime_h
             rec.total_runtime_hours = max(0.0, period_hours - downtime_h)
@@ -131,11 +138,21 @@ class SouthbrookCmmsMtbfMttrReport(models.Model):
         today = fields.Date.context_today(self)
         created = self.env[self._name]
         for eq in Equipment.search([("active", "=", True)]):
-            rec = self.sudo().create({
-                "equipment_id": eq.id,
-                "as_of_date": today,
-                "period_days": 90,
-            })
+            # Upsert one report per (equipment, day). The cron formerly created a
+            # fresh row every run → unbounded growth, and the 30-day MI tile then
+            # counted each equipment ~30x in its per-row average.
+            rec = self.sudo().search([
+                ("equipment_id", "=", eq.id),
+                ("as_of_date", "=", today),
+            ], limit=1)
+            if rec:
+                rec.action_compute()
+            else:
+                rec = self.sudo().create({
+                    "equipment_id": eq.id,
+                    "as_of_date": today,
+                    "period_days": 90,
+                })
             created |= rec
         _logger.info("CMMS daily MTBF/MTTR sweep: %d reports", len(created))
         return len(created)

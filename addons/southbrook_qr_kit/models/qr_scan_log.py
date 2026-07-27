@@ -7,7 +7,12 @@ as `sbk_operator_employee_id`. `user_id` continues to record the kiosk
 session user (typically a shared tablet account). The two may differ;
 forensics rely on having both.
 """
-from odoo import fields, models
+from datetime import timedelta
+
+from odoo import api, fields, models
+
+DEFAULT_RETENTION_DAYS = 180
+PRUNE_CHUNK = 5000
 
 
 SCAN_RESULTS = [
@@ -27,6 +32,9 @@ class QrScanLog(models.Model):
     _description = "Southbrook QR Scan Log"
     _order = "create_date desc, id desc"
 
+    # High-volume append-only log: index create_date (the _order key AND the
+    # default "Last 24h" search filter) — the ORM does not auto-index it.
+    create_date = fields.Datetime(index=True)
     user_id = fields.Many2one(
         "res.users", string="Scanned By (Session)",
         default=lambda s: s.env.user, index=True,
@@ -48,9 +56,45 @@ class QrScanLog(models.Model):
     action = fields.Char(default="open")
     result = fields.Selection(
         SCAN_RESULTS, required=True, index=True, default="ok")
-    target_model = fields.Char()
-    target_id = fields.Integer()
+    # The (target_model, target_id) pair is what "scan history of record X"
+    # queries filter on (search view exposes target_model) — index both.
+    target_model = fields.Char(index=True)
+    target_id = fields.Integer(index=True)
     error_message = fields.Char()
     payload = fields.Char(help="Raw QR payload (for forensics).")
     source_ip = fields.Char(string="Source IP")
     user_agent = fields.Char()
+
+    @api.model
+    def autovacuum(self):
+        """Prune scan-log rows older than the configured retention window.
+
+        Append-only + one row per scan (incl. every failure result) means
+        this table grows without bound. Retention (days) comes from the
+        ``southbrook.qr_kit.scan_log_retention_days`` config parameter
+        (default 180; <= 0 keeps rows forever). Chunked delete so a large
+        backlog does not lock the table in one statement. Never raises.
+        """
+        try:
+            days = int(
+                self.env["ir.config_parameter"].sudo().get_param(
+                    "southbrook.qr_kit.scan_log_retention_days",
+                    DEFAULT_RETENTION_DAYS,
+                )
+                or 0
+            )
+        except (TypeError, ValueError):
+            days = DEFAULT_RETENTION_DAYS
+        if days <= 0:
+            return 0
+        cutoff = fields.Datetime.now() - timedelta(days=days)
+        pruned = 0
+        while True:
+            rows = self.sudo().search(
+                [("create_date", "<", cutoff)], limit=PRUNE_CHUNK
+            )
+            if not rows:
+                break
+            pruned += len(rows)
+            rows.unlink()
+        return pruned

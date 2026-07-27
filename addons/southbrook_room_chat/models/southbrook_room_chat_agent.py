@@ -29,7 +29,7 @@ never touch the network):
 import json
 import logging
 
-from odoo import api, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -313,6 +313,54 @@ class SouthbrookRoomChatAgent(models.AbstractModel):
         val = self.env["ir.config_parameter"].sudo().get_param(
             "southbrook_room_chat.use_mock", "True")
         return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+    @api.model
+    def _daily_cap(self):
+        """Global ceiling on real (non-mock) Anthropic calls per day.
+        ir.config_parameter southbrook_room_chat.max_daily_calls
+        (default 1000). 0 acts as a hard kill-switch — no real call at all.
+
+        The controller's rate limiter is PER WORKER (in-process _RATE_BUCKETS)
+        and cannot see sibling workers, and each chat turn fans out up to
+        _MAX_TOOL_ITERATIONS real API calls — so a paid-API spend ceiling that
+        every worker shares is enforced here, counted per real call. Mirrors
+        southbrook_room_capture._room_capture_daily_cap /
+        southbrook_agent_gateway's per-day cap (this module reused the shared
+        API key but originally dropped the cap — see REVIEW_REPORT H1)."""
+        ICP = self.env["ir.config_parameter"].sudo()
+        try:
+            return int(ICP.get_param(
+                "southbrook_room_chat.max_daily_calls", "1000"))
+        except (TypeError, ValueError):
+            return 1000
+
+    @api.model
+    def _consume_daily_quota(self):
+        """Increment today's real-call counter; return True only if within the
+        global daily cap. Best-effort: the config-param read-modify-write can
+        under-count under heavy concurrency, but as a COST ceiling an
+        approximate bound is acceptable (exact accounting needs a shared
+        counter store — see REVIEW_REPORT R1). 0 = kill-switch."""
+        cap = self._daily_cap()
+        if cap <= 0:
+            return False
+        ICP = self.env["ir.config_parameter"].sudo()
+        today = fields.Date.to_string(fields.Date.context_today(self))
+        stamp = ICP.get_param("southbrook_room_chat.daily_call_date", "")
+        if stamp != today:
+            count = 0
+        else:
+            try:
+                count = int(ICP.get_param(
+                    "southbrook_room_chat.daily_call_count", "0"))
+            except (TypeError, ValueError):
+                count = 0
+        if count >= cap:
+            return False
+        ICP.set_param("southbrook_room_chat.daily_call_date", today)
+        ICP.set_param(
+            "southbrook_room_chat.daily_call_count", str(count + 1))
+        return True
 
     # ------------------------------------------------------------------
     # Coercion helpers (mirrors southbrook.room.capture's conventions)
@@ -715,10 +763,17 @@ class SouthbrookRoomChatAgent(models.AbstractModel):
         }
 
     # ------------------------------------------------------------------
-    # Public entry point
+    # Internal entry point — controller-only, NOT RPC-dispatchable
     # ------------------------------------------------------------------
+    # Deliberately private (leading underscore): this method sudo-reads and
+    # sudo-writes the session for `order_id` WITHOUT re-checking ownership,
+    # trusting its sole caller (controllers/main.py) to have already resolved
+    # the order against the acting user and enforced the rate limit. A public
+    # name would be call_kw-dispatchable, letting any authenticated portal user
+    # invoke it against an arbitrary order_id and bypass both gates. See
+    # REVIEW_REPORT H2.
     @api.model
-    def handle_turn(self, order_id, message, reset=False):
+    def _handle_turn(self, order_id, message, reset=False):
         """Run one chat turn for the given order. Returns
         {"ok": True, "reply": <str>, "room": <draft dict>} or
         {"ok": False, "error": "<code>", "detail": "<msg>"}. Never raises."""
@@ -772,6 +827,23 @@ class SouthbrookRoomChatAgent(models.AbstractModel):
             if use_mock:
                 raw_response = self._mock_model_response(mock_step)
             else:
+                # Global daily spend ceiling / kill-switch, counted per REAL
+                # call (each turn can fan out up to _MAX_TOOL_ITERATIONS of
+                # them). Cross-worker; the controller limiter is per-worker.
+                if not self._consume_daily_quota():
+                    if iterations == 1:
+                        return {
+                            "ok": False, "error": "rate_limited",
+                            "detail": "Daily AI capacity reached; "
+                                      "please try again later.",
+                        }
+                    # Mid-turn: stop looping, keep the draft built so far.
+                    if not final_text:
+                        final_text = (
+                            "I've saved your progress. Our AI planner is at "
+                            "capacity right now — please continue shortly."
+                        )
+                    break
                 system_prompt = self._build_system_prompt(draft, customer)
                 try:
                     raw_response = self._call_anthropic(system_prompt, messages, api_key)

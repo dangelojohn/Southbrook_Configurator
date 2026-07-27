@@ -2,3 +2,4 @@
 from . import test_reliability
 from . import test_shadow
 from . import test_calibration
+from . import test_delivery

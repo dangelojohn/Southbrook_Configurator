@@ -171,6 +171,25 @@ class DeviationWaiver(models.Model):
     )
 
     # ------------------------------------------------------------------
+    # C1 — the 'approved' transition is governance-critical (it lets an
+    # out-of-spec cabinet ship). Every gate — engineering-group check, SoD,
+    # customer-acknowledgement, terminal-state block — lives in action_approve.
+    # The QC group has ORM write on this model, so a raw
+    # write({"state": "approved"}) would bypass ALL of it (forged approver, no
+    # sign-off). Block the direct transition; it may only be reached through
+    # action_approve (which sets the private context flag below).
+    # ------------------------------------------------------------------
+    def write(self, vals):
+        if (not self.env.su
+                and vals.get("state") == "approved"
+                and not self.env.context.get("_sbk_waiver_approve_action")):
+            raise AccessError(_(
+                "A deviation waiver can only be approved via the Approve "
+                "action, which enforces engineering sign-off, segregation of "
+                "duties, and customer acknowledgement."))
+        return super().write(vals)
+
+    # ------------------------------------------------------------------
     # Computed fields
     # ------------------------------------------------------------------
     @api.depends("production_id", "production_id.lot_producing_ids")
@@ -265,24 +284,28 @@ class DeviationWaiver(models.Model):
                     "(this one is %(state)s).",
                     state=dict(WAIVER_STATES).get(rec.state, rec.state),
                 ))
-            if eng_group and eng_group not in self.env.user.groups_id \
+            if eng_group and eng_group not in self.env.user.group_ids \
                     and not self.env.user.has_group("base.group_system"):
                 raise AccessError(_(
                     "Only Manufacturing Managers (engineering) can "
                     "approve a deviation waiver."))
-            # SoD — approver must not be the mi.check author.
-            check_creator = rec.mi_check_id.create_uid
-            if check_creator and check_creator == self.env.user \
+            # SoD — the approver must not be the person who REQUESTED the
+            # waiver (rec.create_uid). The old check compared the underlying
+            # NCR's create_uid, but engine-generated NCRs (the majority) are
+            # created via sudo → create_uid = OdooBot, so it NEVER tripped: the
+            # same manager could raise the waiver via the wizard and approve it.
+            requester = rec.create_uid
+            if requester and requester == self.env.user \
                     and not self.env.user.has_group("base.group_system"):
                 raise AccessError(_(
                     "Segregation of Duties: the engineer approving the "
-                    "waiver cannot be the same user who created the "
-                    "underlying NCR. Have a second engineer approve."))
+                    "waiver cannot be the one who requested it. Have a "
+                    "second engineer approve."))
             if not rec.customer_acknowledged:
                 raise UserError(_(
                     "Cannot approve until customer acknowledgement is "
                     "captured (tick the box + record the method + ref)."))
-            rec.write({
+            rec.with_context(_sbk_waiver_approve_action=True).write({
                 "state": "approved",
                 "engineering_approver_id": self.env.user.id,
                 "engineering_approved_at": fields.Datetime.now(),

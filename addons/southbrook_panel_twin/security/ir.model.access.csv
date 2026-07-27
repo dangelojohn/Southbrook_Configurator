@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sb_panel_user,sb.panel user,model_sb_panel,base.group_user,1,0,0,0
+access_sb_panel_mrp,sb.panel mrp,model_sb_panel,mrp.group_mrp_user,1,1,1,1
+access_sb_panel_cycle_user,sb.panel.cycle user,model_sb_panel_cycle,base.group_user,1,0,0,0
+access_sb_panel_cycle_mrp,sb.panel.cycle mrp,model_sb_panel_cycle,mrp.group_mrp_user,1,1,1,1
+access_sb_machine_event_user,sb.machine.event user,model_sb_machine_event,base.group_user,1,0,0,0
+access_sb_machine_event_mrp,sb.machine.event mrp,model_sb_machine_event,mrp.group_mrp_user,1,1,1,1

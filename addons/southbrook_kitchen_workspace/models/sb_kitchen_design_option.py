@@ -41,10 +41,14 @@ class SbKitchenDesignOption(models.Model):
         False atomically."""
         res = super().write(vals)
         if vals.get("is_selected"):
-            for option in self.filtered("is_selected"):
+            selected = self.filtered("is_selected")
+            if selected:
+                # One batched search across all affected projects instead of a
+                # search() per record; clear every OTHER selected option so the
+                # one-of-N invariant holds per project.
                 siblings = self.search([
-                    ("project_id", "=", option.project_id.id),
-                    ("id", "!=", option.id),
+                    ("project_id", "in", selected.project_id.ids),
+                    ("id", "not in", selected.ids),
                     ("is_selected", "=", True),
                 ])
                 if siblings:

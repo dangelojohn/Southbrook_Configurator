@@ -413,11 +413,15 @@ class SbCutlist(models.Model):
                 try:
                     scrap = Scrap.create(vals)
                     scrap_ids.append(scrap.id)
-                except Exception:  # noqa: BLE001
-                    # One bad entry shouldn't abort the rest; log to
-                    # ir.logging via the standard mechanism (silent
-                    # try/except keeps the round-trip resilient).
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    # One bad entry shouldn't abort the rest, but DO surface it
+                    # — a silent pass let the cutlist flip to 'nested' with zero
+                    # scrap and no trace (e.g. the user lacks stock.scrap create
+                    # rights). Log so the gap is observable. (Audit LOW-4.)
+                    _logger.warning(
+                        "Nesting offcut scrap create failed for cutlist %s "
+                        "(product=%s): %s", self.name or self.id,
+                        product.default_code or product.id, exc)
         if scrap_ids:
             write_vals["nesting_scrap_ids"] = [(6, 0, scrap_ids)]
         self.write(write_vals)

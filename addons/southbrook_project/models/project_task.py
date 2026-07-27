@@ -11,7 +11,19 @@ logs "Medium priority". We extend the selection so an operator picks
 between Standard / Rush / Urgent, which logs clear labels into the
 chatter.
 """
-from odoo import _, api, fields, models
+from dateutil.relativedelta import relativedelta
+
+from odoo import api, fields, models
+
+_BACKFILL_DESCRIPTION = (
+    "<p>Southbrook Cabinetry production tracking. Each task represents a "
+    "single cabinet job moving through the five-stage pipeline: Design &amp; "
+    "Quote → Cutting &amp; Machining → Assembly → Finishing → Delivery &amp; "
+    "Install.</p>"
+    "<p>Tag tasks with Rush / Custom / Warranty / Repair plus the scope "
+    "(Kitchen / Vanity) so the Tasks Analysis report can slice the queue by "
+    "priority and scope.</p>"
+)
 
 
 # Material/species the cabinet shop uses most often. Keep this as a
@@ -265,15 +277,56 @@ class ProjectProject(models.Model):
              "steps as full tasks.",
     )
 
+    @api.depends("task_ids.state", "task_ids.parent_id", "task_ids.project_id")
     def _compute_southbrook_top_level_task_count(self):
         # Open = anything not done or cancelled. Listing closed states
         # rather than open ones keeps this resilient to upstream
         # additions of new in-progress sub-states.
+        #
+        # Batched via _read_group: one aggregate query for the whole
+        # recordset instead of a search_count per project (the latter is an
+        # N+1 that fires once per card if the project-overview kanban that
+        # surfaces this field is enabled). @api.depends wires it into the
+        # recompute graph so the count refreshes when a task's state/parent
+        # changes rather than silently going stale.
         closed_states = ("1_done", "1_canceled")
-        Task = self.env["project.task"]
-        for rec in self:
-            rec.southbrook_top_level_task_count = Task.search_count([
-                ("project_id", "=", rec.id),
+        groups = self.env["project.task"]._read_group(
+            [
+                ("project_id", "in", self.ids),
                 ("parent_id", "=", False),
                 ("state", "not in", closed_states),
-            ])
+            ],
+            groupby=["project_id"],
+            aggregates=["__count"],
+        )
+        counts = {project.id: count for project, count in groups}
+        for rec in self:
+            rec.southbrook_top_level_task_count = counts.get(rec.id, 0)
+
+    def _southbrook_backfill_defaults(self):
+        """Fill blank description / planned dates / feature toggles on this
+        project. Returns the list of field names actually written.
+
+        Idempotency note: description and the two dates are only written when
+        blank, so operator-set values survive. The two Boolean feature flags
+        (allow_task_dependencies / allow_milestones) default to False, so
+        "never set" and "operator turned off" are indistinguishable — a
+        (re-)install therefore always turns them ON. This runs from the
+        post_init hook (install-time only), not on upgrade.
+        """
+        self.ensure_one()
+        vals = {}
+        if not self.description:
+            vals["description"] = _BACKFILL_DESCRIPTION
+        today = fields.Date.context_today(self)
+        if not self.date_start:
+            vals["date_start"] = today
+        if not self.date:
+            vals["date"] = today + relativedelta(months=6)
+        if not self.allow_task_dependencies:
+            vals["allow_task_dependencies"] = True
+        if not self.allow_milestones:
+            vals["allow_milestones"] = True
+        if vals:
+            self.write(vals)
+        return list(vals.keys())

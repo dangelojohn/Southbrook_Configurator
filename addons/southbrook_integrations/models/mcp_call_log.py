@@ -22,6 +22,14 @@ class SouthbrookIntegrationsMcpCallLog(models.Model):
         index=True,
         help="Persona / source of the call (`mcp_server`, `odoo_user`, etc).",
     )
+    user_id = fields.Many2one(
+        "res.users",
+        string="Invoked By",
+        index=True,
+        ondelete="set null",
+        help="The authenticated principal that ran the tool — required to "
+             "attribute a call to a key/user during a forensic review.",
+    )
     args_json = fields.Text()
     result_size = fields.Integer()
     latency_ms = fields.Integer()

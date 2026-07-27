@@ -31,7 +31,7 @@ import logging
 import os
 import warnings
 
-from odoo import _, api, models
+from odoo import _, api, fields, models
 from odoo.tools import plaintext2html
 
 _logger = logging.getLogger(__name__)
@@ -210,6 +210,52 @@ class SouthbrookRoomCapture(models.AbstractModel):
         val = self.env["ir.config_parameter"].sudo().get_param(
             "southbrook_room_capture.use_mock", "True")
         return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+    @api.model
+    def _room_capture_daily_cap(self):
+        """Global ceiling on real (non-mock) Anthropic analyze() calls per
+        day. ir.config_parameter southbrook_room_capture.max_daily_calls
+        (default 500). 0 acts as a hard kill-switch — no real calls at all.
+
+        The per-request rate limiter in the controller is PER WORKER and
+        cannot see sibling workers, so a paid-API spend ceiling that every
+        worker shares is enforced here instead. Bounds the cost blast-radius
+        of a burst of portal self-signups hammering /room-capture/analyze."""
+        ICP = self.env["ir.config_parameter"].sudo()
+        try:
+            return int(ICP.get_param(
+                "southbrook_room_capture.max_daily_calls", "500"))
+        except (TypeError, ValueError):
+            return 500
+
+    @api.model
+    def _room_capture_consume_daily_quota(self):
+        """Increment today's real-call counter; return True only if the call
+        is within the global daily cap. Best-effort: the config-param
+        read-modify-write can under-count under heavy concurrency, but as a
+        COST ceiling an approximate bound is acceptable (exact accounting
+        would need a shared counter store — see REVIEW_REPORT recommendation
+        R1). 0 = kill-switch: no real call is ever permitted."""
+        cap = self._room_capture_daily_cap()
+        if cap <= 0:
+            return False
+        ICP = self.env["ir.config_parameter"].sudo()
+        today = fields.Date.to_string(fields.Date.context_today(self))
+        stamp = ICP.get_param("southbrook_room_capture.daily_call_date", "")
+        if stamp != today:
+            count = 0
+        else:
+            try:
+                count = int(ICP.get_param(
+                    "southbrook_room_capture.daily_call_count", "0"))
+            except (TypeError, ValueError):
+                count = 0
+        if count >= cap:
+            return False
+        ICP.set_param("southbrook_room_capture.daily_call_date", today)
+        ICP.set_param(
+            "southbrook_room_capture.daily_call_count", str(count + 1))
+        return True
 
     # ------------------------------------------------------------------
     # Image handling — decode + downscale. NEVER writes to disk or the
@@ -731,6 +777,14 @@ class SouthbrookRoomCapture(models.AbstractModel):
                 return {
                     "ok": False, "error": "not_configured",
                     "detail": "Anthropic API key is not configured.",
+                }
+            if not self._room_capture_consume_daily_quota():
+                # Global daily spend ceiling reached (or kill-switch set).
+                # A cross-worker bound the per-worker rate limiter can't give.
+                return {
+                    "ok": False, "error": "rate_limited",
+                    "detail": "Daily analysis capacity reached; "
+                              "please try again later.",
                 }
             try:
                 raw_response = self._call_anthropic(

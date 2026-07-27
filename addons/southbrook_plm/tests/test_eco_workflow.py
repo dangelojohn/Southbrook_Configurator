@@ -190,6 +190,55 @@ class TestSouthbrookPlm(TransactionCase):
         with self.assertRaises(UserError):
             eco.with_user(self.plain_user).action_apply()
 
+    def test_direct_write_cannot_forge_terminal_state(self):
+        """H1 regression: a non-approver (and anyone) cannot forge an ECO into
+        a terminal state by a direct write — terminal states are reachable only
+        through the gated Apply/Reject actions (which run the handlers)."""
+        eco = self.Eco.create({
+            "title": "Forge attempt",
+            "eco_type_id": self.env.ref("southbrook_plm.eco_type_document").id,
+        })
+        applied_stage = self.env["southbrook.eco.stage"].search(
+            [("is_applied_stage", "=", True)], limit=1)
+        # Bare state forge.
+        with self.assertRaises(UserError):
+            eco.with_user(self.plain_user).write({"state": "applied"})
+        # stage_id + matching state (the exact hole the old guard let through).
+        with self.assertRaises(UserError):
+            eco.with_user(self.plain_user).write(
+                {"stage_id": applied_stage.id, "state": "applied"})
+        self.assertNotEqual(eco.state, "applied")
+        self.assertFalse(eco.approver_id)
+
+    def test_plain_user_cannot_reject(self):
+        """M3 regression: reject is an approver decision."""
+        eco = self.Eco.create({
+            "title": "Reject attempt",
+            "eco_type_id": self.env.ref("southbrook_plm.eco_type_document").id,
+        })
+        with self.assertRaises(UserError):
+            eco.with_user(self.plain_user).action_reject()
+
+    def test_plain_user_cannot_reset_applied_eco(self):
+        """H2 regression: resetting an applied ECO wipes approval provenance —
+        a plain PLM User must not be able to."""
+        product = self.env["product.product"].create(
+            {"name": "Reset Test Cabinet", "type": "consu"})
+        bom = self.Bom.create(
+            {"product_tmpl_id": product.product_tmpl_id.id, "product_qty": 1.0})
+        eco = self.Eco.create({
+            "title": "Rev then reset",
+            "eco_type_id": self.type_bom.id,
+            "bom_id": bom.id,
+        })
+        eco.with_user(self.approver).action_apply()
+        self.assertEqual(eco.state, "applied")
+        with self.assertRaises(UserError):
+            eco.with_user(self.plain_user).action_reset_draft()
+        # Approver still can (provenance change is an approver decision).
+        eco.with_user(self.approver).action_reset_draft()
+        self.assertEqual(eco.state, "open")
+
     def test_approval_required_stage_gating(self):
         review = self.env.ref("southbrook_plm.stage_review")
         approved = self.env.ref("southbrook_plm.stage_approved")

@@ -51,6 +51,21 @@ WIZARD_DOWNTIME_REASONS = [
     ("other", "Other"),
 ]
 
+# The wizard's reason keys are NOT the same as the downtime model's
+# Selection keys (southbrook.kitchen.workcenter.downtime.DOWNTIME_REASONS).
+# Writing an unmapped key onto the model's required Selection raises
+# ValueError in v19 — which, inside the wizard's atomic savepoint, aborted
+# the WHOLE report-problem submit (scrap + defect + downtime) for 4 of the 6
+# reasons. Map wizard → model explicitly.
+WIZARD_TO_MODEL_DOWNTIME_REASON = {
+    "machine_breakdown": "machine_breakdown",
+    "material_shortage": "material_not_available",
+    "changeover": "color_finish_changeover",
+    "quality_hold": "waiting_quality_approval",
+    "operator_break": "operator_unavailable",
+    "other": "other",
+}
+
 WIZARD_SCRAP_REASONS = [
     ("damage_in_process", "Damage In Process"),
     ("wrong_dimension", "Wrong Dimension"),
@@ -355,10 +370,10 @@ class SouthbrookReportProblemWizard(models.TransientModel):
         date_start = fields.Datetime.now() - timedelta(
             minutes=self.downtime_minutes)
         date_end = fields.Datetime.now()
-        # Map wizard reasons onto the model's reason enum. The model
-        # enum is defined in the downtime module; both share
-        # 'machine_breakdown', 'material_shortage', 'changeover',
-        # 'quality_hold', 'operator_break', 'other'.
+        # Map the wizard's reason key onto the model's Selection key (they are
+        # NOT identical — see WIZARD_TO_MODEL_DOWNTIME_REASON).
+        model_reason = WIZARD_TO_MODEL_DOWNTIME_REASON.get(
+            self.downtime_reason, "other")
         downtime = self.env["southbrook.kitchen.workcenter.downtime"].sudo().create({
             "name": (
                 _("W040 wizard: %s") % dict(WIZARD_DOWNTIME_REASONS).get(
@@ -369,7 +384,7 @@ class SouthbrookReportProblemWizard(models.TransientModel):
             "date_start": date_start,
             "date_end": date_end,
             "duration_min": self.downtime_minutes,
-            "reason": self.downtime_reason,
+            "reason": model_reason,
             "notes": self.downtime_notes or "",
             "state": "closed",
             "responsible_id": self.env.user.id,

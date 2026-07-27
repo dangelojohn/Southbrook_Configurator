@@ -59,7 +59,14 @@ def find_training(env, query: str, limit: int = 5):
         capped = max(1, min(int(limit or 5), 10))
     except (TypeError, ValueError):
         capped = 5
-    Item = env["southbrook.training.item"].sudo()
+    # Do NOT sudo() — search_for_user builds its role_group_ids gate from
+    # self.env.user. Under sudo that resolves to the SUPERUSER (in every group),
+    # so the gate matches every item and a trade_partner persona would receive
+    # internal-role-gated training. The Hermes dispatch already binds env to the
+    # persona's user (request.env(user=...)), so the un-sudo'd call evaluates the
+    # gate against the real caller. (search_for_user still sudo's the catalogue
+    # read internally; only the gate needs the real identity.)
+    Item = env["southbrook.training.item"]
     rows = Item.search_for_user(query=query, limit=capped)
     return {
         "schema": "southbrook.training.find.v1",

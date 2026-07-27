@@ -121,6 +121,26 @@ class TestSouthbrookCmmsWms(TransactionCase):
         self.assertEqual(contract.days_to_expiry, 45)
         self.assertEqual(contract.state, "expiring_soon")
 
+    def test_expiry_cron_runs_and_deduplicates(self):
+        """The expiry cron must run without crashing (regression: it used the
+        v19-removed res.groups.users), post an alert, stamp last_alert_date,
+        and NOT re-alert on a same-week second run."""
+        today = fields.Date.context_today(self.env.user)
+        contract = self.env["southbrook.cmms.service_contract"].create({
+            "name": "Expiring Contract",
+            "vendor_id": self.vendor.id,
+            "date_end": today + timedelta(days=20),
+            "expiry_alert_at": "60",
+        })
+        SC = self.env["southbrook.cmms.service_contract"]
+        sent1 = SC._cron_check_expiry()
+        self.assertGreaterEqual(sent1, 1)
+        self.assertEqual(contract.last_alert_date, today)
+        # Second run same day: throttled, no new alert for this contract.
+        before = contract.last_alert_date
+        SC._cron_check_expiry()
+        self.assertEqual(contract.last_alert_date, before)
+
     # ---- Oversize picking ----
     def test_oversize_flag_triggers_on_2400mm(self):
         bigprod = self.Product.create({

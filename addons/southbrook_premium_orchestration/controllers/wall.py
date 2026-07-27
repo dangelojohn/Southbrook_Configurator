@@ -35,6 +35,7 @@ REFRESH CADENCE:
   "Updated Xs ago" stamp accordingly (green / amber / red). Tuning
   per station per spec §7.18.
 """
+import hmac
 import logging
 from datetime import datetime, timedelta
 
@@ -56,6 +57,24 @@ class WallFeedController(http.Controller):
         type="http", auth="public", methods=["GET"], csrf=False,
     )
     def wall_feed(self, station, **kwargs):
+        # Optional code-side token gate (defense-in-depth for the documented
+        # "effectively public" exposure — the payload carries customer names +
+        # SO refs + tracking #s). If `southbrook_premium_orchestration.wall_token`
+        # is configured, require it via ?token= or the X-Wall-Token header
+        # (constant-time compare). If UNSET, behaves exactly as before (public),
+        # so the POC is unaffected and the owner can lock down without a network
+        # or module-logic change.
+        configured = request.env["ir.config_parameter"].sudo().get_param(
+            "southbrook_premium_orchestration.wall_token", "")
+        if configured:
+            supplied = (request.httprequest.headers.get("X-Wall-Token")
+                        or kwargs.get("token") or "")
+            if not hmac.compare_digest(str(supplied), str(configured)):
+                return request.make_response(
+                    '{"error":"unauthorized"}',
+                    status=401,
+                    headers=[("Content-Type", "application/json")],
+                )
         builders = {
             "shipping": self._build_shipping,
         }

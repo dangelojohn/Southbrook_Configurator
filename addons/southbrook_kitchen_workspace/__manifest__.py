@@ -35,7 +35,7 @@ when the design + spec are written.
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.5.0",
+    "version": "19.0.0.6.0",
     "depends": [
         "mail",
         "crm",

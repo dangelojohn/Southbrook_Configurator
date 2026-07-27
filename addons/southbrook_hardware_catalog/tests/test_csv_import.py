@@ -100,3 +100,41 @@ class TestMarathonCsvImport(TransactionCase):
         wiz.action_import()
         self.assertEqual(wiz.error_count, 1)
         self.assertIn("brand_code", wiz.result_log)
+
+    def test_import_accepts_extended_categories(self):
+        """Regression: the wizard's category set was a stale hard-coded copy
+        missing end_panel/filler/corner_mech (added to the model 2026-06-18),
+        so valid rows using them were rejected. It now derives from the
+        model's HARDWARE_CATEGORIES."""
+        csv_bytes = (
+            b"marathon_sku,name,brand_code,category\n"
+            b"TEST-EP-1,End Panel,blum,end_panel\n"
+            b"TEST-CM-1,Magic Corner,blum,corner_mech\n"
+            b"TEST-FL-1,Filler Strip,blum,filler\n"
+        )
+        wiz = self._make_wizard(csv_bytes, dry_run=False)
+        wiz.action_import()
+        self.assertEqual(wiz.error_count, 0)
+        self.assertEqual(wiz.created_count, 3)
+        ep = self.env["product.product"].search(
+            [("x_marathon_sku", "=", "TEST-EP-1")])
+        self.assertEqual(ep.x_hardware_category, "end_panel")
+
+    def test_bad_row_does_not_discard_good_rows(self):
+        """Per-row isolation: a failing row is reported as an error while the
+        good rows on either side of it still import."""
+        csv_bytes = (
+            b"marathon_sku,name,brand_code,category\n"
+            b"TEST-MIX-1,Good One,blum,hinge\n"
+            b"TEST-MIX-BAD,Bad Cat,blum,not_a_category\n"
+            b"TEST-MIX-2,Good Two,blum,slide\n"
+        )
+        wiz = self._make_wizard(csv_bytes, dry_run=False)
+        wiz.action_import()
+        self.assertEqual(wiz.created_count, 2)
+        self.assertEqual(wiz.error_count, 1)
+        for sku in ("TEST-MIX-1", "TEST-MIX-2"):
+            self.assertTrue(
+                self.env["product.product"].search(
+                    [("x_marathon_sku", "=", sku)]),
+                "good row %s must persist despite the bad row" % sku)

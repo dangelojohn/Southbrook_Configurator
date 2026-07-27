@@ -45,7 +45,7 @@
             <field name="year">2026</field>
             <field name="threshold">0.0</field>
             <field name="rate">0.33</field>
-            <field name="cumulative">58686.775</field>
+            <field name="cumulative">58686.725</field>
         </record>
 
         <!-- ===== Ontario 2026 ===== -->
@@ -75,14 +75,14 @@
             <field name="year">2026</field>
             <field name="threshold">220000.00</field>
             <field name="rate">0.1216</field>
-            <field name="cumulative">12445.4765</field>
+            <field name="cumulative">12445.5965</field>
         </record>
         <record id="bracket_ontario_2026_5" model="southbrook.payroll.tax_bracket">
             <field name="jurisdiction">ontario</field>
             <field name="year">2026</field>
             <field name="threshold">0.0</field>
             <field name="rate">0.1316</field>
-            <field name="cumulative">20957.4765</field>
+            <field name="cumulative">20957.5965</field>
         </record>
     </data>
 </odoo>

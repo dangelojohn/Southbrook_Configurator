@@ -120,3 +120,26 @@ class TestProdboardAssetImporter(TransactionCase):
         self.assertFalse(archetype.prodboard_asset_attachment_id)
         self.assertIn("network disabled", archetype.prodboard_asset_error)
 
+    def test_ssrf_guard_blocks_non_public_and_non_http_urls(self):
+        """import_assets(allow_network=True) is an AbstractModel method that
+        bypasses ir.model.access, so any authenticated user can drive
+        _fetch_url with an arbitrary image_url. The guard must reject
+        file://, loopback, RFC1918, link-local and cloud-metadata targets."""
+        for bad in (
+            "file:///etc/passwd",                        # local file read
+            "ftp://example.com/x",                       # non-http scheme
+            "http://127.0.0.1:8069/web",                 # loopback
+            "http://169.254.169.254/latest/meta-data/",  # cloud metadata
+            "http://10.1.2.3/x",                          # RFC1918
+            "http://192.168.0.5/x",                       # RFC1918
+            "http://172.16.4.4/x",                        # RFC1918
+            "http:///no-host",                            # no host
+            "",                                           # empty
+        ):
+            with self.assertRaises(ValueError, msg="must block %r" % bad):
+                self.Importer._assert_safe_public_url(bad)
+
+    def test_ssrf_guard_allows_public_ip(self):
+        # A public IP literal (no DNS needed — works offline) must pass.
+        self.Importer._assert_safe_public_url("https://8.8.8.8/icon.png")
+

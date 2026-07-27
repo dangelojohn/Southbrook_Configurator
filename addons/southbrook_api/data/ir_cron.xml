@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      GC for expired idempotency records. The model docstring promised this
+      cron but it was never shipped, so the table grew unbounded (one row per
+      POST carrying an Idempotency-Key; the lazy unlink in get_cached only
+      trims rows that happen to be replayed). Runs daily.
+      v19 ir.cron: no numbercall/doall (removed — ir.cron now inherits
+      ir.actions.server); schedule via interval_number/interval_type.
+    -->
+    <record id="ir_cron_api_idempotency_gc" model="ir.cron">
+        <field name="name">Southbrook API: purge expired idempotency records</field>
+        <field name="model_id" ref="model_southbrook_api_idempotency"/>
+        <field name="state">code</field>
+        <field name="code">model._gc_expired()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

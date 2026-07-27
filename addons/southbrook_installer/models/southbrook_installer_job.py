@@ -286,13 +286,16 @@ class SouthbrookInstallerJob(models.Model):
         "job_id",
         string="Tool Loans",
     )
+    # store=True: these are fetched for up to 200 jobs on every dashboard
+    # load and 30s poll; storing them (deps already declared) avoids a
+    # recompute+refetch each time, matching completion_pct/open_damage_count.
     tool_loan_count = fields.Integer(
         compute="_compute_tool_loan_count",
-        store=False,
+        store=True,
     )
     tool_loan_open_count = fields.Integer(
         compute="_compute_tool_loan_count",
-        store=False,
+        store=True,
     )
 
     # ------------------------------------------------------------------
@@ -323,16 +326,21 @@ class SouthbrookInstallerJob(models.Model):
         related="stage_id.is_terminal",
         store=True,
         readonly=True,
+        # Default filter on every Jobs list/kanban + the dashboard's default
+        # view; index it like every other filtered boolean in this module.
+        index=True,
     )
 
-    # Smart-button counters
+    # Smart-button counters. store=True — stage_log_count/done_count ride the
+    # dashboard BOARD_FIELDS payload (200 jobs, 30s poll); store to avoid the
+    # recurring recompute (deps already declared on the compute).
     stage_log_count = fields.Integer(
         compute="_compute_stage_log_count",
-        store=False,
+        store=True,
     )
     stage_log_done_count = fields.Integer(
         compute="_compute_stage_log_count",
-        store=False,
+        store=True,
     )
 
     # ==================================================================
@@ -452,7 +460,7 @@ class SouthbrookInstallerJob(models.Model):
             else:
                 rec.on_site_duration_hrs = 0.0
 
-    @api.depends("is_blocked", "stage_is_terminal", "stage_id.sequence")
+    @api.depends("is_blocked", "stage_is_terminal")
     def _compute_color(self):
         for rec in self:
             if rec.is_blocked:
@@ -515,23 +523,29 @@ class SouthbrookInstallerJob(models.Model):
                     "southbrook.installer.job"
                 ) or _("INST/New")
         jobs = super().create(vals_list)
-        for job in jobs:
-            job._spawn_phase_logs()
+        jobs._spawn_phase_logs()
         return jobs
 
     def _spawn_phase_logs(self):
         """Idempotent: creates one stage_log per active phase that is
-        not already linked. Safe to call again after adding a new phase."""
+        not already linked. Safe to call again after adding a new phase.
+
+        Batched across the whole recordset: the active-phase list is
+        queried once and a single Log.create() covers every job's missing
+        logs (was one Phase.search + one Log.create per job)."""
         Log = self.env["southbrook.installer.stage.log"]
-        Phase = self.env["southbrook.installer.phase"]
+        active_phases = self.env["southbrook.installer.phase"].search(
+            [("active", "=", True)]
+        )
+        vals_list = []
         for job in self:
-            existing = job.stage_log_ids.mapped("phase_id")
-            missing = Phase.search([("active", "=", True)]) - existing
-            if missing:
-                Log.create([
-                    {"job_id": job.id, "phase_id": phase.id}
-                    for phase in missing.sorted("sequence")
-                ])
+            missing = active_phases - job.stage_log_ids.mapped("phase_id")
+            vals_list += [
+                {"job_id": job.id, "phase_id": phase.id}
+                for phase in missing.sorted("sequence")
+            ]
+        if vals_list:
+            Log.create(vals_list)
 
     # ==================================================================
     # Stage advance — the heart of the workflow

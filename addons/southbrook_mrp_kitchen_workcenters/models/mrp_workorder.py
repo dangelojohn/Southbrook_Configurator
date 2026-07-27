@@ -68,7 +68,11 @@ _FORM_OPEN_DEDUPE_SEC = 30
 
 
 class MrpWorkorder(models.Model):
-    _inherit = ["mrp.workorder", "southbrook.qr.mixin"]
+    # v19 core dropped mail.thread from mrp.workorder (prod's older build had
+    # it). This module posts shop-floor chatter to the work order in several
+    # places (downtime notify W069, raise-ECO W034, subcontract W066, report-
+    # problem W040) — restore the mixin so wo.message_post / .message_ids work.
+    _inherit = ["mrp.workorder", "southbrook.qr.mixin", "mail.thread"]
     _qr_kind = "wo"
 
     # ------------------------------------------------------------------
@@ -804,8 +808,9 @@ class MrpWorkorder(models.Model):
         if len(self) != 1:
             return
         env = self.env
-        # Test-harness bypass — TransactionCase sets test_enable=True
-        # on the env's context. Skip silently to keep test runs clean.
+        # Test-harness bypass — a caller (or test) sets test_enable in the
+        # context to opt out of form-open logging. (The real guard against
+        # non-UI callers is the bound-request check below.)
         if env.context.get("test_enable"):
             return
         # Cron / sudo with no request — skip. `request` is a

@@ -9,9 +9,9 @@
                  but is a latent tokenizer-regression trap. -->
             <CheckBox
                 id="props.id"
-                value="props.state || false"
+                value="state.value"
                 className="'d-inline-block me-2'"
-                disabled="isReadonly"
+                disabled="props.readonly"
             />
         </div>
     </t>

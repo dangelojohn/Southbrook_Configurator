@@ -15,7 +15,7 @@ doesn't require a code change.
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from odoo import api, models
 
@@ -169,9 +169,20 @@ class SouthbrookHardwareCatalog(models.AbstractModel):
                 # on tall_oven / tall_fridge equals appliance-door count.
                 totals[app_sku] = totals.get(app_sku, 0) + max(door_count, 1)
 
+        # Batch the SKU→product lookup: one query for all SKUs instead of a
+        # search() per SKU. resolve() is the per-carcass hot path (called by
+        # BoM generation across whole orders), so the round-trip count matters.
+        # setdefault keeps the first product per SKU — same as the prior
+        # limit=1 (default order) semantics.
+        by_sku: Dict[str, Any] = {}
+        if totals:
+            for product in Product.search(
+                    [("x_marathon_sku", "in", list(totals))]):
+                by_sku.setdefault(product.x_marathon_sku, product)
+
         result: List[Tuple] = []
         for sku, qty in totals.items():
-            product = Product.search([("x_marathon_sku", "=", sku)], limit=1)
+            product = by_sku.get(sku)
             if not product:
                 _logger.warning(
                     "hardware_map references SKU '%s' not present in the "

@@ -58,6 +58,29 @@ class TestPayrollRun(TransactionCase):
         with self.assertRaises(Exception):
             run.action_compute()
 
+    def test_recompute_blocked_on_paid_run(self):
+        """A PAID run must not be recomputable — recompute would unlink the
+        paid payslips and orphan the journal entry (regression: the guard
+        formerly only blocked 'posted')."""
+        run = self._make_run()
+        run.action_compute()
+        run.state = "paid"
+        with self.assertRaises(Exception):
+            run.action_compute()
+
+    def test_additional_tax_parses_first_amount_only(self):
+        """A free-text additional-tax note must yield ONLY the first dollar
+        amount, not a concatenation of every digit (regression: '$25 ... 2026'
+        formerly withheld $252,026)."""
+        emp = self.employees[0]
+        contract = self.Contract.search(
+            [("employee_id", "=", emp.id)], limit=1)
+        contract.additional_federal_tax_request = "$25.00 / period — TD1 Jan 2026"
+        slip = self.env["southbrook.payroll.payslip"].create(
+            {"employee_id": emp.id, "contract_id": contract.id, "gross": 2000.0}
+        )
+        self.assertAlmostEqual(slip.additional_tax, 25.00, places=2)
+
     def test_post_creates_journal_entry(self):
         """action_post creates a balanced account.move.
 

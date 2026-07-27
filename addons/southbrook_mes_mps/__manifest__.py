@@ -6,7 +6,7 @@
         "Bottleneck Report (CE-native, no Enterprise mrp_mps or "
         "mrp_workorder dep)"
     ),
-    "version": "19.0.1.0.1",
+    "version": "19.0.2.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry / OdooIQ",
     "category": "Manufacturing/MES",
@@ -24,6 +24,7 @@
         "security/groups.xml",
         "security/ir.model.access.csv",
         "data/ir_sequence.xml",
+        "data/mi_tiles.xml",
         "data/cron_oee_daily.xml",
         "data/cron_bottleneck_daily.xml",
         "views/mps_period_views.xml",

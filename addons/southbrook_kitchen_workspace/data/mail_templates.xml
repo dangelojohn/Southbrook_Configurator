@@ -71,7 +71,7 @@
         Target completion: <t t-out="object.date_target or 'TBD'"/>
     </p>
     <p style="margin: 24px 0;">
-        <a t-attf-href="/odoo/action-base.action_open_view_form_view/{{ object.id }}"
+        <a t-attf-href="/odoo/action-southbrook_kitchen_workspace.action_sb_kitchen_project/{{ object.id }}"
            style="background:#1c2d49; color:white; padding:12px 20px;
                   text-decoration:none; border-radius:4px; font-weight:600;">
             Open project
@@ -106,7 +106,7 @@
         <strong t-out="object.selected_design_option_id.name or '(none)'"/>
     </p>
     <p style="margin: 24px 0;">
-        <a t-attf-href="/odoo/action-base.action_open_view_form_view/{{ object.id }}"
+        <a t-attf-href="/odoo/action-southbrook_kitchen_workspace.action_sb_kitchen_project/{{ object.id }}"
            style="background:#1c2d49; color:white; padding:12px 20px;
                   text-decoration:none; border-radius:4px; font-weight:600;">
             Open project
@@ -146,7 +146,7 @@
         </a>
     </p>
     <p style="color:#666; font-size: 13px;">
-        Completed: <t t-out="object.date_completed or fields.Date.today()"/><br/>
+        Completed: <t t-out="format_date(object.date_completed)"/><br/>
         Theme: <t t-out="object.theme or 'Signature'"/>
     </p>
     <p>

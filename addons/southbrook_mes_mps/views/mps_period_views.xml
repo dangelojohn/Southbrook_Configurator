@@ -68,7 +68,10 @@
         <field name="product_id" type="row"/>
         <field name="week_start" type="col" interval="week"/>
         <field name="forecast_qty" type="measure"/>
-        <field name="to_supply_qty" type="measure"/>
+        <!-- to_supply_qty is a NON-STORED compute; a pivot measure aggregates
+             via _read_group which cannot handle non-stored fields (crashes on
+             pivot open). It stays as a summed column in the list view (which
+             renders non-stored computes fine). -->
       </pivot>
     </field>
   </record>

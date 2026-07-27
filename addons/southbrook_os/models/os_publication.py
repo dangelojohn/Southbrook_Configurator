@@ -54,7 +54,8 @@ class OsPublicationSection(models.Model):
     _order = "slug"
 
     publication_id = fields.Many2one(
-        "southbrook.os.publication", required=True, ondelete="cascade")
+        "southbrook.os.publication", required=True, ondelete="cascade",
+        index=True)
     slug = fields.Char(required=True)
     name = fields.Char(required=True)
     body = fields.Text(required=True)

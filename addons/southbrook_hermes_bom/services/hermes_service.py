@@ -170,6 +170,21 @@ class HermesService:
                 ", ".join(missing),
                 ", ".join(sorted(data.keys())),
             ))
+        # Type-check the nested sections here (inside research(), which the
+        # caller guards) so a malformed shape raises a clean UserError rather
+        # than an AttributeError later in _populate_from_response/_apply_bom
+        # — that would crash OUTSIDE the wizard's try/except and leave the
+        # audit job stuck at state='running'.
+        for key in REQUIRED_TOP_LEVEL_KEYS:
+            if key in data and not isinstance(data[key], dict):
+                raise UserError(_(
+                    "Hermes response section '%s' must be an object, got %s."
+                ) % (key, type(data[key]).__name__))
+        bom = data.get("bom") or {}
+        if "lines" in bom and not isinstance(bom["lines"], list):
+            raise UserError(_(
+                "Hermes response 'bom.lines' must be a list, got %s."
+            ) % type(bom["lines"]).__name__)
 
     def _demo_response(self, payload):
         """Deterministic, offline stand-in for a real Hermes response.

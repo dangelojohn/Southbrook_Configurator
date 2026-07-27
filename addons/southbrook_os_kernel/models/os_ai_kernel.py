@@ -458,6 +458,11 @@ class SouthbrookOsAiKernel(models.AbstractModel):
             vals = {
                 "feature": feature,
                 "state": state,
+                # Capture the real caller here: the row is created via
+                # sudo() (to bypass the ledger's admin-only create ACL), so
+                # the user_id field default would otherwise resolve to
+                # SUPERUSER and lose per-user cost/usage attribution.
+                "user_id": self.env.uid,
                 "provider": provider,
                 "model_name": model_name,
                 "error": error,

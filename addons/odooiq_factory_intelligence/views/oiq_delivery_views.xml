@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_oiq_delivery_estimate_list" model="ir.ui.view">
+        <field name="name">oiq.delivery.estimate.list</field>
+        <field name="model">oiq.delivery.estimate</field>
+        <field name="arch" type="xml">
+            <list string="Delivery Estimates" create="0">
+                <field name="production_id"/>
+                <field name="completion_start"/>
+                <field name="completion_end"/>
+                <field name="prediction_quality" widget="badge"
+                       decoration-success="prediction_quality == 'high'"
+                       decoration-warning="prediction_quality == 'med'"
+                       decoration-danger="prediction_quality == 'low'"/>
+                <field name="historical_accuracy_pct"/>
+                <field name="accuracy_window_days"/>
+                <field name="sample_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_oiq_delivery_estimate_form" model="ir.ui.view">
+        <field name="name">oiq.delivery.estimate.form</field>
+        <field name="model">oiq.delivery.estimate</field>
+        <field name="arch" type="xml">
+            <form string="Delivery Estimate">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="production_id"/>
+                            <field name="completion_start"/>
+                            <field name="completion_end"/>
+                        </group>
+                        <group>
+                            <field name="prediction_quality"/>
+                            <field name="historical_accuracy_pct"/>
+                            <field name="accuracy_window_days"/>
+                            <field name="sample_count"/>
+                        </group>
+                    </group>
+                    <group string="Basis">
+                        <field name="basis_text" nolabel="1" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_oiq_delivery_estimate" model="ir.actions.act_window">
+        <field name="name">Delivery Estimates</field>
+        <field name="res_model">oiq.delivery.estimate</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_oiq_delivery" name="Delivery Estimates" parent="menu_oiq_root"
+              action="action_oiq_delivery_estimate" sequence="35"
+              groups="group_odooiq_user"/>
+
+</odoo>

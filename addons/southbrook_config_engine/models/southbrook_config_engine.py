@@ -290,19 +290,43 @@ class SouthbrookConfigEngine(models.AbstractModel):
 
     def _greedy_pack(self, length_mm: float,
                      widths_desc: List[int]) -> Optional[List[dict]]:
-        """Recursive greedy fit with single-level backtracking."""
-        if abs(length_mm) <= 1.0:
-            return []
-        for w in widths_desc:
-            if w > length_mm + 1:
-                continue
-            sub = self._greedy_pack(length_mm - w, widths_desc)
-            if sub is not None:
-                cab = {"width_mm": float(w),
-                       "door_count": 2 if w >= 600 else 1,
-                       "drawer_count": 0, "soft_close": True}
-                return [cab] + sub
-        return None  # No partition fits
+        """Exact-partition greedy fit, MEMOISED.
+
+        Without memoisation this explores the entire composition tree when no
+        exact ±1 mm partition exists — the common case for real (float) gap
+        lengths, since widths are multiples of 25 but gaps are arbitrary. A
+        single ~4.2 m gap measured ~292M recursive calls (a multi-second worker
+        hang on nearly every placement). The fractional part of length_mm is
+        invariant under subtracting integer widths, so rounding to whole mm is a
+        collision-free memo key WITHIN one pack — this turns the exponential
+        walk into pseudo-polynomial DP while returning the identical first-fit
+        plan. Also filters non-positive widths (a 0/negative width — e.g. a
+        malformed rule `{"preferred_widths_mm":[0]}` — would otherwise recurse
+        on the same length forever).
+        """
+        widths = [w for w in widths_desc if w > 0]
+        memo: dict = {}
+
+        def _pack(length: float) -> Optional[List[dict]]:
+            if abs(length) <= 1.0:
+                return []
+            key = round(length)
+            if key in memo:
+                return memo[key]
+            result = None
+            for w in widths:
+                if w > length + 1:
+                    continue
+                sub = _pack(length - w)
+                if sub is not None:
+                    result = [{"width_mm": float(w),
+                               "door_count": 2 if w >= 600 else 1,
+                               "drawer_count": 0, "soft_close": True}] + sub
+                    break
+            memo[key] = result
+            return result
+
+        return _pack(length_mm)
 
     # ------------------------------------------------------------------
     # Rule resolution
@@ -318,7 +342,10 @@ class SouthbrookConfigEngine(models.AbstractModel):
             return {"left_mm": override, "right_mm": override}
 
         for r in rules.get("clearance") or []:
-            if r["appliance_kind"] != app["kind"]:
+            # blank appliance_kind = matches any appliance (per field help);
+            # mirrors the theme "blank = all" check just below. A bare `!=`
+            # made a blank-scoped rule match NOTHING (dead rule).
+            if r["appliance_kind"] and r["appliance_kind"] != app["kind"]:
                 continue
             if r["theme"] and r["theme"] != theme:
                 continue
@@ -330,7 +357,9 @@ class SouthbrookConfigEngine(models.AbstractModel):
     def _resolve_width_preference(self, theme, rules) -> List[int]:
         """Pick the preferred-widths list for this theme."""
         for r in rules.get("width_pref") or []:
-            if r["theme"] == theme:
+            # blank theme = applies to any theme (per field help), so a manager
+            # can seed a catch-all width preference. Was exact-match only.
+            if not r["theme"] or r["theme"] == theme:
                 widths = r["payload"].get("preferred_widths_mm")
                 if widths:
                     return widths

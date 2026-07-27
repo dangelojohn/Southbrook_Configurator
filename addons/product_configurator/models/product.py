@@ -115,6 +115,11 @@ class ProductTemplate(models.Model):
         string="Variant name",
         help="Generate Name based on Mako Template",
         copy=True,
+        # SECURITY: Mako templates execute Python (<% %> blocks) when the
+        # variant display name is computed — an RCE surface. Restrict who can
+        # read/write this field to configurator managers rather than inheriting
+        # whatever (often broad) product.template write ACL exists.
+        groups="product_configurator.group_product_configurator_manager",
     )
 
     # We are calculating weight of variants based on weight of

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 {
     "name": "Southbrook AI Agent Gateway",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Website/CRM",
     "summary": (
         "Machine-readable front door for AI shopping/research agents: "

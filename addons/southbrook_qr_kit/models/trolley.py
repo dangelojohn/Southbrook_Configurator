@@ -151,18 +151,23 @@ class MrpWorkorderTrolley(models.Model):
             "x_sbk_trolley_bound_by": employee.id if employee else False,
         })
         op_label = employee.name if employee else self.env.user.display_name
-        if prev:
-            self.message_post(body=_(
-                "Trolley re-bound: %(old)s → %(new)s (by %(who)s).") % {
-                "old": prev.display_name,
-                "new": picking.display_name,
-                "who": op_label,
-            })
-        else:
-            self.message_post(body=_(
-                "Trolley %(t)s bound to this workorder by %(who)s.") % {
-                "t": picking.display_name, "who": op_label,
-            })
+        # mrp.workorder does not carry mail.thread in base v19 CE — only the
+        # full MRP stack mixes it in. Post the bind audit onto the workorder
+        # only when chatter is available, so trolley-bind never crashes on a
+        # lean install; the picking chatter below is always written.
+        if hasattr(self, "message_post"):
+            if prev:
+                self.message_post(body=_(
+                    "Trolley re-bound: %(old)s → %(new)s (by %(who)s).") % {
+                    "old": prev.display_name,
+                    "new": picking.display_name,
+                    "who": op_label,
+                })
+            else:
+                self.message_post(body=_(
+                    "Trolley %(t)s bound to this workorder by %(who)s.") % {
+                    "t": picking.display_name, "who": op_label,
+                })
         # Mirror onto the picking's chatter for the trace-back lookup.
         picking.message_post(body=_(
             "Bound to workorder %(wo)s (MO %(mo)s) by %(who)s.") % {

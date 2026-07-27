@@ -147,12 +147,13 @@ class BuilderPoIntake(models.Model):
             raise UserError(_("Cannot decode the CSV file: %s") % exc)
         reader = csv.DictReader(io.StringIO(decoded))
         Line = self.env["southbrook.builder.po.intake.line"]
+        vals_list = []
         for raw_row in reader:
             row = {k.strip().lower(): (v or "").strip()
                    for k, v in raw_row.items() if k}
             if not row.get("cabinet_code") and not row.get("unit_number"):
                 continue  # blank row
-            Line.create({
+            vals_list.append({
                 "intake_id": self.id,
                 "unit_number": row.get("unit_number", ""),
                 "cabinet_code": row.get("cabinet_code", ""),
@@ -160,6 +161,8 @@ class BuilderPoIntake(models.Model):
                 "due_date": _safe_date(row.get("due_date")),
                 "notes": row.get("notes", ""),
             })
+        if vals_list:
+            Line.create(vals_list)
 
     def _parse_json(self):
         self.ensure_one()
@@ -173,10 +176,11 @@ class BuilderPoIntake(models.Model):
         if not isinstance(payload, list):
             payload = payload.get("lines") or []
         Line = self.env["southbrook.builder.po.intake.line"]
+        vals_list = []
         for entry in payload:
             if not isinstance(entry, dict):
                 continue
-            Line.create({
+            vals_list.append({
                 "intake_id": self.id,
                 "unit_number": str(entry.get("unit_number", ""))[:64],
                 "cabinet_code": str(entry.get("cabinet_code", ""))[:64],
@@ -184,6 +188,8 @@ class BuilderPoIntake(models.Model):
                 "due_date": _safe_date(entry.get("due_date")),
                 "notes": str(entry.get("notes", ""))[:255],
             })
+        if vals_list:
+            Line.create(vals_list)
 
     # ------------------------------------------------------------------
     # Sale order creation
@@ -220,8 +226,8 @@ class BuilderPoIntake(models.Model):
             "origin": self.name,
         })
         SOLine = self.env["sale.order.line"]
-        for line in valid_lines:
-            SOLine.create({
+        SOLine.create([
+            {
                 "order_id": so.id,
                 "product_id": line.product_id.id,
                 "product_uom_qty": line.qty,
@@ -229,7 +235,9 @@ class BuilderPoIntake(models.Model):
                           u=line.unit_number or "?",
                           p=line.product_id.display_name,
                           note=(f" ({line.notes})" if line.notes else "")),
-            })
+            }
+            for line in valid_lines
+        ])
         self.sale_order_id = so.id
         self.state = "applied"
         self.message_post(

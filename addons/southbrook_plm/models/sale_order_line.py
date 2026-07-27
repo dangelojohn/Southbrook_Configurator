@@ -130,6 +130,18 @@ class SaleOrderLine(models.Model):
         # it directly. (Bug found by test-run 2026-06-01.)
         active_spec = self.env["southbrook.cut.spec"].sudo()._get_active()
         Bom = self.env["mrp.bom"].sudo()
+        # Batch the active-BoM lookup: ONE search keyed by template instead of a
+        # search() per line — a 40-line kitchen order otherwise fires 40
+        # sequential queries at confirm. setdefault keeps the first active BoM
+        # per template, matching the prior limit=1 and _apply_bom's
+        # one-active-per-template invariant.
+        tmpl_ids = self.product_id.product_tmpl_id.ids
+        bom_by_tmpl = {}
+        if tmpl_ids:
+            for bom in Bom.search(
+                    [("product_tmpl_id", "in", tmpl_ids),
+                     ("active", "=", True)]):
+                bom_by_tmpl.setdefault(bom.product_tmpl_id.id, bom)
         for line in self:
             if line.southbrook_cut_spec_version_id:
                 # Already snapshotted — preserve the original.
@@ -139,17 +151,7 @@ class SaleOrderLine(models.Model):
                 vals["southbrook_cut_spec_version_id"] = active_spec.id
             tmpl = line.product_id.product_tmpl_id
             if tmpl:
-                # Pick the active BoM on this template (the canonical
-                # one that's currently shipping). _apply_bom's archive
-                # pattern guarantees there's at most one active per
-                # template at a time.
-                bom = Bom.search(
-                    [
-                        ("product_tmpl_id", "=", tmpl.id),
-                        ("active", "=", True),
-                    ],
-                    limit=1,
-                )
+                bom = bom_by_tmpl.get(tmpl.id)
                 if bom and bom.southbrook_version:
                     vals["southbrook_bom_version"] = bom.southbrook_version
             if vals:

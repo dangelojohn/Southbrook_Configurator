@@ -258,8 +258,8 @@ class SouthbrookToolCategory(models.Model):
     # ──────────────────────────────────────────────────────────────────
     # ORM helpers
     # ──────────────────────────────────────────────────────────────────
-    def name_get(self):
-        return [(c.id, c.complete_name) for c in self]
+    # (v19 removed name_get; display_name derives from _rec_name =
+    # "complete_name", so no override is needed.)
 
     @api.model
     def name_search(self, name="", args=None, operator="ilike", limit=100):

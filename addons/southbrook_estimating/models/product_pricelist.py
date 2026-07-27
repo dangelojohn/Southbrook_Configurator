@@ -29,6 +29,22 @@ class ProductPricelistItem(models.Model):
         ),
     )
 
+    def _compute_price(self, product, quantity, uom, date, currency=None, **kwargs):
+        """Dispatch refacing margin-target items to _compute_refacing_price.
+
+        Odoo's native pricing engine only knows fixed/percentage/formula, so a
+        pricelist item carrying the custom live-cost→35%-margin rule would
+        otherwise fall through to the base price and the whole Refacing (CTHS)
+        channel would silently be a no-op. Intercept BEFORE the native branch,
+        but ONLY for items flagged is_refacing_margin_target — every other
+        pricelist/channel stays on the stock code path, untouched.
+        """
+        if self and self.is_refacing_margin_target:
+            self.ensure_one()
+            return self._compute_refacing_price(product, quantity, date=date)
+        return super()._compute_price(
+            product, quantity, uom, date, currency=currency, **kwargs)
+
     def _compute_refacing_price(self, product, quantity, partner=False, date=False):
         """Return price set to hit REFACING_TARGET_MARGIN over cost.
 
