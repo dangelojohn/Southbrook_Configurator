@@ -97,3 +97,35 @@ class TestSuggestedPurchaseQty(TransactionCase):
             "uom_yield_qty — @api.depends is missing the seller fields "
             "(I-1)",
         )
+
+    def test_yield_suggestion_uom_is_units_not_product_stocking_uom(self):
+        """Fix (2026-07-26): a yield-based suggestion is a COUNT of purchase
+        units, so it must display in Units — NOT the product's own stocking
+        UoM when that isn't Units (live: sheet goods stocked in m² showed a
+        misleading 'order 1 m²'). Mirror that with a non-Units stocking UoM.
+        """
+        units = self.env.ref("uom.product_uom_unit")
+        area = self.env.ref("uom.product_uom_kgm")  # any non-Units UoM stands in for m²
+        fam = self.env["material.family"].create({
+            "name": "EW2", "code": "ew_sp2", "default_waste_pct": 12.0})
+        mat = self.env["southbrook.kitchen.material"].create({
+            "name": "Sheet2", "code": "sheet_sp2", "family_id": fam.id,
+            "density": 0.68, "weight_source": "density_volume", "thickness_mm": 19.05})
+        vendor = self.env["res.partner"].create({"name": "V2"})
+        comp = self.env["product.product"].create({
+            "name": "Comp SP2", "purchase_method": "purchase", "uom_id": area.id})
+        comp.product_tmpl_id.material_id = mat.id
+        self.env["product.supplierinfo"].create({
+            "partner_id": vendor.id, "product_tmpl_id": comp.product_tmpl_id.id,
+            "price": 40.0, "uom_yield_qty": 2.97})  # product_uom_id mirrors stocking UoM
+        tmpl = self.env["product.template"].create({"name": "Cab SP2"})
+        bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": tmpl.id, "product_id": tmpl.product_variant_id.id})
+        line = self.env["mrp.bom.line"].create({
+            "bom_id": bom.id, "product_id": comp.id, "product_qty": 1.0})
+        line.material_demand_qty = 5.0
+        line._compute_suggested_purchase_qty()
+        self.assertEqual(line.suggested_purchase_qty, 2.0)
+        self.assertEqual(line.suggested_purchase_uom_id, units,
+                         "yield-count suggestion must be in Units, not the m²-like stocking UoM")
+        self.assertNotEqual(line.suggested_purchase_uom_id, area)

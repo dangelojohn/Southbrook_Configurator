@@ -209,13 +209,12 @@ class MrpBomLine(models.Model):
     suggested_purchase_uom_id = fields.Many2one(
         "uom.uom", string="Suggested Order UoM",
         compute="_compute_suggested_purchase_qty", store=True,
-        help="Vendor's purchase UoM (product.supplierinfo.product_uom_id) "
-             "when a seller resolves, else the product's own uom_id. Odoo 19 "
-             "removed product.uom_po_id (a single uom_id replaces the old "
-             "sales/purchase UoM split) — verified by grep against the "
-             "installed core (product/models/product_template.py, "
-             "product_product.py) and against product_supplierinfo.py, "
-             "which exposes product_uom_id, not product_uom.",
+        help="Unit for the suggested order quantity. A yield-based suggestion "
+             "is a COUNT of purchase units (e.g. sheets), so this is Units by "
+             "default — showing it in the product's m² stocking UoM would "
+             "misread as an area ('1 m²' when it means '1 sheet'). If a seller "
+             "carries a purchase UoM deliberately distinct from the product's "
+             "stocking UoM, that is honored instead.",
     )
 
     _SB_DEFAULT_SHEET_THICKNESS_MM = 19.05  # 3/4" — documented fallback
@@ -336,9 +335,25 @@ class MrpBomLine(models.Model):
             # fractional ratio (e.g. 1.885 still rounds to 1.885 -> ceil 2).
             ratio = float_round(gross / yield_qty, precision_digits=4)
             line.suggested_purchase_qty = float(math.ceil(ratio))
+            # A yield-based suggestion is a COUNT of purchase units (e.g. how
+            # many 4x8 sheets), NOT an area — even though the sheet product's
+            # own UoM is often m². Expressing it in the product/seller m² UoM
+            # made it read a misleading "order 1 m²" when it means "order 1
+            # sheet". uom_yield_qty is "canonical demand (m²) per ONE purchase
+            # unit", so the quotient is dimensionless purchase-units → show it
+            # in Units. (If the seller carries a genuinely countable purchase
+            # UoM in the Units category, honor that; otherwise fall back to the
+            # generic Units so the count never displays as an area.)
+            units = self.env.ref("uom.product_uom_unit", raise_if_not_found=False)
+            seller_uom = seller.product_uom_id
+            # Honor the seller UoM only when the shop deliberately set a
+            # purchase unit distinct from the product's stocking UoM; otherwise
+            # the seller UoM just mirrors the m² stocking UoM and would
+            # mislabel the count — use Units.
+            deliberate = seller_uom and seller_uom != line.product_id.uom_id
             line.suggested_purchase_uom_id = (
-                seller.product_uom_id or line.product_id.uom_id
-            ).id
+                seller_uom.id if deliberate else (units.id if units else False)
+            )
 
     # ----------------------------------------------------------------
     # Pure helpers — LOCKED conversion + weight_source dispatch.
