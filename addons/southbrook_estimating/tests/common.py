@@ -23,6 +23,15 @@ class SouthbrookTestCase(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Opt out of southbrook_mrp_pm's SO->MO production-approval gate
+        # for every estimating test suite. Subclasses that confirm
+        # synthetic SOs or seed MOs with origin=self.order.name (e.g.
+        # qweb_reports, analytics_capture) cannot exercise the approval
+        # workflow inline; we bypass once at the base so the test fleet
+        # stays unblocked. See
+        # southbrook_mrp_pm/models/mrp_production.py.
+        cls.env = cls.env(context={
+            **cls.env.context, "bypass_production_approval": True})
         cls.Partner = cls.env["res.partner"]
         cls.Order = cls.env["sale.order"]
         cls.Product = cls.env["product.product"]

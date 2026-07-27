@@ -40,6 +40,13 @@ class TestSendToManufacturing(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Opt out of southbrook_mrp_pm's SO->MO production-approval gate;
+        # this suite confirms a synthetic SO with a manufacturable line
+        # and then drives send_to_manufacturing without exercising the
+        # approval workflow. See
+        # southbrook_mrp_pm/models/mrp_production.py.
+        cls.env = cls.env(context={
+            **cls.env.context, "bypass_production_approval": True})
         cls.partner = cls.env["res.partner"].create({
             "name": "Dealer Mfg Test",
             "email": "dealer.mfg.test@southbrook.test",
