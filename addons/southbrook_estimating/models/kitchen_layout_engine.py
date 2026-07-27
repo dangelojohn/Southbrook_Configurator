@@ -35,6 +35,8 @@ Coordinate frame (millimetres, right-handed, matches the existing scene):
     rotation_deg = 0.
 """
 
+import math
+
 # Wall geometry table. Each wall declares:
 #   along : which world axis the run advances on ("x" or "z")
 #   rot   : the cabinet's Y-rotation (deg) when placed on this wall
@@ -50,6 +52,82 @@ _WALL_SPEC = {
 }
 
 ALLOWED_ROTATIONS = (0, 90, 180, 270)
+
+# M5/M6 — headings within this tolerance of a right angle count as
+# orthogonal; junctions outside it refuse auto corner resolution.
+ORTHO_TOL_DEG = 1.0
+
+
+# ── M5 — the room as a first-class wall graph ───────────────────────────
+# 09-rule-engine-spec.md §2.1 (`wall-segment-local-frames`,
+# `corner-junction-as-real-object`): walls are explicit segment objects
+# and corners are junction objects derived from them, instead of the
+# implicit 4-wall room. `wall_graph(room)` is the RECTANGLE
+# specialization — segment ids equal today's wall names and its junction
+# set is exactly `_CORNER_SPECS`, so every existing behavior is
+# byte-identical (pinned by test). A caller may hand `resolve_and_layout`
+# a custom graph instead; junctions that aren't orthogonal (M6) or don't
+# map onto the four canonical walls refuse auto-resolution with a
+# diagnostic rather than guessing.
+#
+# Segment: {"id", "origin_mm": (x, z), "length_mm",
+#           "rot_deg"     — cabinet rotation on this wall (_WALL_SPEC),
+#           "run_dir_deg" — world direction of the run cursor advance
+#                           (0 = +X, 90 = +Z)}
+# Junction: {"id", "wall_a", "wall_b" — wall_a X-running / wall_b
+#            Z-running for the canonical four, "corner_point_mm": (x, z),
+#            "interior_angle_deg", "kind": "inside"|"outside",
+#            "xz_keys": (xk, zk) — cell anchoring, as in _CORNER_SPECS}
+
+def wall_graph(room):
+    """The default graph for a rectangular room. Segment ids are the
+    legacy wall names; junction ids/order match `_CORNER_SPECS`."""
+    W = float(room.get("width_mm", 0))
+    D = float(room.get("depth_mm", 0))
+    segments = [
+        {"id": "back",  "origin_mm": (0.0, 0.0), "length_mm": W,
+         "rot_deg": 0,   "run_dir_deg": 0},
+        {"id": "front", "origin_mm": (0.0, D),   "length_mm": W,
+         "rot_deg": 180, "run_dir_deg": 0},
+        {"id": "left",  "origin_mm": (0.0, 0.0), "length_mm": D,
+         "rot_deg": 90,  "run_dir_deg": 90},
+        {"id": "right", "origin_mm": (W, 0.0),   "length_mm": D,
+         "rot_deg": 270, "run_dir_deg": 90},
+    ]
+    junctions = [
+        {"id": name, "wall_a": walls[0], "wall_b": walls[1],
+         "corner_point_mm": ({"0": 0.0, "W": W}[xk],
+                             {"0": 0.0, "D": D}[zk]),
+         "interior_angle_deg": 90.0, "kind": "inside",
+         "xz_keys": (xk, zk)}
+        for name, walls, (xk, zk) in _CORNER_SPECS
+    ]
+    return {"segments": segments, "junctions": junctions}
+
+
+def _graph_corner_specs(graph):
+    """Split a graph's junctions into (auto_specs, refused) where
+    auto_specs is a `_CORNER_SPECS`-shaped list for the junctions the
+    engine may auto-resolve (orthogonal + both walls canonical), and
+    refused carries a reason per junction the engine must not touch."""
+    auto, refused = [], []
+    for j in graph.get("junctions", ()):
+        angle = j.get("interior_angle_deg", 90.0)
+        if abs(angle - 90.0) > ORTHO_TOL_DEG:
+            refused.append((j, "non-orthogonal junction (%.1f°) — auto "
+                               "corner resolution refused; place a "
+                               "custom corner manually" % angle))
+            continue
+        if (j.get("wall_a") not in _WALL_SPEC
+                or j.get("wall_b") not in _WALL_SPEC
+                or "xz_keys" not in j):
+            refused.append((j, "junction walls %r/%r are not canonical "
+                               "orthogonal walls — auto corner "
+                               "resolution refused"
+                               % (j.get("wall_a"), j.get("wall_b"))))
+            continue
+        auto.append((j["id"], (j["wall_a"], j["wall_b"]), j["xz_keys"]))
+    return auto, refused
 
 
 class LayoutCapacityExceeded(Exception):
@@ -169,6 +247,83 @@ def motion_envelope_from_anchor_mm(cab, place, clearance_front_mm):
 def footprints_overlap(a, b, eps=1.0):
     return (a[0] < b[1] - eps and b[0] < a[1] - eps and
             a[2] < b[3] - eps and b[2] < a[3] - eps)
+
+
+# ── M6 — OBB narrow phase for arbitrary rotations ───────────────────────
+# The AABB helpers above are exact ONLY for ALLOWED_ROTATIONS. A manually
+# placed cabinet on a non-orthogonal wall (M6) carries an arbitrary
+# rotation; its true footprint is an oriented box. Rotation sign matches
+# the renderer (THREE grp.rotation.y = +deg): local +X → world
+# (cos θ, −sin θ) and local +Z → world (sin θ, cos θ) in the (x, z) plane
+# — verified against footprint_from_anchor_mm at 90/270 (pinned by test).
+
+def obb_corners_from_anchor_mm(cab, place):
+    """The 4 world-space (x, z) corner points of an ANCHOR-convention
+    cabinet at any rotation. Order: anchor, +width, +width+depth, +depth
+    (counter-clockwise or clockwise depending on rotation — SAT doesn't
+    care)."""
+    w = cab.get("width_mm", 0)
+    d = cab.get("depth_mm", 0)
+    x = place["x"]
+    z = place["z"]
+    th = math.radians(place.get("rotation_deg", 0) or 0)
+    ux, uz = math.cos(th), -math.sin(th)     # local +X (width)
+    vx, vz = math.sin(th), math.cos(th)      # local +Z (depth)
+    return [
+        (x, z),
+        (x + w * ux, z + w * uz),
+        (x + w * ux + d * vx, z + w * uz + d * vz),
+        (x + d * vx, z + d * vz),
+    ]
+
+
+def convex_polys_overlap(pa, pb, eps=1.0):
+    """SAT overlap test for two convex polygons (lists of (x, z)
+    points). Same eps semantics as footprints_overlap: shapes merely
+    touching within eps do NOT overlap."""
+    for poly_a, poly_b in ((pa, pb), (pb, pa)):
+        n = len(poly_a)
+        for i in range(n):
+            x1, z1 = poly_a[i]
+            x2, z2 = poly_a[(i + 1) % n]
+            # Edge normal (perpendicular in the plane).
+            ax, az = -(z2 - z1), (x2 - x1)
+            proj_a = [px * ax + pz * az for px, pz in poly_a]
+            proj_b = [px * ax + pz * az for px, pz in poly_b]
+            # Normalize eps by the axis length (unnormalized normal).
+            norm = math.hypot(ax, az) or 1.0
+            if (max(proj_a) <= min(proj_b) + eps * norm
+                    or max(proj_b) <= min(proj_a) + eps * norm):
+                return False   # separating axis found
+    return True
+
+
+def solid_overlap_from_anchor_mm(cab_a, place_a, cab_b, place_b, eps=1.0):
+    """Do two ANCHOR-convention cabinets physically overlap? Fast AABB
+    path when both rotations are orthogonal (exact there), SAT OBB
+    narrow phase otherwise — the single entry point validators should
+    use so a 45° manual cabinet is judged by its true oriented box, not
+    a wrong axis-aligned branch."""
+    def _ortho(place):
+        rot = (place.get("rotation_deg", 0) or 0) % 360
+        return min(abs(rot - a) for a in (0, 90, 180, 270, 360)) \
+            <= ORTHO_TOL_DEG
+    if _ortho(place_a) and _ortho(place_b):
+        return footprints_overlap(
+            footprint_from_anchor_mm(cab_a, place_a),
+            footprint_from_anchor_mm(cab_b, place_b), eps=eps)
+    return convex_polys_overlap(
+        obb_corners_from_anchor_mm(cab_a, place_a),
+        obb_corners_from_anchor_mm(cab_b, place_b), eps=eps)
+
+
+def obb_within_room(cab, place, room, eps=2.0):
+    """ANCHOR-convention in-room check valid at any rotation: every
+    corner point inside the room rectangle (± eps)."""
+    W = room.get("width_mm", 0)
+    D = room.get("depth_mm", 0)
+    return all(-eps <= px <= W + eps and -eps <= pz <= D + eps
+               for px, pz in obb_corners_from_anchor_mm(cab, place))
 
 
 def within_room(cab, place, room, eps=2.0):
@@ -400,7 +555,8 @@ def _corner_cell_aabb(xk, zk, room, corner_size_mm):
 
 
 def detect_corners(cabinets, room, placements=None,
-                    corner_size_mm=_CORNER_FOOTPRINT_MM):
+                    corner_size_mm=_CORNER_FOOTPRINT_MM,
+                    corner_specs=None):
     """Find every inside 90° corner that needs a corner cabinet.
 
     Pure + deterministic. Detection only — resolution (footprint
@@ -421,6 +577,10 @@ def detect_corners(cabinets, room, placements=None,
        "walls": [wall_a, wall_b],
        "position_mm": {"x": float, "z": float}}
     """
+    if corner_specs is None:
+        # Legacy default — identical to wall_graph(room)'s junction set
+        # for a rectangle (M5 parity, pinned by test).
+        corner_specs = _CORNER_SPECS
     room_w = room.get("width_mm", 0)
     room_d = room.get("depth_mm", 0)
     coord = {"0": 0.0, "W": float(room_w), "D": float(room_d)}
@@ -443,7 +603,7 @@ def detect_corners(cabinets, room, placements=None,
         return False
 
     out = []
-    for name, (wa, wb), (xk, zk) in _CORNER_SPECS:
+    for name, (wa, wb), (xk, zk) in corner_specs:
         cell = (_corner_cell_aabb(xk, zk, room, corner_size_mm)
                 if placed_by_id is not None else None)
         for layer in ("base", "wall"):
@@ -656,7 +816,7 @@ def _select_corner_rule(corner_name, layer, corner_rules, room):
 
 def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                        wall_order=("back", "left"), auto_assign=True,
-                       corner_rules=None,
+                       corner_rules=None, graph=None,
                        **layout_kwargs):
     """Full pipeline: (optionally distribute a flat cabinet list across
     walls), detect inside corners, insert a corner-cabinet node at each
@@ -689,6 +849,16 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     Returns {"cabinets", "assigned", "placements", "corners", "inserted",
     "removed_ids", "corner_diagnostics"}.
     """
+    # M5 — the room is a wall GRAPH. Default: the rectangle
+    # specialization, whose junction set equals _CORNER_SPECS exactly
+    # (parity pinned by test). A custom graph's non-orthogonal or
+    # non-canonical junctions are refused up front (M6) with a
+    # diagnostic — the engine never guesses at a corner it has no
+    # placement math for.
+    if graph is None:
+        graph = wall_graph(room)
+    auto_specs, refused_junctions = _graph_corner_specs(graph)
+
     assigned = (auto_assign_walls(cabinets, room, wall_order) if auto_assign
                 else [dict(c) for c in cabinets])
     # Detect corners against REAL placed footprints (geometric occupancy),
@@ -697,13 +867,17 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     # whether each run's cabinets actually reach the shared corner cell.
     provisional_placements = layout(assigned, room, **layout_kwargs)
     corners = detect_corners(assigned, room, placements=provisional_placements,
-                              corner_size_mm=corner_size_mm)
+                              corner_size_mm=corner_size_mm,
+                              corner_specs=auto_specs)
     inserted = []
     fillers = []            # M3 — rule-demanded corner filler strips
     removed_ids = set()
     offsets = {}
     standalone_cells = []   # [(cell_aabb, corner_node)] for the cap pass
     corner_diagnostics = []
+    for j, reason in refused_junctions:
+        corner_diagnostics.append({
+            "corner": j.get("id"), "layer": None, "reason": reason})
     room_w = room.get("width_mm", 0)
     room_d = room.get("depth_mm", 0)
     zl = layout_kwargs.get("zone_layout") or _DEFAULT_ZONE_LAYOUT

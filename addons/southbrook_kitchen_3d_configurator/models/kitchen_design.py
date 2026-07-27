@@ -1130,11 +1130,15 @@ class SouthbrookKitchenDesign(models.Model):
                     place_b = {"x": (b.x_position_in or 0) * _CHECK7_MM,
                                "z": (b.z_position_in or 0) * _CHECK7_MM,
                                "rotation_deg": b.rotation_deg or 0}
-                    fp_a = kitchen_layout_engine.footprint_from_anchor_mm(
-                        cab_a, place_a)
-                    fp_b = kitchen_layout_engine.footprint_from_anchor_mm(
-                        cab_b, place_b)
-                    if not kitchen_layout_engine.footprints_overlap(fp_a, fp_b):
+                    # M6 — single dispatch entry point: exact AABB fast
+                    # path for orthogonal pairs, SAT OBB narrow phase
+                    # when either cabinet carries an arbitrary rotation
+                    # (a manually placed unit on a non-90° wall). The
+                    # old footprint_from_anchor_mm-only path silently
+                    # judged a 45° cabinet by a wrong axis-aligned
+                    # branch.
+                    if not kitchen_layout_engine.solid_overlap_from_anchor_mm(
+                            cab_a, place_a, cab_b, place_b):
                         continue
                     issues.append({
                         "code":     "FOOTPRINT_COLLISION",
@@ -1317,8 +1321,16 @@ class SouthbrookKitchenDesign(models.Model):
                 payload = rr.payload or {}
                 layer = _line_layer(cl)
                 # -- 12: motion envelope --
+                # M6 — the envelope box math is orthogonal-only; a
+                # manually rotated corner line (non-90° wall) skips THIS
+                # check rather than being judged by a wrong branch (its
+                # solid collisions stay fully covered by check #7's OBB
+                # dispatch above). Check #13 below still applies.
+                rot12 = (cl.rotation_deg or 0) % 360
+                ortho12 = min(abs(rot12 - a)
+                              for a in (0, 90, 180, 270, 360)) <= 1.0
                 clearance = payload.get("clearance_front_mm") or 0
-                if clearance > 0:
+                if clearance > 0 and ortho12:
                     env_box = kitchen_layout_engine.\
                         motion_envelope_from_anchor_mm(
                             _cab(cl), _anchor_place(cl), clearance)

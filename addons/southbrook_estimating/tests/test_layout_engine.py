@@ -795,3 +795,146 @@ class TestCornerFillersM3(TransactionCase):
                 cab, {"x": 0, "z": 0, "rotation_deg": rot}, c)
             self.assertEqual(tuple(round(v) for v in got), want,
                              "rot %d" % rot)
+
+
+class TestWallGraphM5(TransactionCase):
+    """M5 — the room as a first-class wall graph; rectangle
+    specialization is byte-identical to the legacy implicit walls."""
+
+    ROOM = {"width_mm": 5080.0, "depth_mm": 5080.0, "height_mm": 2438.0}
+
+    @staticmethod
+    def _cab(i, wall, seq):
+        return {"id": "base-%s-%d" % (wall, i), "width_mm": 610.0,
+                "height_mm": 876.0, "depth_mm": 610.0, "family": "base",
+                "cabinet_type": "base", "zone": "base_run",
+                "wall": wall, "run_seq": seq}
+
+    def test_rectangle_graph_shape(self):
+        g = E.wall_graph(self.ROOM)
+        self.assertEqual([s["id"] for s in g["segments"]],
+                         ["back", "front", "left", "right"])
+        by_id = {s["id"]: s for s in g["segments"]}
+        self.assertEqual(by_id["back"]["length_mm"], 5080.0)
+        self.assertEqual(by_id["right"]["origin_mm"], (5080.0, 0.0))
+        self.assertEqual(by_id["front"]["rot_deg"], 180)
+        # Junction set mirrors _CORNER_SPECS exactly (names, pairs,
+        # anchoring keys) — the parity guarantee.
+        specs = [(j["id"], (j["wall_a"], j["wall_b"]), j["xz_keys"])
+                 for j in g["junctions"]]
+        self.assertEqual(
+            specs, [(n, w, xz) for n, w, xz in E._CORNER_SPECS])
+        self.assertTrue(all(j["interior_angle_deg"] == 90.0
+                            for j in g["junctions"]))
+
+    def test_default_graph_is_byte_identical(self):
+        cabs = ([self._cab(i, "back", i) for i in range(3)]
+                + [self._cab(i, "left", i) for i in range(3)])
+        r0 = E.resolve_and_layout(cabs, self.ROOM, auto_assign=False)
+        r1 = E.resolve_and_layout(cabs, self.ROOM, auto_assign=False,
+                                  graph=E.wall_graph(self.ROOM))
+        self.assertEqual(r0["placements"], r1["placements"])
+        self.assertEqual(r0["inserted"], r1["inserted"])
+        self.assertEqual(r0["corner_diagnostics"],
+                         r1["corner_diagnostics"])
+
+    def test_non_orthogonal_junction_refused_with_diagnostic(self):
+        g = E.wall_graph(self.ROOM)
+        # Mutate back-left into a 135° junction (an angled wall meets
+        # the back run) — M6: the engine must refuse, not guess.
+        for j in g["junctions"]:
+            if j["id"] == "back-left":
+                j["interior_angle_deg"] = 135.0
+        cabs = ([self._cab(i, "back", i) for i in range(3)]
+                + [self._cab(i, "left", i) for i in range(3)])
+        r = E.resolve_and_layout(cabs, self.ROOM, auto_assign=False,
+                                 graph=g)
+        self.assertFalse(
+            [n for n in r["inserted"] if n["corner"] == "back-left"])
+        reasons = [d for d in r["corner_diagnostics"]
+                   if d["corner"] == "back-left"]
+        self.assertTrue(reasons)
+        self.assertIn("non-orthogonal", reasons[0]["reason"])
+
+    def test_non_canonical_junction_refused(self):
+        g = E.wall_graph(self.ROOM)
+        g["junctions"].append({"id": "bay-1", "wall_a": "bay-wall",
+                               "wall_b": "left",
+                               "corner_point_mm": (0.0, 2000.0),
+                               "interior_angle_deg": 90.0,
+                               "kind": "inside", "xz_keys": ("0", "0")})
+        r = E.resolve_and_layout([self._cab(0, "back", 0)], self.ROOM,
+                                 auto_assign=False, graph=g)
+        reasons = [d for d in r["corner_diagnostics"]
+                   if d["corner"] == "bay-1"]
+        self.assertTrue(reasons)
+        self.assertIn("not canonical", reasons[0]["reason"])
+
+
+class TestObbNarrowPhaseM6(TransactionCase):
+    """M6 — OBB corners, SAT overlap, dispatcher, in-room at arbitrary
+    rotation."""
+
+    def test_obb_matches_aabb_at_orthogonal_rotations(self):
+        cab = {"width_mm": 600.0, "depth_mm": 300.0}
+        for rot in (0, 90, 180, 270):
+            place = {"x": 1000.0, "z": 2000.0, "rotation_deg": rot}
+            pts = E.obb_corners_from_anchor_mm(cab, place)
+            xs = [p[0] for p in pts]
+            zs = [p[1] for p in pts]
+            aabb = E.footprint_from_anchor_mm(cab, place)
+            self.assertAlmostEqual(min(xs), aabb[0], places=6)
+            self.assertAlmostEqual(max(xs), aabb[1], places=6)
+            self.assertAlmostEqual(min(zs), aabb[2], places=6)
+            self.assertAlmostEqual(max(zs), aabb[3], places=6)
+
+    def test_sat_detects_and_rejects_rotated_overlap(self):
+        cab = {"width_mm": 600.0, "depth_mm": 600.0}
+        axis = E.obb_corners_from_anchor_mm(
+            cab, {"x": 0.0, "z": 0.0, "rotation_deg": 0})
+        # 45° diamond positioned so its axis-aligned BOUNDING box
+        # overlaps the axis cabinet but its true oriented box does NOT
+        # (separated on the x−z diagonal axis): a naive AABB test
+        # false-positives here; SAT must not. Precondition asserted so
+        # the fixture can never silently degrade into a trivial miss.
+        nm_place = {"x": 500.0, "z": -400.0, "rotation_deg": 45}
+        near_miss = E.obb_corners_from_anchor_mm(cab, nm_place)
+        xs = [pt[0] for pt in near_miss]
+        zs = [pt[1] for pt in near_miss]
+        self.assertTrue(E.footprints_overlap(
+            (min(xs), max(xs), min(zs), max(zs)),
+            E.footprint_from_anchor_mm(
+                cab, {"x": 0.0, "z": 0.0, "rotation_deg": 0})),
+            "fixture regression: bounding boxes must overlap")
+        self.assertFalse(E.convex_polys_overlap(axis, near_miss))
+        # Slide it into genuine contact.
+        hit = E.obb_corners_from_anchor_mm(
+            cab, {"x": 550.0, "z": 300.0, "rotation_deg": 45})
+        self.assertTrue(E.convex_polys_overlap(axis, hit))
+
+    def test_dispatcher_orthogonal_equals_aabb_and_rotated_uses_sat(self):
+        a = {"width_mm": 600.0, "depth_mm": 600.0}
+        pa = {"x": 0.0, "z": 0.0, "rotation_deg": 0}
+        b = {"width_mm": 600.0, "depth_mm": 600.0}
+        # Orthogonal pair: identical verdicts to the AABB primitive.
+        for bx, expect in ((300.0, True), (700.0, False)):
+            pb = {"x": bx, "z": 0.0, "rotation_deg": 0}
+            self.assertEqual(
+                E.solid_overlap_from_anchor_mm(a, pa, b, pb),
+                E.footprints_overlap(
+                    E.footprint_from_anchor_mm(a, pa),
+                    E.footprint_from_anchor_mm(b, pb)))
+        # Rotated near-miss whose bounding box DOES overlap (see the
+        # SAT test's precondition): the dispatcher must route to SAT
+        # and say no-overlap.
+        pb45 = {"x": 500.0, "z": -400.0, "rotation_deg": 45}
+        self.assertFalse(E.solid_overlap_from_anchor_mm(a, pa, b, pb45))
+
+    def test_obb_within_room_at_45(self):
+        room = {"width_mm": 3000.0, "depth_mm": 3000.0}
+        cab = {"width_mm": 600.0, "depth_mm": 600.0}
+        inside = {"x": 1500.0, "z": 1500.0, "rotation_deg": 45}
+        self.assertTrue(E.obb_within_room(cab, inside, room))
+        # Same pose near the +X wall: a 45° box's diagonal pokes out.
+        poking = {"x": 2900.0, "z": 1500.0, "rotation_deg": 45}
+        self.assertFalse(E.obb_within_room(cab, poking, room))
