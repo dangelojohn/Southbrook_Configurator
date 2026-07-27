@@ -347,8 +347,17 @@
                                     <field name="width_in"/>
                                     <field name="height_in"/>
                                     <field name="depth_in"/>
+                                    <!-- F17 fix — Wall/Y/Rotation were previously hidden,
+                                         so a broken multi-wall layout (e.g. five lines all
+                                         reading "Base @ X=0" because they're on different
+                                         walls/rotations) was invisible to a reviewer looking
+                                         only at Position/Type/Zone/W/H/D/X/Z. -->
+                                    <field name="wall"/>
                                     <field name="x_position_in" string="X (in)"/>
+                                    <field name="y_position_in" string="Y"/>
                                     <field name="z_position_in" string="Z (in)"/>
+                                    <field name="rotation_deg" string="Rot °" optional="show"/>
+                                    <field name="layout_role" optional="hide"/>
                                     <field name="quantity"/>
                                     <field name="price_unit" widget="monetary"/>
                                     <field name="currency_id" column_invisible="1"/>

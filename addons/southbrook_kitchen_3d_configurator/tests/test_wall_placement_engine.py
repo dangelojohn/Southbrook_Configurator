@@ -132,11 +132,15 @@ class TestWallPlacementEngine(TransactionCase):
 
         # The engine's left-wall placement: 24in-wide cabinet, base_run
         # zone (cross_offset=0, y_floor=0), first (only) cabinet on the
-        # wall -> centre = width/2 = 12in along Z; x sits at the wall
-        # face (cross_offset=0); rotation_deg=90 (left wall).
+        # wall -> CENTRE = width/2 = 12in along Z; x sits at the wall
+        # face (cross_offset=0); rotation_deg=90 (left wall). C4 fix
+        # (v19.0.5.20.0): the persisted convention is a back-left-bottom-
+        # corner ANCHOR, not the engine's internal along-axis centre, so
+        # `_place_lines_on_wall` converts before writing — for rot=90
+        # that's z_anchor = z_centre + w/2 = 12in + 12in = 24in.
         self.assertAlmostEqual(line.rotation_deg, 90.0, places=2)
         self.assertAlmostEqual(line.x_position_in, 0.0, places=2)
-        self.assertAlmostEqual(line.z_position_in, 12.0, places=2)
+        self.assertAlmostEqual(line.z_position_in, 24.0, places=2)
         self.assertAlmostEqual(line.y_position_in, 0.0, places=2)
         # The raw client garbage must NOT have survived.
         self.assertNotAlmostEqual(line.x_position_in, client_garbage_x, places=2)
@@ -183,8 +187,19 @@ class TestWallPlacementEngine(TransactionCase):
     def test_save_response_includes_placed_poses_for_wall_lines(self):
         """save_design's response additively carries `placed`: the
         engine-updated pose for each non-back-wall line it moved, keyed
-        by layout_key, so the client can apply it live without a
-        reload (PR4 task 3). A back-wall line must NOT appear in it."""
+        by layout_key (PR4 task 3). A back-wall line must NOT appear in
+        it.
+
+        C2 (2026-07-26) rewrote the tail of this contract: a save whose
+        design spans 2+ walls now ALSO runs corner resolution
+        (action_auto_arrange) after the `placed` echo is computed, and
+        returns the authoritative post-resolution state as
+        `relaid`/`lines`. `placed` is therefore a pre-resolution echo
+        the relaid `lines` supersede (the client applies `placed`
+        first, then replaces state.items wholesale from `lines`), so
+        this test no longer asserts placed == persisted pose — for this
+        1-back + 1-left fixture both cabinets meet at the back-left
+        corner cell and are consumed into a corner cabinet."""
         result, lines = self._save([
             {
                 "product_id":     self.product.id,
@@ -205,12 +220,34 @@ class TestWallPlacementEngine(TransactionCase):
         self.assertIn("wallplace-mixed-left", placed_by_key)
         self.assertNotIn("wallplace-mixed-back", placed_by_key)
 
-        left_line = lines.filtered(
-            lambda l: l.layout_key == "wallplace-mixed-left")
-        placed = placed_by_key["wallplace-mixed-left"]
-        self.assertAlmostEqual(placed["x_position_in"], left_line.x_position_in, places=2)
-        self.assertAlmostEqual(placed["z_position_in"], left_line.z_position_in, places=2)
-        self.assertAlmostEqual(placed["rotation_deg"], left_line.rotation_deg, places=2)
+        # C2 — the save resolved the corner the two walls formed: the
+        # response carries the authoritative relaid state, and `lines`
+        # mirrors the DB exactly (key set and poses).
+        self.assertTrue(result.get("relaid"), result)
+        self.assertIsNotNone(result.get("lines"))
+        design = self.env["southbrook.kitchen.design"].browse(result["id"])
+        design.invalidate_recordset()
+        db_by_key = {l.layout_key: l for l in design.cabinet_line_ids}
+        resp_by_key = {l["layout_key"]: l for l in result["lines"]}
+        self.assertEqual(set(resp_by_key), set(db_by_key))
+        for key, resp in resp_by_key.items():
+            line = db_by_key[key]
+            self.assertAlmostEqual(
+                resp["x_position_in"], line.x_position_in, places=2, msg=key)
+            self.assertAlmostEqual(
+                resp["z_position_in"], line.z_position_in, places=2, msg=key)
+            self.assertAlmostEqual(
+                resp["rotation_deg"], line.rotation_deg, places=2, msg=key)
+        # Both single cabinets met at the back-left cell → consumed into
+        # a derived corner; the originals are archived, not deleted.
+        corner = design.cabinet_line_ids.filtered(
+            lambda l: l.cabinet_type == "corner")
+        self.assertTrue(corner)
+        archived = design.with_context(
+            active_test=False).cabinet_line_ids.filtered(lambda l: not l.active)
+        self.assertEqual(
+            sorted(archived.mapped("layout_key")),
+            ["wallplace-mixed-back", "wallplace-mixed-left"])
 
     def test_second_save_reflects_run_seq_progression_on_wall(self):
         """Two cabinets added to the left wall in the same save must
@@ -235,9 +272,11 @@ class TestWallPlacementEngine(TransactionCase):
         self.assertEqual(len(lines), 2)
         l1 = lines.filtered(lambda l: l.layout_key == "wallplace-run-1")
         l2 = lines.filtered(lambda l: l.layout_key == "wallplace-run-2")
-        # First cabinet centres at 12in; second starts where the first
-        # ends (24in) and centres at 36in.
-        self.assertAlmostEqual(l1.z_position_in, 12.0, places=2)
-        self.assertAlmostEqual(l2.z_position_in, 36.0, places=2)
+        # Engine CENTRES: first cabinet at 12in, second (starts where the
+        # first ends, 24in) at 36in. C4 fix (v19.0.5.20.0) persists the
+        # ANCHOR convention instead (z_anchor = z_centre + w/2 for rot=90):
+        # 12+12=24in and 36+12=48in.
+        self.assertAlmostEqual(l1.z_position_in, 24.0, places=2)
+        self.assertAlmostEqual(l2.z_position_in, 48.0, places=2)
         self.assertAlmostEqual(l1.rotation_deg, 90.0, places=2)
         self.assertAlmostEqual(l2.rotation_deg, 90.0, places=2)

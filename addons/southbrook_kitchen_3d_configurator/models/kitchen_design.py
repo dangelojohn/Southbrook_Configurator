@@ -511,13 +511,30 @@ class SouthbrookKitchenDesign(models.Model):
             # interactive flow), RESPECT that arrangement and just resolve
             # corners; otherwise auto-distribute a flat list across walls.
             manual = any((c.get("wall") or "back") != "back" for c in cabs)
+            # M1 (2026-07-27) — rules-as-data: feed active junction rules
+            # (southbrook.placement.rule, southbrook_estimating) to the
+            # pure engine. The engine picks the corner cabinet whose
+            # per-leg wall consumption fits this room (asymmetric blind
+            # corners included) and tags the node with the rule's SKU;
+            # with no rules (or none fitting) it falls back to the legacy
+            # square + _CORNER_SKU below, so behavior degrades safely.
+            Rule = self.env.get("southbrook.placement.rule")
+            corner_rules = (
+                Rule.sudo().search([
+                    ("anchor_class", "=", "junction"),
+                ]).engine_dicts() if Rule is not None else None)
             r = kitchen_layout_engine.resolve_and_layout(
                 cabs, room,
                 auto_assign=not manual,
+                corner_rules=corner_rules,
                 zone_layout=SaleOrder._ZONE_LAYOUT,
                 worktop_cursor=SaleOrder._WORKTOP_CURSOR,
                 worktop_y=SaleOrder._WORKTOP_Y_FLOOR,
             )
+            for diag in r.get("corner_diagnostics") or ():
+                _logger.info("[auto-arrange] design=%s corner=%s/%s: %s",
+                             design.id, diag["corner"], diag["layer"],
+                             diag["reason"])
             finals = {c["id"]: c for c in r["cabinets"]}
             places = {p["id"]: p for p in r["placements"]}
 
@@ -525,10 +542,27 @@ class SouthbrookKitchenDesign(models.Model):
             #    corner replaced. They stay part of the customer's canonical
             #    selection and are restored on the next run; archiving hides
             #    them from the scene + manufacturing mirror in the meantime.
+            #
+            #    Idempotence fix (2026-07-26) — persist each archived
+            #    cabinet's post-distribution wall/run_seq (from the
+            #    engine's "assigned" list) BEFORE archiving. Without
+            #    this, a replaced cabinet kept its PRE-distribution wall
+            #    (usually "back"), so the next run's reset restored it
+            #    onto the wrong wall and reconstructed a different —
+            #    possibly overfull — run than the one just resolved
+            #    (measured: run 2 of an idempotence cycle overflowing
+            #    the back wall by one cabinet width and raising
+            #    LayoutCapacityExceeded).
+            assigned_by_id = {c["id"]: c for c in r.get("assigned", [])}
             if r["removed_ids"]:
-                design.cabinet_line_ids.filtered(
-                    lambda l: l.id in set(r["removed_ids"])).write(
-                    {"active": False})
+                for dl in design.cabinet_line_ids.filtered(
+                        lambda l: l.id in set(r["removed_ids"])):
+                    a = assigned_by_id.get(dl.id)
+                    vals = {"active": False}
+                    if a is not None:
+                        vals["wall"] = a.get("wall") or "back"
+                        vals["run_seq"] = a.get("run_seq", 0)
+                    dl.write(vals)
             # refresh the O2M so the survivor loop never sees an archived record
             design.invalidate_recordset(["cabinet_line_ids"])
 
@@ -538,19 +572,31 @@ class SouthbrookKitchenDesign(models.Model):
                 place = places.get(dl.id)
                 if not cab or not place:
                     continue
+                # C4 fix — the engine emits along-axis-CENTRED poses;
+                # the persisted/rendered convention is a back-left-
+                # bottom-corner ANCHOR (COORDINATE_CONTRACT.md). Convert
+                # in the mm domain, BEFORE the *IN conversion below.
+                anchor = kitchen_layout_engine.anchor_pose_mm(cab, place)
                 dl.write({
                     "wall":          cab.get("wall", "back"),
                     "run_seq":       cab.get("run_seq", 0),
-                    "x_position_in": place["x"] * IN,
-                    "y_position_in": place["y"] * IN,
-                    "z_position_in": place["z"] * IN,
-                    "rotation_deg":  place["rotation_deg"],
+                    "x_position_in": anchor["x"] * IN,
+                    "y_position_in": anchor["y"] * IN,
+                    "z_position_in": anchor["z"] * IN,
+                    "rotation_deg":  anchor["rotation_deg"],
                 })
 
             # 3) insert a real corner cabinet per resolved corner
             for node in r["inserted"]:
                 place = places[node["id"]]
-                code = self._CORNER_SKU.get(node["layer"], "SB-CORNER")
+                # C4 fix — same centre->anchor conversion as step 2. The
+                # corner node dict IS the "cab" here (it carries its own
+                # width_mm).
+                anchor = kitchen_layout_engine.anchor_pose_mm(node, place)
+                # M1 — a rule-resolved node carries the winning rule's
+                # SKU; _CORNER_SKU stays the legacy-fallback mapping.
+                code = (node.get("sku")
+                        or self._CORNER_SKU.get(node["layer"], "SB-CORNER"))
                 tmpl = self.env["product.template"].sudo().search(
                     [("default_code", "=", code)], limit=1)
                 variant = False
@@ -567,13 +613,18 @@ class SouthbrookKitchenDesign(models.Model):
                     "quantity":      1,
                     "price_unit":    variant.list_price or tmpl.list_price,
                     "cabinet_type":  "corner",
+                    # C8 fix — corner lines omitted `zone`, so both
+                    # layers silently persisted the field's old truthy
+                    # default ("base_run") even for the wall-layer
+                    # corner. Tag explicitly from the resolved layer.
+                    "zone":          "wall" if node["layer"] == "wall" else "base_run",
                     "width_in":      node["width_mm"] * IN,
                     "height_in":     node["height_mm"] * IN,
                     "depth_in":      node["depth_mm"] * IN,
-                    "x_position_in": place["x"] * IN,
-                    "y_position_in": place["y"] * IN,
-                    "z_position_in": place["z"] * IN,
-                    "rotation_deg":  place["rotation_deg"],
+                    "x_position_in": anchor["x"] * IN,
+                    "y_position_in": anchor["y"] * IN,
+                    "z_position_in": anchor["z"] * IN,
+                    "rotation_deg":  anchor["rotation_deg"],
                     "wall":          node["wall"],
                     # I2: a front-right standalone corner (both-high, no
                     # host run to join) omits run_seq from the engine's
@@ -586,6 +637,62 @@ class SouthbrookKitchenDesign(models.Model):
                         design.id, node["corner"], node["layer"]),
                     "origin":        "configurator",
                     # DERIVED artifact — deleted + regenerated every run.
+                    "layout_role":   "derived",
+                })
+
+            # 3b) M3 — rule-demanded corner FILLER strips become real
+            #     derived design lines so they reach the manufacturing
+            #     mirror/BOM/cutlist (docs 08
+            #     `blind-corner-filler-strip-separate-bom-line`). The
+            #     engine already reserved their space (run offsets), so
+            #     a missing filler product degrades to a geometric gap
+            #     the installer scribes — never a collision.
+            # NOTE: filler templates in the live catalog (e.g. FP3,
+            # "Filler Panel 3in") carry southbrook_cabinet_type='filler'
+            # but NOT southbrook_is_cabinet — they're accessories, not
+            # droppable cabinets. Order by is_cabinet DESC so a properly
+            # flagged filler wins if one ever exists, else FP3-class.
+            filler_tmpl = self.env["product.template"].sudo().search(
+                [("southbrook_cabinet_type", "=", "filler")],
+                order="southbrook_is_cabinet desc, id", limit=1)
+            filler_variant = False
+            if filler_tmpl:
+                filler_variant = (filler_tmpl.product_variant_id
+                                  or filler_tmpl.product_variant_ids[:1])
+            for node in r.get("fillers") or ():
+                if not filler_variant:
+                    _logger.warning(
+                        "[auto-arrange] no filler product template — "
+                        "skipping corner filler line %s (design %s); the "
+                        "engine still reserved its space",
+                        node["id"], design.id)
+                    break
+                place = places.get(node["id"])
+                if place is None:
+                    continue
+                anchor = kitchen_layout_engine.anchor_pose_mm(node, place)
+                Line.create({
+                    "design_id":     design.id,
+                    "product_id":    filler_variant.id,
+                    "quantity":      1,
+                    "price_unit":    (filler_variant.list_price
+                                      or filler_tmpl.list_price),
+                    "cabinet_type":  "filler",
+                    "zone":          node.get("zone") or "accessory",
+                    "width_in":      node["width_mm"] * IN,
+                    "height_in":     node["height_mm"] * IN,
+                    "depth_in":      node["depth_mm"] * IN,
+                    "x_position_in": anchor["x"] * IN,
+                    "y_position_in": anchor["y"] * IN,
+                    "z_position_in": anchor["z"] * IN,
+                    "rotation_deg":  anchor["rotation_deg"],
+                    "wall":          node["wall"],
+                    "run_seq":       -1,
+                    "pinned":        False,
+                    "layout_key":    "cornerfill-%s-%s-%s-%s" % (
+                        design.id, node["corner"], node["layer"],
+                        node["wall"]),
+                    "origin":        "configurator",
                     "layout_role":   "derived",
                 })
 
@@ -649,11 +756,98 @@ class SouthbrookKitchenDesign(models.Model):
         lines = lines.sudo()
         SaleOrder = self.env["sale.order"]
         MM, IN = 25.4, 1.0 / 25.4
+
+        # ── C3 fix — reserve existing corner cells ──────────────────────
+        # Without this, a wall that already has a DERIVED corner cabinet
+        # (from action_auto_arrange) re-flows its run from the room
+        # origin straight INTO the reserved corner cell, because layout()
+        # was called with no wall_start_offsets. Build offsets from every
+        # active corner line's layout_key ("corner-<design_id>-
+        # <corner_name>-<layer>"; corner_name itself contains a hyphen,
+        # e.g. "back-left", so parse from the known prefix/suffix rather
+        # than a naive split) and reserve BOTH walls of that corner in
+        # that (wall, layer) — mirrors kitchen_layout_engine's own
+        # per-(wall, layer) offset keying (I1).
+        corner_walls_by_name = {
+            name: walls for name, walls, _xz in kitchen_layout_engine._CORNER_SPECS
+        }
+        wall_start_offsets = {}
+        key_prefix = "corner-%s-" % design.id
+        for dl in design.cabinet_line_ids:
+            if dl.cabinet_type != "corner":
+                continue
+            key = dl.layout_key or ""
+            layer = None
+            corner_name = None
+            if key.startswith(key_prefix):
+                if key.endswith("-base"):
+                    layer = "base"
+                    corner_name = key[len(key_prefix):-len("-base")]
+                elif key.endswith("-wall"):
+                    layer = "wall"
+                    corner_name = key[len(key_prefix):-len("-wall")]
+            if layer is None or corner_name is None:
+                _logger.debug(
+                    "[_place_lines_on_wall] design %s: corner line %s has "
+                    "an unparseable layout_key %r — skipping offset "
+                    "reservation for it", design.id, dl.id, key)
+                continue
+            walls = corner_walls_by_name.get(corner_name)
+            if not walls:
+                _logger.debug(
+                    "[_place_lines_on_wall] design %s: corner line %s "
+                    "layout_key %r names unknown corner %r — skipping",
+                    design.id, dl.id, key, corner_name)
+                continue
+            # M2 (2026-07-27) — PER-LEG reservation. The corner's persisted
+            # anchor pose means: rot 0/180 → width_in spans the X axis and
+            # depth_in spans Z; rot 90/270 → width spans Z, depth spans X.
+            # Each wall of the pair is offset by the corner's extent along
+            # THAT wall's axis, so an asymmetric blind corner (45" along
+            # its host wall, 24" of the other) reserves 45/24 — not 45/45.
+            # Symmetric corners reduce to the old single-width behavior.
+            width_mm = (dl.width_in or 0) * MM
+            depth_mm = (dl.depth_in or 0) * MM
+            rot = int(round(dl.rotation_deg or 0)) % 360
+            ext_x = width_mm if rot in (0, 180) else depth_mm
+            ext_z = depth_mm if rot in (0, 180) else width_mm
+            for w in walls:
+                leg = ext_x if w in ("back", "front") else ext_z
+                wall_start_offsets[(w, layer)] = max(
+                    wall_start_offsets.get((w, layer), 0), leg)
+
+        # M3 — a corner FILLER strip (derived, layout_key
+        # "cornerfill-<design>-<corner>-<layer>-<wall>") extends its
+        # wall's reservation past the corner cell by its own width, so a
+        # newly added cabinet lands after corner + filler, not inside the
+        # strip. Added ON TOP of the corner extents above (sum, not max —
+        # the strip sits between the cell edge and the run start).
+        fill_prefix = "cornerfill-%s-" % design.id
+        for dl in design.cabinet_line_ids:
+            if dl.cabinet_type != "filler" or dl.layout_role != "derived":
+                continue
+            key = dl.layout_key or ""
+            if not key.startswith(fill_prefix):
+                continue
+            # A wall-layer strip carries zone="wall" (set at create from
+            # the engine node); everything else is base-layer.
+            layer = "wall" if dl.zone == "wall" else "base"
+            w = dl.wall or "back"
+            wall_start_offsets[(w, layer)] = (
+                wall_start_offsets.get((w, layer), 0)
+                + (dl.width_in or 0) * MM)
+
         cabs = []
         for dl in design.cabinet_line_ids:
             if dl.origin != "configurator":
                 continue
             if dl.cabinet_type in ("filler", "panel"):
+                continue
+            # C3 fix — a DERIVED corner cabinet must not be fed into
+            # layout() as an ordinary run member (its cell is reserved
+            # via wall_start_offsets above instead); otherwise the run
+            # re-flow shoves it out of its resolved corner position.
+            if dl.cabinet_type == "corner" and dl.layout_role == "derived":
                 continue
             is_wall = dl.cabinet_type == "wall"
             cabs.append({
@@ -676,19 +870,25 @@ class SouthbrookKitchenDesign(models.Model):
         }
         places = {p["id"]: p for p in kitchen_layout_engine.layout(
             cabs, room,
+            wall_start_offsets=wall_start_offsets,
             zone_layout=SaleOrder._ZONE_LAYOUT,
             worktop_cursor=SaleOrder._WORKTOP_CURSOR,
             worktop_y=SaleOrder._WORKTOP_Y_FLOOR)}
+        cabs_by_id = {c["id"]: c for c in cabs}
         result = {}
         for line in lines:
             p = places.get(line.id)
-            if not p:
+            cab = cabs_by_id.get(line.id)
+            if not p or not cab:
                 continue
+            # C4 fix — centre (engine) -> anchor (persisted/rendered)
+            # conversion, mm domain, BEFORE the *IN conversion below.
+            anchor = kitchen_layout_engine.anchor_pose_mm(cab, p)
             pose = {
-                "x_position_in": p["x"] * IN,
-                "y_position_in": p["y"] * IN,
-                "z_position_in": p["z"] * IN,
-                "rotation_deg":  p["rotation_deg"],
+                "x_position_in": anchor["x"] * IN,
+                "y_position_in": anchor["y"] * IN,
+                "z_position_in": anchor["z"] * IN,
+                "rotation_deg":  anchor["rotation_deg"],
             }
             line.write(pose)
             result[line.id] = pose
@@ -881,38 +1081,80 @@ class SouthbrookKitchenDesign(models.Model):
 
         # ── v19.0.4.22.0 audit P2#7 — extended production checks ──────
 
-        # 7) Y-axis (front-back) depth collision — pairs of same-type
-        #    cabs whose x AND y footprints both overlap. Catches L-run
-        #    corner clashes and back-to-back islands the x-only check
-        #    at (3) sees as "different runs".
-        for ct, lines in by_type.items():
-            if ct in ("filler", "panel"):
+        # 7) Footprint collision — same-LAYER (base-elevation vs wall-
+        #    elevation plane) cabinets whose PERSISTED, anchor-convention
+        #    world AABBs overlap. C7 fix (v19.0.5.20.0): the prior check
+        #    read y_position_in as the front-back axis — pre-PR3.0 that
+        #    field WAS the depth axis, but the y/z field-semantics
+        #    migration (migrations/19.0.5.18.0; docs/2026-07-12-
+        #    canonical-coordinate-flow.md) repurposed y_position_in as
+        #    ELEVATION, so this check went blind to every real corner
+        #    clash (it compared elevations instead of depths) while
+        #    still able to false-flag cabinets that merely differ in
+        #    mount height. It also ignored rotation_deg entirely, so a
+        #    90°-rotated left/right-wall run's true footprint was never
+        #    considered. Rewritten against kitchen_layout_engine's shared
+        #    footprint_from_anchor_mm/footprints_overlap — the SAME
+        #    geometry math the renderer and the engine's own corner-
+        #    detection use — so this validation and the actual persisted
+        #    scene can never disagree about what overlaps.
+        #    Code renamed Y_AXIS_COLLISION -> FOOTPRINT_COLLISION (grepped
+        #    the repo first; nothing else referenced the old code).
+        _CHECK7_MM = 25.4
+        by_layer = {}
+        for line in self.cabinet_line_ids:
+            if line.cabinet_type in ("filler", "panel"):
                 continue
+            # A corner line's layer comes from its zone (C8 tags the
+            # wall-layer corner zone='wall'): the upper corner shares
+            # the base corner's x/z cell at a different ELEVATION, so
+            # classifying both as "base" would false-flag the pair as
+            # a blocking collision.
+            if line.cabinet_type == "wall" or (
+                    line.cabinet_type == "corner" and line.zone == "wall"):
+                layer = "wall"
+            else:
+                layer = "base"
+            by_layer.setdefault(layer, []).append(line)
+        for layer, lines in by_layer.items():
             for i in range(len(lines)):
                 for j in range(i + 1, len(lines)):
                     a, b = lines[i], lines[j]
-                    if a.x_position_in + (a.width_in or 0) <= b.x_position_in + 0.01:
+                    cab_a = {"width_mm": (a.width_in or 0) * _CHECK7_MM,
+                             "depth_mm": (a.depth_in or 0) * _CHECK7_MM}
+                    cab_b = {"width_mm": (b.width_in or 0) * _CHECK7_MM,
+                             "depth_mm": (b.depth_in or 0) * _CHECK7_MM}
+                    place_a = {"x": (a.x_position_in or 0) * _CHECK7_MM,
+                               "z": (a.z_position_in or 0) * _CHECK7_MM,
+                               "rotation_deg": a.rotation_deg or 0}
+                    place_b = {"x": (b.x_position_in or 0) * _CHECK7_MM,
+                               "z": (b.z_position_in or 0) * _CHECK7_MM,
+                               "rotation_deg": b.rotation_deg or 0}
+                    # M6 — single dispatch entry point: exact AABB fast
+                    # path for orthogonal pairs, SAT OBB narrow phase
+                    # when either cabinet carries an arbitrary rotation
+                    # (a manually placed unit on a non-90° wall). The
+                    # old footprint_from_anchor_mm-only path silently
+                    # judged a 45° cabinet by a wrong axis-aligned
+                    # branch.
+                    if not kitchen_layout_engine.solid_overlap_from_anchor_mm(
+                            cab_a, place_a, cab_b, place_b):
                         continue
-                    if b.x_position_in + (b.width_in or 0) <= a.x_position_in + 0.01:
-                        continue
-                    ay0, by0 = a.y_position_in or 0.0, b.y_position_in or 0.0
-                    ay1 = ay0 + (a.depth_in or 0)
-                    by1 = by0 + (b.depth_in or 0)
-                    if ay1 <= by0 + 0.01 or by1 <= ay0 + 0.01:
-                        continue
-                    if (abs((a.depth_in or 0) - (b.depth_in or 0)) < 0.01
-                            and abs(ay0 - by0) < 0.01):
-                        continue  # pure x-clash, already flagged at (3)
                     issues.append({
-                        "code":     "Y_AXIS_COLLISION",
+                        "code":     "FOOTPRINT_COLLISION",
                         "severity": "blocking",
                         "message":  (
-                            "%s cabinets overlap front-back at x=%.1f\": "
-                            "%s (d=%.1f\") vs %s (d=%.1f\")"
+                            "%s cabinets overlap: %s (wall=%s, x=%.1f\", "
+                            "z=%.1f\", rot=%d°) vs %s (wall=%s, "
+                            "x=%.1f\", z=%.1f\", rot=%d°)"
                         ) % (
-                            ct.title(), a.x_position_in,
-                            a.product_id.display_name, a.depth_in or 0,
-                            b.product_id.display_name, b.depth_in or 0,
+                            layer.title(),
+                            a.product_id.display_name, a.wall or "back",
+                            a.x_position_in or 0, a.z_position_in or 0,
+                            a.rotation_deg or 0,
+                            b.product_id.display_name, b.wall or "back",
+                            b.x_position_in or 0, b.z_position_in or 0,
+                            b.rotation_deg or 0,
                         ),
                     })
 
@@ -1034,6 +1276,121 @@ class SouthbrookKitchenDesign(models.Model):
                         "is unusual; confirm not a typo."
                     ) % (line.product_id.display_name, line.width_in),
                 })
+
+        # 12) M4 — corner MOTION envelope vs. solids. A corner rule may
+        #     declare `clearance_front_mm`: the region its doors /
+        #     mechanism (susan bifold, LeMans arm, blind pullout) sweep
+        #     in front of the cell. Any SAME-layer solid inside that box
+        #     blocks the mechanism (motion-vs-solid = blocking per
+        #     docs/research/corner-engine/09-rule-engine-spec.md §5).
+        # 13) M4 — rule-demanded corner filler strips must exist. The
+        #     engine emits them as derived lines (M3); a user deleting
+        #     one leaves a gap the BOM no longer covers → warning (the
+        #     installer CAN scribe on site, so not blocking).
+        Rule = self.env.get("southbrook.placement.rule")
+        if Rule is not None:
+            _MM12 = 25.4
+
+            def _line_layer(line):
+                if line.cabinet_type == "wall" or (
+                        line.cabinet_type == "corner"
+                        and line.zone == "wall"):
+                    return "wall"
+                return "base"
+
+            def _anchor_place(line):
+                return {"x": (line.x_position_in or 0) * _MM12,
+                        "z": (line.z_position_in or 0) * _MM12,
+                        "rotation_deg": line.rotation_deg or 0}
+
+            def _cab(line):
+                return {"width_mm": (line.width_in or 0) * _MM12,
+                        "depth_mm": (line.depth_in or 0) * _MM12}
+
+            rules_by_tmpl = {}
+            for rr in Rule.sudo().search(
+                    [("anchor_class", "=", "junction")]):
+                rules_by_tmpl.setdefault(rr.product_tmpl_id.id, rr)
+            corner_lines = self.cabinet_line_ids.filtered(
+                lambda l: l.cabinet_type == "corner")
+            key_prefix12 = "corner-%s-" % self.id
+            for cl in corner_lines:
+                rr = rules_by_tmpl.get(cl.product_id.product_tmpl_id.id)
+                if rr is None:
+                    continue
+                payload = rr.payload or {}
+                layer = _line_layer(cl)
+                # -- 12: motion envelope --
+                # M6 — the envelope box math is orthogonal-only; a
+                # manually rotated corner line (non-90° wall) skips THIS
+                # check rather than being judged by a wrong branch (its
+                # solid collisions stay fully covered by check #7's OBB
+                # dispatch above). Check #13 below still applies.
+                rot12 = (cl.rotation_deg or 0) % 360
+                ortho12 = min(abs(rot12 - a)
+                              for a in (0, 90, 180, 270, 360)) <= 1.0
+                clearance = payload.get("clearance_front_mm") or 0
+                if clearance > 0 and ortho12:
+                    env_box = kitchen_layout_engine.\
+                        motion_envelope_from_anchor_mm(
+                            _cab(cl), _anchor_place(cl), clearance)
+                    for other in self.cabinet_line_ids:
+                        if other.id == cl.id:
+                            continue
+                        if other.cabinet_type in ("filler", "panel"):
+                            continue
+                        if _line_layer(other) != layer:
+                            continue
+                        fp = kitchen_layout_engine.footprint_from_anchor_mm(
+                            _cab(other), _anchor_place(other))
+                        if kitchen_layout_engine.footprints_overlap(
+                                env_box, fp):
+                            issues.append({
+                                "code":     "MOTION_ENVELOPE_COLLISION",
+                                "severity": "blocking",
+                                "message":  (
+                                    "%s sits inside the %.1f\" door/"
+                                    "mechanism clearance in front of the "
+                                    "corner cabinet %s (%s) — the corner "
+                                    "cannot open."
+                                ) % (other.product_id.display_name,
+                                     clearance / _MM12,
+                                     cl.product_id.display_name,
+                                     rr.corner_type_id or rr.name),
+                            })
+                # -- 13: demanded fillers present --
+                fx = payload.get("filler_x_mm") or 0
+                fz = payload.get("filler_z_mm") or 0
+                if (fx <= 0 and fz <= 0) or not (
+                        cl.layout_key or "").startswith(key_prefix12):
+                    continue
+                cname = (cl.layout_key[len(key_prefix12):]
+                         .rsplit("-", 1)[0])
+                spec12 = kitchen_layout_engine._CORNER_RESOLVE.get(cname)
+                if spec12 is None:
+                    continue   # standalone corner — engine emits none
+                host_w, other_w, other_end12, _h = spec12
+                expected_walls = [host_w] + (
+                    [other_w] if other_end12 == "first" else [])
+                for w in expected_walls:
+                    fw = fx if w in ("back", "front") else fz
+                    if fw <= 0:
+                        continue
+                    want_key = "cornerfill-%s-%s-%s-%s" % (
+                        self.id, cname, layer, w)
+                    if not self.cabinet_line_ids.filtered(
+                            lambda l: l.layout_key == want_key):
+                        issues.append({
+                            "code":     "CORNER_FILLER_MISSING",
+                            "severity": "warning",
+                            "message":  (
+                                "The %s corner (%s) requires a %.1f\" "
+                                "filler on the %s wall but the strip is "
+                                "missing — re-run auto-arrange or plan "
+                                "to scribe on site."
+                            ) % (cname, cl.product_id.display_name,
+                                 fw / _MM12, w),
+                        })
 
         return issues
 
@@ -1782,9 +2139,22 @@ class SouthbrookKitchenDesignLine(models.Model):
         store=True,
         index=True,
         compute="_compute_zone",
+        precompute=True,
         readonly=False,
         copy=True,
-        default="base_run",
+        # v19.0.5.20.0 C1 fix — NO default here. A truthy default made
+        # `_compute_zone`'s "only backfill on empty" guard (below) never
+        # fire on create(), so every wall/tall/filler/panel cabinet
+        # silently persisted zone='base_run' forever. precompute=True is
+        # what makes required=True safe without the default: a stored
+        # computed field is normally computed AFTER the INSERT (which
+        # would violate the NOT NULL column constraint when create()
+        # omits zone — measured, 44 test errors); precompute runs
+        # _compute_zone on the new records BEFORE the INSERT, so the
+        # field is always populated from _ZONE_FROM_CABINET_TYPE (or the
+        # caller's explicit value, which precompute respects). See
+        # migrations/19.0.5.20.0/ for the backfill of rows already wrong
+        # in the DB.
         help="Q21 zone grouping. Defaults from cabinet_type; override "
              "for island-mounted bases or corner-wall cabinets.",
     )

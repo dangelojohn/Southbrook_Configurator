@@ -33,7 +33,7 @@ import {
     Component, onMounted, onWillUnmount, onWillUpdateProps, useRef, xml,
 } from "@odoo/owl";
 
-import { IN, P }             from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
+import { IN, P, FULL_HEIGHT_WALLS } from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
 import { loadThreeJS }       from "@southbrook_kitchen_3d_configurator/js/canvas/three_loader.esm";
 import { initScene }         from "@southbrook_kitchen_3d_configurator/js/canvas/scene_init.esm";
 import { destroyScene }      from "@southbrook_kitchen_3d_configurator/js/canvas/scene_dispose.esm";
@@ -402,16 +402,40 @@ export class KitchenCanvas extends Component {
 
     // PR4b — cast the HTML5 drop point against the tagged room-wall
     // meshes and return which wall (back/left/right/front) the pointer
-    // dropped onto, reusing the exact `_raycastWall` the click / hover
-    // wall-picker already uses (kitchen_canvas.esm.js `_onMouseDown` /
-    // `_onMouseOver`). This adds NO placement math: it only names the
-    // wall. Returns null when the ray misses every wall mesh (e.g. a
-    // drop over open floor) so the caller can fall back to activeWall.
+    // dropped onto. This adds NO placement math: it only names the
+    // wall. Returns null when the ray misses every eligible wall mesh
+    // (e.g. a drop over open floor) so the caller can fall back to
+    // activeWall.
+    //
+    // F7 fix (2026-07-27) — this used to call the shared `_raycastWall`
+    // (all four wall meshes, including the low 12" kick-strips
+    // room_shell.esm.js renders for right/front). A drop near the room
+    // boundary could land on an invisible kick-strip and silently
+    // resolve to that wall — overriding the user's actual Active Wall
+    // pick even though they never intended to target right/front.
+    // Drop-inference is now restricted to `_raycastDropWall`, which only
+    // considers FULL_HEIGHT_WALLS (constants.esm.js). Click-to-select
+    // (`_onMouseDown`/`_onMouseOver`, still via `_raycastWall`) is
+    // unaffected — kick-strip walls stay explicitly clickable.
     _computeDropWall(ev) {
         const { activeCamera, raycaster } = this.T;
         if (!activeCamera || !raycaster) return null;
         raycaster.setFromCamera(this._ndcFromEvent(ev), activeCamera);
-        return this._raycastWall(raycaster);
+        return this._raycastDropWall(raycaster);
+    }
+
+    // F7 fix (2026-07-27) — drop-inference-only wall raycast: filters
+    // `wallMeshes` down to the full-height walls (back/left today) before
+    // testing intersection, so a stray ray landing on a low kick-strip
+    // (right/front) never gets inferred as a deliberate drop-onto-wall.
+    // Sibling to `_raycastWall` (used by click/hover, all four walls).
+    _raycastDropWall(raycaster) {
+        const meshes = Object.entries(this.T.wallMeshes)
+            .filter(([name, mesh]) => mesh && FULL_HEIGHT_WALLS.includes(name))
+            .map(([, mesh]) => mesh);
+        if (!meshes.length) return null;
+        const hit = raycaster.intersectObjects(meshes, false);
+        return hit.length ? (hit[0].object.userData && hit[0].object.userData.wall) || null : null;
     }
 
     // Golden-scene harness. Returns a sorted, order-independent list of every
@@ -471,6 +495,39 @@ export class KitchenCanvas extends Component {
             makeMesh(THREE, grp, geo, color, pos, rotE, opts);
         const res = builder(THREE, mkG, P,
             { ...it, x_position_in: 0, __localFrame: true });
+        // F8 fix (2026-07-27) — the builder above ran against `{ ...it,
+        // x_position_in: 0, __localFrame: true }`, a SHALLOW COPY used
+        // only so the builder's local-frame geometry math (walls/panels
+        // reading __localFrame to zero their own Y/X contribution — see
+        // wall_cabinet.esm.js / other_cabinets.esm.js) works regardless
+        // of the group's world transform below. Every builder attaches
+        // that copy as `mesh.userData.item` (base/wall/other_cabinets'
+        // `ud: { cab, cabType, item }`), so without this rebind
+        // `mesh.userData.item !== it` — the real state.items entry.
+        // Consequence (verified live): `_onMouseDown`'s drag-move and
+        // Q/E rotate mutate the clone's x_position_in/rotation_deg
+        // (never seen again — it's discarded on the next rebuild) while
+        // `_savePinnedPosition`/`onMoveItem` still persist the clone's
+        // values to the DB by layout_key — a silent no-op in the
+        // client's own state that only surfaces as a divergence on
+        // reload. The clone's x_position_in is also permanently forced
+        // to 0, so `state.selected` (populated straight from
+        // `h.userData.item` in `_onMouseDown`) read x=0 for whatever was
+        // selected.
+        //
+        // Fix: after the builder returns, walk every mesh it attached
+        // (the group + every child, since `mkG` above adds children
+        // directly onto `grp`) and rebind any `userData.item` that
+        // still points at the local-frame copy back onto the REAL item
+        // `it`. The copy is discarded here; nothing downstream ever
+        // sees it again. This does not touch the builder's geometry math
+        // (which already ran) — only the ATTACHED INTERACTION IDENTITY.
+        grp.traverse((obj) => {
+            if (obj.userData && obj.userData.item) {
+                obj.userData.item = it;
+            }
+        });
+        grp.userData.item = it;
         grp.position.set(
             (it.x_position_in || 0) * IN,
             (it.y_position_in || 0) * IN,

@@ -38,6 +38,22 @@ export const WALLS = Object.freeze({
     FRONT: "front",
 });
 
+// F7 fix (2026-07-27) — walls room_shell.esm.js renders FULL HEIGHT
+// (back + left). Right + front are the low 12" "kick-strip" walls —
+// always visible, click-selectable, and hover-glowable exactly like
+// the tall walls, but too short to occlude the open-cutaway view. A
+// stray floor-plane ray from an HTML5 drop can still land on a
+// kick-strip near the room boundary; before this fix that silently
+// resolved to a wall pick and overrode the user's deliberately-chosen
+// Active Wall (kitchen_configurator.js's wallOverride precedence, also
+// fixed alongside this constant). kitchen_canvas.esm.js's drop-wall
+// raycast (`_raycastDropWall`) filters to only this list so a drop can
+// never be inferred onto a kick-strip wall; a CLICK on one (the
+// toolbar / 3D click-to-select path, `_raycastWall`) is unaffected and
+// still hits all four. Single source of truth so room_shell.esm.js's
+// rendering and this drop-inference gate can't drift independently.
+export const FULL_HEIGHT_WALLS = Object.freeze(["back", "left"]);
+
 // ─── Colour palette ───────────────────────────────────────────────────────────
 export const P = {
     scene:   0xECE9E3,

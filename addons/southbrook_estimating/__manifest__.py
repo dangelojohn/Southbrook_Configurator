@@ -58,7 +58,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.7.18.0",
+    "version": "19.0.9.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -218,6 +218,11 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # Builder PO intake stub (SAMI PRD #16, 2026-06-26).
         "data/builder_po_intake_seed.xml",
         "views/builder_po_intake_views.xml",
+        # M1 rules-as-data corner cabinetry layer
+        # (docs/research/corner-engine/09-rule-engine-spec.md §6-7).
+        # MUST load AFTER product_templates.xml so the seeder's
+        # default_code search for SB-CORNER finds a real template.
+        "data/placement_rules.xml",
     ],
     # ------------------------------------------------------------------
     # Asset bundles — Track 1 (3D cabinet viewport).

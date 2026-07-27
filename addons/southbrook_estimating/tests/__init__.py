@@ -48,3 +48,5 @@ from . import test_layout_invariants
 from . import test_geometry_writeback
 # Repair Wave 2, Upgrade 2 — live shorthand SKUs added to _SKU_DEFAULTS.
 from . import test_sku_defaults_wave2
+# M1 rules-as-data corner cabinetry layer (09-rule-engine-spec.md §6-7).
+from . import test_placement_rule

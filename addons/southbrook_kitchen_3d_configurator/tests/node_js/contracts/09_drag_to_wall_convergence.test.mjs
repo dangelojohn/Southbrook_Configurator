@@ -10,9 +10,8 @@
  *
  * PR4b closes the gap WITHOUT adding any placement math on the client:
  * `_onCanvasDrop` now asks the canvas which wall the pointer dropped onto
- * (`_computeDropWall` -> canvas `computeDropWall` -> the same
- * `_raycastWall` the click/hover wall-picker uses, reading userData.wall
- * off the tagged room-wall meshes) and passes it to
+ * (`_computeDropWall` -> canvas `computeDropWall` -> `_raycastWall`,
+ * reading userData.wall off the tagged room-wall meshes) and passes it to
  * `_addCabinetFromProduct(product, targetX, wallOverride)`. The server
  * path is unchanged: a non-back wall is still routed through the pure
  * `kitchen_layout_engine` (_place_lines_on_wall) and the engine pose is
@@ -25,6 +24,25 @@
  * Because both inputs carry the same `wall`, they feed the same engine
  * and therefore persist the same pose. Nothing here computes a
  * coordinate; it asserts the two UX paths converge on one record.
+ *
+ * F7 fix (2026-07-27) — PR4b's precedence in `_addCabinetFromProduct` was
+ * `wallOverride || this.state.activeWall || WALLS.BACK`: an explicit
+ * drop-wall override always won over a deliberately-selected Active
+ * Wall. That was safe as long as `wallOverride` only ever came from a
+ * genuine, deliberate drop-onto-wall gesture — but `_computeDropWall`
+ * raycasts ALL FOUR room-wall meshes, including the low 12" "kick-strip"
+ * walls room_shell.esm.js renders for right/front (present so those
+ * walls stay click-selectable without enclosing the open-cutaway view).
+ * A drop over open floor near the room boundary could land on one of
+ * those invisible strips and resolve to a wall the rep never intended,
+ * silently overriding their actual Active Wall pick. The precedence is
+ * now inverted — `this.state.activeWall || wallOverride || WALLS.BACK`
+ * — so a deliberate selection always wins; the drop-raycast override
+ * only matters when nothing is actively selected. None of the tests
+ * below needed to change: they only ever exercise `wallOverride` when
+ * `activeWall` is null/absent, which behaves identically under both
+ * orderings. The dedicated conflict case — both set, to DIFFERENT
+ * walls — is covered by the new test at the bottom of this file.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -146,4 +164,24 @@ test("INVARIANT: drag-onto-left and select-left-then-Add produce an identical re
     assert.deepEqual(recordB, recordA);
     assert.equal(recordA.wall, "left");
     assert.equal(recordB.wall, "left");
+});
+
+test("F7 fix: a deliberately-selected Active Wall wins over a CONFLICTING drop-wall override", async () => {
+    // The precedence conflict none of the tests above exercise: activeWall
+    // and the drop-raycast override disagree. Before the F7 fix
+    // (`wallOverride || activeWall || BACK`) the drop override would have
+    // won here — exactly the defect (an accidental ray, e.g. hitting the
+    // low kick-strip wall room_shell.esm.js renders for right/front, could
+    // silently beat a rep's deliberate Active Wall click). After the fix
+    // (`activeWall || wallOverride || BACK`) the deliberate selection
+    // always wins.
+    const h = await freshConfigurator();
+    h.component.state.activeWall = "left";     // deliberately selected
+    stubCanvas(h.component, "right");          // conflicting drop-raycast hit
+
+    h.component._onCanvasDrop(dropEvent(PRODUCT.product_id));
+    clearTimeout(h.component._autoSaveTimer);
+
+    assert.equal(newestItem(h.component).wall, "left",
+        "the deliberately-selected Active Wall must win over a conflicting drop override");
 });

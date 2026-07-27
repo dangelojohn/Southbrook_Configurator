@@ -35,6 +35,8 @@ Coordinate frame (millimetres, right-handed, matches the existing scene):
     rotation_deg = 0.
 """
 
+import math
+
 # Wall geometry table. Each wall declares:
 #   along : which world axis the run advances on ("x" or "z")
 #   rot   : the cabinet's Y-rotation (deg) when placed on this wall
@@ -50,6 +52,82 @@ _WALL_SPEC = {
 }
 
 ALLOWED_ROTATIONS = (0, 90, 180, 270)
+
+# M5/M6 — headings within this tolerance of a right angle count as
+# orthogonal; junctions outside it refuse auto corner resolution.
+ORTHO_TOL_DEG = 1.0
+
+
+# ── M5 — the room as a first-class wall graph ───────────────────────────
+# 09-rule-engine-spec.md §2.1 (`wall-segment-local-frames`,
+# `corner-junction-as-real-object`): walls are explicit segment objects
+# and corners are junction objects derived from them, instead of the
+# implicit 4-wall room. `wall_graph(room)` is the RECTANGLE
+# specialization — segment ids equal today's wall names and its junction
+# set is exactly `_CORNER_SPECS`, so every existing behavior is
+# byte-identical (pinned by test). A caller may hand `resolve_and_layout`
+# a custom graph instead; junctions that aren't orthogonal (M6) or don't
+# map onto the four canonical walls refuse auto-resolution with a
+# diagnostic rather than guessing.
+#
+# Segment: {"id", "origin_mm": (x, z), "length_mm",
+#           "rot_deg"     — cabinet rotation on this wall (_WALL_SPEC),
+#           "run_dir_deg" — world direction of the run cursor advance
+#                           (0 = +X, 90 = +Z)}
+# Junction: {"id", "wall_a", "wall_b" — wall_a X-running / wall_b
+#            Z-running for the canonical four, "corner_point_mm": (x, z),
+#            "interior_angle_deg", "kind": "inside"|"outside",
+#            "xz_keys": (xk, zk) — cell anchoring, as in _CORNER_SPECS}
+
+def wall_graph(room):
+    """The default graph for a rectangular room. Segment ids are the
+    legacy wall names; junction ids/order match `_CORNER_SPECS`."""
+    W = float(room.get("width_mm", 0))
+    D = float(room.get("depth_mm", 0))
+    segments = [
+        {"id": "back",  "origin_mm": (0.0, 0.0), "length_mm": W,
+         "rot_deg": 0,   "run_dir_deg": 0},
+        {"id": "front", "origin_mm": (0.0, D),   "length_mm": W,
+         "rot_deg": 180, "run_dir_deg": 0},
+        {"id": "left",  "origin_mm": (0.0, 0.0), "length_mm": D,
+         "rot_deg": 90,  "run_dir_deg": 90},
+        {"id": "right", "origin_mm": (W, 0.0),   "length_mm": D,
+         "rot_deg": 270, "run_dir_deg": 90},
+    ]
+    junctions = [
+        {"id": name, "wall_a": walls[0], "wall_b": walls[1],
+         "corner_point_mm": ({"0": 0.0, "W": W}[xk],
+                             {"0": 0.0, "D": D}[zk]),
+         "interior_angle_deg": 90.0, "kind": "inside",
+         "xz_keys": (xk, zk)}
+        for name, walls, (xk, zk) in _CORNER_SPECS
+    ]
+    return {"segments": segments, "junctions": junctions}
+
+
+def _graph_corner_specs(graph):
+    """Split a graph's junctions into (auto_specs, refused) where
+    auto_specs is a `_CORNER_SPECS`-shaped list for the junctions the
+    engine may auto-resolve (orthogonal + both walls canonical), and
+    refused carries a reason per junction the engine must not touch."""
+    auto, refused = [], []
+    for j in graph.get("junctions", ()):
+        angle = j.get("interior_angle_deg", 90.0)
+        if abs(angle - 90.0) > ORTHO_TOL_DEG:
+            refused.append((j, "non-orthogonal junction (%.1f°) — auto "
+                               "corner resolution refused; place a "
+                               "custom corner manually" % angle))
+            continue
+        if (j.get("wall_a") not in _WALL_SPEC
+                or j.get("wall_b") not in _WALL_SPEC
+                or "xz_keys" not in j):
+            refused.append((j, "junction walls %r/%r are not canonical "
+                               "orthogonal walls — auto corner "
+                               "resolution refused"
+                               % (j.get("wall_a"), j.get("wall_b"))))
+            continue
+        auto.append((j["id"], (j["wall_a"], j["wall_b"]), j["xz_keys"]))
+    return auto, refused
 
 
 class LayoutCapacityExceeded(Exception):
@@ -147,9 +225,105 @@ def footprint_from_anchor_mm(cab, place):
     return (x - d, x, z, z + w)
 
 
+def motion_envelope_from_anchor_mm(cab, place, clearance_front_mm):
+    """M4 — AABB of the region a cabinet's doors/mechanism sweep IN FRONT
+    of its face (the direction it faces per rotation), extending
+    `clearance_front_mm` from the ANCHOR-convention footprint. Solid
+    cabinets inside this box block the mechanism (motion-vs-solid =
+    blocking per 09-rule-engine-spec.md §5)."""
+    x0, x1, z0, z1 = footprint_from_anchor_mm(cab, place)
+    c = clearance_front_mm
+    rot = int(round(place.get("rotation_deg", 0))) % 360
+    if rot == 0:        # faces +Z
+        return (x0, x1, z1, z1 + c)
+    if rot == 180:      # faces -Z
+        return (x0, x1, z0 - c, z0)
+    if rot == 90:       # faces +X
+        return (x1, x1 + c, z0, z1)
+    # rot == 270        # faces -X
+    return (x0 - c, x0, z0, z1)
+
+
 def footprints_overlap(a, b, eps=1.0):
     return (a[0] < b[1] - eps and b[0] < a[1] - eps and
             a[2] < b[3] - eps and b[2] < a[3] - eps)
+
+
+# ── M6 — OBB narrow phase for arbitrary rotations ───────────────────────
+# The AABB helpers above are exact ONLY for ALLOWED_ROTATIONS. A manually
+# placed cabinet on a non-orthogonal wall (M6) carries an arbitrary
+# rotation; its true footprint is an oriented box. Rotation sign matches
+# the renderer (THREE grp.rotation.y = +deg): local +X → world
+# (cos θ, −sin θ) and local +Z → world (sin θ, cos θ) in the (x, z) plane
+# — verified against footprint_from_anchor_mm at 90/270 (pinned by test).
+
+def obb_corners_from_anchor_mm(cab, place):
+    """The 4 world-space (x, z) corner points of an ANCHOR-convention
+    cabinet at any rotation. Order: anchor, +width, +width+depth, +depth
+    (counter-clockwise or clockwise depending on rotation — SAT doesn't
+    care)."""
+    w = cab.get("width_mm", 0)
+    d = cab.get("depth_mm", 0)
+    x = place["x"]
+    z = place["z"]
+    th = math.radians(place.get("rotation_deg", 0) or 0)
+    ux, uz = math.cos(th), -math.sin(th)     # local +X (width)
+    vx, vz = math.sin(th), math.cos(th)      # local +Z (depth)
+    return [
+        (x, z),
+        (x + w * ux, z + w * uz),
+        (x + w * ux + d * vx, z + w * uz + d * vz),
+        (x + d * vx, z + d * vz),
+    ]
+
+
+def convex_polys_overlap(pa, pb, eps=1.0):
+    """SAT overlap test for two convex polygons (lists of (x, z)
+    points). Same eps semantics as footprints_overlap: shapes merely
+    touching within eps do NOT overlap."""
+    for poly_a, poly_b in ((pa, pb), (pb, pa)):
+        n = len(poly_a)
+        for i in range(n):
+            x1, z1 = poly_a[i]
+            x2, z2 = poly_a[(i + 1) % n]
+            # Edge normal (perpendicular in the plane).
+            ax, az = -(z2 - z1), (x2 - x1)
+            proj_a = [px * ax + pz * az for px, pz in poly_a]
+            proj_b = [px * ax + pz * az for px, pz in poly_b]
+            # Normalize eps by the axis length (unnormalized normal).
+            norm = math.hypot(ax, az) or 1.0
+            if (max(proj_a) <= min(proj_b) + eps * norm
+                    or max(proj_b) <= min(proj_a) + eps * norm):
+                return False   # separating axis found
+    return True
+
+
+def solid_overlap_from_anchor_mm(cab_a, place_a, cab_b, place_b, eps=1.0):
+    """Do two ANCHOR-convention cabinets physically overlap? Fast AABB
+    path when both rotations are orthogonal (exact there), SAT OBB
+    narrow phase otherwise — the single entry point validators should
+    use so a 45° manual cabinet is judged by its true oriented box, not
+    a wrong axis-aligned branch."""
+    def _ortho(place):
+        rot = (place.get("rotation_deg", 0) or 0) % 360
+        return min(abs(rot - a) for a in (0, 90, 180, 270, 360)) \
+            <= ORTHO_TOL_DEG
+    if _ortho(place_a) and _ortho(place_b):
+        return footprints_overlap(
+            footprint_from_anchor_mm(cab_a, place_a),
+            footprint_from_anchor_mm(cab_b, place_b), eps=eps)
+    return convex_polys_overlap(
+        obb_corners_from_anchor_mm(cab_a, place_a),
+        obb_corners_from_anchor_mm(cab_b, place_b), eps=eps)
+
+
+def obb_within_room(cab, place, room, eps=2.0):
+    """ANCHOR-convention in-room check valid at any rotation: every
+    corner point inside the room rectangle (± eps)."""
+    W = room.get("width_mm", 0)
+    D = room.get("depth_mm", 0)
+    return all(-eps <= px <= W + eps and -eps <= pz <= D + eps
+               for px, pz in obb_corners_from_anchor_mm(cab, place))
 
 
 def within_room(cab, place, room, eps=2.0):
@@ -358,6 +532,9 @@ def _layer_of(cab):
 # constant.
 _CORNER_FOOTPRINT_MM = 914.0            # 36"
 _CORNER_HEIGHT_MM = {"base": 876.0, "wall": 762.0}   # 34.5" / 30"
+# M3 — a corner filler strip's depth matches its layer's run depth
+# (24" base / 12" upper), same convention as the corner heights above.
+_CORNER_FILLER_DEPTH_MM = {"base": 610.0, "wall": 305.0}
 
 
 def _corner_cell_aabb(xk, zk, room, corner_size_mm):
@@ -378,7 +555,8 @@ def _corner_cell_aabb(xk, zk, room, corner_size_mm):
 
 
 def detect_corners(cabinets, room, placements=None,
-                    corner_size_mm=_CORNER_FOOTPRINT_MM):
+                    corner_size_mm=_CORNER_FOOTPRINT_MM,
+                    corner_specs=None):
     """Find every inside 90° corner that needs a corner cabinet.
 
     Pure + deterministic. Detection only — resolution (footprint
@@ -399,6 +577,10 @@ def detect_corners(cabinets, room, placements=None,
        "walls": [wall_a, wall_b],
        "position_mm": {"x": float, "z": float}}
     """
+    if corner_specs is None:
+        # Legacy default — identical to wall_graph(room)'s junction set
+        # for a rectangle (M5 parity, pinned by test).
+        corner_specs = _CORNER_SPECS
     room_w = room.get("width_mm", 0)
     room_d = room.get("depth_mm", 0)
     coord = {"0": 0.0, "W": float(room_w), "D": float(room_d)}
@@ -421,7 +603,7 @@ def detect_corners(cabinets, room, placements=None,
         return False
 
     out = []
-    for name, (wa, wb), (xk, zk) in _CORNER_SPECS:
+    for name, (wa, wb), (xk, zk) in corner_specs:
         cell = (_corner_cell_aabb(xk, zk, room, corner_size_mm)
                 if placed_by_id is not None else None)
         for layer in ("base", "wall"):
@@ -547,7 +729,43 @@ def _corner_node_pose(xk, zk, room, corner_size_mm, rotation_deg, y_floor):
     `corner_size_mm` cell, for any of the four `ALLOWED_ROTATIONS`. Used so
     the inserted corner node's `__pose` lands in the corner cell regardless
     of which run's cursor (`host_wall`) it was bookkept against."""
-    x0, x1, z0, z1 = _corner_cell_aabb(xk, zk, room, corner_size_mm)
+    cell = _corner_cell_aabb(xk, zk, room, corner_size_mm)
+    return _corner_node_pose_rect(cell, rotation_deg, y_floor)
+
+
+# ── M2 (2026-07-27) — per-leg (asymmetric) corner cells ─────────────────
+# A corner cabinet does not necessarily consume the SAME wall length on
+# both legs: a blind corner runs ~45" along its host wall but only its
+# 24" depth along the other. The square `corner_size_mm` cell above stays
+# as the legacy default; these rect variants carry independent extents.
+# Convention (matches _CORNER_SPECS): every corner's wall pair is
+# (wall_a, wall_b) with wall_a X-running (back/front) and wall_b
+# Z-running (left/right); `ext_x` is the consumption along wall_a's axis,
+# `ext_z` along wall_b's.
+
+def _corner_cell_rect(xk, zk, room, ext_x, ext_z):
+    """World-space AABB of a corner's rectangular cell: `ext_x` along the
+    X axis by `ext_z` along Z, anchored at the room corner named by
+    (xk, zk), extending toward the room interior."""
+    room_w = room.get("width_mm", 0)
+    room_d = room.get("depth_mm", 0)
+    if xk == "0":
+        x0, x1 = 0.0, ext_x
+    else:   # "W"
+        x0, x1 = room_w - ext_x, room_w
+    if zk == "0":
+        z0, z1 = 0.0, ext_z
+    else:   # "D"
+        z0, z1 = room_d - ext_z, room_d
+    return (x0, x1, z0, z1)
+
+
+def _corner_node_pose_rect(cell, rotation_deg, y_floor):
+    """Centre-convention pose whose `footprint_mm` AABB is EXACTLY `cell`
+    for the given rotation. The caller must size the node so width runs
+    along the rotation's along-axis (rot 0/180 → width spans x, rot
+    90/270 → width spans z)."""
+    x0, x1, z0, z1 = cell
     rot = int(round(rotation_deg)) % 360
     if rot == 0:
         x, z = (x0 + x1) / 2.0, z0
@@ -560,8 +778,45 @@ def _corner_node_pose(xk, zk, room, corner_size_mm, rotation_deg, y_floor):
     return {"x": x, "y": y_floor, "z": z, "rotation_deg": rot}
 
 
+def _select_corner_rule(corner_name, layer, corner_rules, room):
+    """M2 — pick the placement rule for a detected corner, or None.
+
+    A rule is a plain dict (see southbrook.placement.rule.engine_dicts):
+      {"rule_id", "sku", "tier": "base"|"wall", "sequence",
+       "leg_x_mm", "leg_z_mm", "height_mm",
+       "min_leg_x_mm", "min_leg_z_mm", "host_leg": "x"|"z" (optional)}
+
+    Filter: tier must match the corner's layer, and each of the corner's
+    two walls must be long enough for the rule's min leg on that axis.
+    Rank: ascending `sequence`, then rule_id for determinism. Returns the
+    winning rule dict or None (caller falls back to the legacy constants
+    and records a diagnostic).
+    """
+    if not corner_rules:
+        return None
+    walls = {w for _n, ws, _xz in _CORNER_SPECS
+             for w in (ws if _n == corner_name else ())}
+    if not walls:
+        return None
+    lengths = _wall_lengths(room)
+    # wall_a is the X-running member, wall_b the Z-running member.
+    len_x = min(lengths[w] for w in walls if w in ("back", "front"))
+    len_z = min(lengths[w] for w in walls if w in ("left", "right"))
+    fits = [r for r in corner_rules
+            if r.get("tier") == layer
+            and len_x >= (r.get("min_leg_x_mm") or 0)
+            and len_z >= (r.get("min_leg_z_mm") or 0)
+            and (r.get("leg_x_mm") or 0) > 0
+            and (r.get("leg_z_mm") or 0) > 0]
+    if not fits:
+        return None
+    fits.sort(key=lambda r: (r.get("sequence", 100), r.get("rule_id") or ""))
+    return fits[0]
+
+
 def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                        wall_order=("back", "left"), auto_assign=True,
+                       corner_rules=None, graph=None,
                        **layout_kwargs):
     """Full pipeline: (optionally distribute a flat cabinet list across
     walls), detect inside corners, insert a corner-cabinet node at each
@@ -582,8 +837,28 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     wall's low end is there) so it is placed standalone in its cell and both
     adjoining runs are capped. Handles an L, a U, or a full G-shape.
 
-    Returns {"cabinets", "placements", "corners", "inserted"}.
+    corner_rules (M2, 2026-07-27): optional list of plain rule dicts (see
+    `_select_corner_rule`) — rules-as-data replacing the constant square
+    cell. Per resolved corner, the winning rule supplies the SKU, per-leg
+    wall consumption (asymmetric corners like blind units), height, and
+    optionally which wall the box runs along (`host_leg`). When None/empty
+    or when no rule fits a given corner, that corner falls back to the
+    legacy `corner_size_mm` square + the Odoo layer's default SKU mapping,
+    and a diagnostic is recorded in the returned "corner_diagnostics".
+
+    Returns {"cabinets", "assigned", "placements", "corners", "inserted",
+    "removed_ids", "corner_diagnostics"}.
     """
+    # M5 — the room is a wall GRAPH. Default: the rectangle
+    # specialization, whose junction set equals _CORNER_SPECS exactly
+    # (parity pinned by test). A custom graph's non-orthogonal or
+    # non-canonical junctions are refused up front (M6) with a
+    # diagnostic — the engine never guesses at a corner it has no
+    # placement math for.
+    if graph is None:
+        graph = wall_graph(room)
+    auto_specs, refused_junctions = _graph_corner_specs(graph)
+
     assigned = (auto_assign_walls(cabinets, room, wall_order) if auto_assign
                 else [dict(c) for c in cabinets])
     # Detect corners against REAL placed footprints (geometric occupancy),
@@ -592,11 +867,17 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     # whether each run's cabinets actually reach the shared corner cell.
     provisional_placements = layout(assigned, room, **layout_kwargs)
     corners = detect_corners(assigned, room, placements=provisional_placements,
-                              corner_size_mm=corner_size_mm)
+                              corner_size_mm=corner_size_mm,
+                              corner_specs=auto_specs)
     inserted = []
+    fillers = []            # M3 — rule-demanded corner filler strips
     removed_ids = set()
     offsets = {}
     standalone_cells = []   # [(cell_aabb, corner_node)] for the cap pass
+    corner_diagnostics = []
+    for j, reason in refused_junctions:
+        corner_diagnostics.append({
+            "corner": j.get("id"), "layer": None, "reason": reason})
     room_w = room.get("width_mm", 0)
     room_d = room.get("depth_mm", 0)
     zl = layout_kwargs.get("zone_layout") or _DEFAULT_ZONE_LAYOUT
@@ -607,13 +888,30 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         pick = min if end == "first" else max
         return pick(run, key=lambda c: c.get("run_seq", 0), default=None)
 
+    def _corner_geometry(corner, layer):
+        """(rule, ext_x, ext_z, height_mm) for one detected corner —
+        rule-driven when a rule fits (M2), legacy square otherwise."""
+        rule = _select_corner_rule(corner["corner"], layer, corner_rules,
+                                   room)
+        if rule is None:
+            if corner_rules:
+                corner_diagnostics.append({
+                    "corner": corner["corner"], "layer": layer,
+                    "reason": "no placement rule fits — legacy %.0fmm "
+                              "square used" % corner_size_mm,
+                })
+            return None, corner_size_mm, corner_size_mm, \
+                _CORNER_HEIGHT_MM[layer]
+        return (rule, rule["leg_x_mm"], rule["leg_z_mm"],
+                rule.get("height_mm") or _CORNER_HEIGHT_MM[layer])
+
     for corner in corners:
         layer = corner["layer"]
         if corner["corner"] in _CORNER_STANDALONE:
             # Both-high corner (front-right): place the corner cabinet
             # STANDALONE filling its cell, and mark the cell for the cap pass.
-            cell = (room_w - corner_size_mm, room_w,
-                    room_d - corner_size_mm, room_d)
+            rule, ext_x, ext_z, height_mm = _corner_geometry(corner, layer)
+            cell = (room_w - ext_x, room_w, room_d - ext_z, room_d)
             y_floor = zl.get("wall" if layer == "wall" else "base_run",
                              ("ground", 0, 0))[1]
             node = {
@@ -624,16 +922,19 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                 "layer": layer,
                 "cabinet_type": "wall" if layer == "wall" else "base",
                 "family": "wall" if layer == "wall" else "base",
-                "width_mm": corner_size_mm,
-                "depth_mm": corner_size_mm,
-                "height_mm": _CORNER_HEIGHT_MM[layer],
+                # rot 0 → width spans X, depth spans Z (footprint_mm).
+                "width_mm": ext_x,
+                "depth_mm": ext_z,
+                "height_mm": height_mm,
                 "zone": "wall" if layer == "wall" else "base_run",
                 "wall": "right",
                 # Explicit pose (rot 0) whose AABB is exactly the cell.
-                "__pose": {"x": room_w - corner_size_mm / 2.0, "y": y_floor,
-                           "z": room_d - corner_size_mm, "rotation_deg": 0},
+                "__pose": _corner_node_pose_rect(cell, 0, y_floor),
                 "replaced_ids": [],
             }
+            if rule is not None:
+                node["rule_id"] = rule.get("rule_id")
+                node["sku"] = rule.get("sku")
             inserted.append(node)
             standalone_cells.append((cell, node))
             continue
@@ -641,6 +942,7 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         if spec is None:
             continue   # remaining corners not yet footprint-reserved
         host_wall, other_wall, other_end, handed = spec
+        rule, ext_x, ext_z, height_mm = _corner_geometry(corner, layer)
         # The corner cabinet REPLACES the two standard cabinets that meet at
         # the corner — otherwise they'd overlap the corner cell / overflow.
         # `host_wall` identifies the run whose LOW end is at this corner —
@@ -656,12 +958,30 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
             if c is not None:
                 removed_ids.add(c["id"])
         wall_tag, rotation_deg = _CORNER_RESOLVE_PRESENTATION[corner["corner"]]
+        # M2 — a rule may pin which wall the box runs along (`host_leg`):
+        # "x" → the pair's X-running wall (wall_a), "z" → Z-running
+        # (wall_b). A blind corner genuinely runs flush along one wall —
+        # its presentation IS that wall's, even when the legacy table
+        # would tag the other (e.g. back-left defaults to left/90, but a
+        # host_leg="x" blind box lies along the back wall at rot 0 and
+        # correctly renders like a normal back cabinet with a blind face).
+        if rule is not None and rule.get("host_leg") in ("x", "z"):
+            pair = next(ws for n, ws, _xz in _CORNER_SPECS
+                        if n == corner["corner"])
+            wall_tag = (pair[0] if rule["host_leg"] == "x" else pair[1])
+            rotation_deg = _WALL_SPEC[wall_tag]["rot"]
         xk, zk = _CORNER_XZ_KEYS[corner["corner"]]
         y_floor = zl.get("wall" if layer == "wall" else "base_run",
                          ("ground", 0, 0))[1]
-        pose = _corner_node_pose(xk, zk, room, corner_size_mm, rotation_deg,
-                                 y_floor)
-        inserted.append({
+        cell = _corner_cell_rect(xk, zk, room, ext_x, ext_z)
+        pose = _corner_node_pose_rect(cell, rotation_deg, y_floor)
+        # Node dims follow the pose convention (footprint_mm): width runs
+        # along the rotation's along-axis. rot 0/180 → width spans the
+        # cell's X extent; rot 90/270 → width spans its Z extent.
+        rot_n = int(round(rotation_deg)) % 360
+        node_w = ext_x if rot_n in (0, 180) else ext_z
+        node_d = ext_z if rot_n in (0, 180) else ext_x
+        node = {
             "id": "corner-%s-%s" % (corner["corner"], layer),
             "corner_cabinet": True,
             "corner": corner["corner"],
@@ -669,16 +989,20 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
             "layer": layer,
             "cabinet_type": "wall" if layer == "wall" else "base",
             "family": "wall" if layer == "wall" else "base",
-            "width_mm": corner_size_mm,
-            "depth_mm": corner_size_mm,
-            "height_mm": _CORNER_HEIGHT_MM[layer],
+            "width_mm": node_w,
+            "depth_mm": node_d,
+            "height_mm": height_mm,
             "zone": "wall" if layer == "wall" else "base_run",
             "wall": wall_tag,
             "run_seq": -1,
             "__pose": pose,
             "replaced_ids": [c["id"] for c in (host_first, other_cab)
                              if c is not None],
-        })
+        }
+        if rule is not None:
+            node["rule_id"] = rule.get("rule_id")
+            node["sku"] = rule.get("sku")
+        inserted.append(node)
         # The corner no longer consumes host_wall's run cursor by joining it
         # (it carries an explicit __pose instead), so host_wall's own
         # surviving cabinets need the SAME explicit start-offset the
@@ -690,15 +1014,96 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         # run, and vice versa. Each detected corner is already scoped to
         # exactly one layer (`corner["layer"]`); the offset must stay
         # scoped to it too.
+        # M2 — the reservation is PER LEG: each wall's run starts past the
+        # corner's consumption ALONG THAT WALL's axis (X-running walls use
+        # ext_x, Z-running use ext_z). Symmetric rules and the legacy
+        # square reduce to the old single corner_size_mm behavior.
+        #
+        # M3 — a rule may additionally demand a FILLER strip on a leg
+        # (filler_x_mm / filler_z_mm — e.g. the 3" blind-corner filler
+        # per KraftMaid/NKBA, docs 02/06 `filler-blind-corner-min`). The
+        # filler is a REAL node (emitted below, → BOM/cutlist in the ORM
+        # layer) and the leg's run starts past corner + filler.
+        filler_x = (rule.get("filler_x_mm") or 0.0) if rule else 0.0
+        filler_z = (rule.get("filler_z_mm") or 0.0) if rule else 0.0
+
+        def _leg_for(wall):
+            return ext_x if wall in ("back", "front") else ext_z
+
+        def _filler_for(wall):
+            return filler_x if wall in ("back", "front") else filler_z
+
+        def _emit_filler(wall):
+            fw = _filler_for(wall)
+            if fw <= 0:
+                return
+            fdepth = _CORNER_FILLER_DEPTH_MM[layer]
+            # Strip cell: between the corner cell's interior edge and the
+            # run start on `wall`, hugging that wall.
+            if wall in ("back", "front"):
+                if xk == "0":
+                    fx0, fx1 = ext_x, ext_x + fw
+                else:   # "W"
+                    fx0, fx1 = room_w - ext_x - fw, room_w - ext_x
+                fz0, fz1 = (0.0, fdepth) if zk == "0" else (room_d - fdepth,
+                                                            room_d)
+            else:
+                if zk == "0":
+                    fz0, fz1 = ext_z, ext_z + fw
+                else:   # "D"
+                    fz0, fz1 = room_d - ext_z - fw, room_d - ext_z
+                fx0, fx1 = (0.0, fdepth) if xk == "0" else (room_w - fdepth,
+                                                            room_w)
+            frot = _WALL_SPEC[wall]["rot"]
+            cell_f = (fx0, fx1, fz0, fz1)
+            fillers.append({
+                "id": "cornerfill-%s-%s-%s" % (corner["corner"], layer,
+                                               wall),
+                "corner_filler": True,
+                "corner": corner["corner"],
+                "layer": layer,
+                "cabinet_type": "filler",
+                "family": "filler",
+                # width runs along the strip's wall (pose convention).
+                "width_mm": fw,
+                "depth_mm": fdepth,
+                "height_mm": height_mm,
+                "zone": "wall" if layer == "wall" else "accessory",
+                "wall": wall,
+                "__pose": _corner_node_pose_rect(cell_f, frot, y_floor),
+                "rule_id": rule.get("rule_id") if rule else None,
+            })
+
         offsets[(host_wall, layer)] = max(
-            offsets.get((host_wall, layer), 0), corner_size_mm)
+            offsets.get((host_wall, layer), 0),
+            _leg_for(host_wall) + _filler_for(host_wall))
+        _emit_filler(host_wall)
         if other_end == "first":
-            # The adjoining low-end run must start past the corner footprint.
+            # The adjoining low-end run must start past corner + filler.
             offsets[(other_wall, layer)] = max(
-                offsets.get((other_wall, layer), 0), corner_size_mm)
+                offsets.get((other_wall, layer), 0),
+                _leg_for(other_wall) + _filler_for(other_wall))
+            _emit_filler(other_wall)
+        elif _filler_for(other_wall) > 0:
+            # High-end adjoining run (it TERMINATES at the corner): the
+            # engine cannot reserve space for a filler there — the run's
+            # last cabinet may legitimately end flush at the cell, and a
+            # strip emitted into that gap could silently overlap it (the
+            # postcondition checks in-room, not pairwise overlap). Skip
+            # the strip and record why; the installer scribes this edge
+            # on site (docs 05 `absorb-out-of-square-at-shorter-leg-end`).
+            corner_diagnostics.append({
+                "corner": corner["corner"], "layer": layer,
+                "reason": "filler on %s skipped: run terminates at the "
+                          "corner (high-end leg) — scribe on site"
+                          % other_wall,
+            })
 
     final = [dict(c) for c in assigned if c["id"] not in removed_ids]
     final.extend(dict(n) for n in inserted)
+    # M3 — filler strips are real, solid layout members: they ride the
+    # postcondition (in-room) check and reach the ORM layer for BOM.
+    final.extend(dict(f) for f in fillers)
     placements = layout(final, room, wall_start_offsets=offsets,
                         **layout_kwargs)
 
@@ -712,7 +1117,8 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         capped = set()
         for cell, node in standalone_cells:
             for c in final:
-                if c.get("corner_cabinet") or c["id"] in capped:
+                if (c.get("corner_cabinet") or c.get("corner_filler")
+                        or c["id"] in capped):
                     continue
                 if footprints_overlap(
                         footprint_mm(c, place_by_id[c["id"]]), cell):
@@ -750,5 +1156,15 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
                      worst["wall"]))
         raise LayoutCapacityExceeded(cap, req, detail=detail, outside=outside)
 
-    return {"cabinets": final, "placements": placements, "corners": corners,
-            "inserted": inserted, "removed_ids": sorted(removed_ids)}
+    # "assigned" — every input cabinet's post-distribution wall/run_seq,
+    # INCLUDING the cabinets a corner replaced (which "cabinets" omits).
+    # The ORM caller must persist wall/run_seq for the replaced-and-
+    # archived cabinets too: if it doesn't, a later reset-and-restore
+    # resurrects them with their PRE-distribution wall, reconstructing a
+    # different (possibly overfull) run than the one this call resolved
+    # — the auto-arrange idempotence break (2026-07-26).
+    return {"cabinets": final, "assigned": assigned,
+            "placements": placements, "corners": corners,
+            "inserted": inserted, "fillers": fillers,
+            "removed_ids": sorted(removed_ids),
+            "corner_diagnostics": corner_diagnostics}
