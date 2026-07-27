@@ -80,7 +80,7 @@
 
     <record id="corner" model="product.template">
       <field name="southbrook_category">Base</field>
-      <field name="southbrook_description">Corner unit with rotating carousel access.</field>
+      <field name="southbrook_description">Highline corner base (CC-CHL): full-height door with open corner storage.</field>
       <field name="southbrook_dimensions">36" &#xD7; 36" &#xD7; 34&#xBD;"H</field>
       <field name="southbrook_icon_key">corner</field>
     </record>

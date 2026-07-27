@@ -597,11 +597,35 @@ class SouthbrookKitchenDesign(models.Model):
                 # SKU; _CORNER_SKU stays the legacy-fallback mapping.
                 code = (node.get("sku")
                         or self._CORNER_SKU.get(node["layer"], "SB-CORNER"))
-                tmpl = self.env["product.template"].sudo().search(
+                # T4a — variant-level lookup FIRST: a multi-variant corner
+                # template (LH + RH after the SB-CORNER repair) has NO
+                # template-level default_code (Odoo only relates it for
+                # single-variant templates), so template-only search would
+                # silently stop finding the corner SKU.
+                Product = self.env["product.product"].sudo()
+                variant = Product.search(
                     [("default_code", "=", code)], limit=1)
-                variant = False
+                tmpl = variant.product_tmpl_id
+                if not tmpl:
+                    tmpl = self.env["product.template"].sudo().search(
+                        [("default_code", "=", code)], limit=1)
                 if tmpl:
-                    variant = tmpl.product_variant_id or tmpl.product_variant_ids[:1]
+                    # Pick the variant matching the corner node's
+                    # handedness (engine tags "L"/"R"); fall back to any
+                    # variant so single-hand catalogs keep working.
+                    hand = node.get("handed")
+                    if hand in ("L", "R") and len(tmpl.product_variant_ids) > 1:
+                        prefix = "LH" if hand == "L" else "RH"
+                        handed = tmpl.product_variant_ids.filtered(
+                            lambda v: any(
+                                pt.attribute_id.name == "Hinge Side"
+                                and (pt.name or "").startswith(prefix)
+                                for pt in
+                                v.product_template_attribute_value_ids))
+                        variant = handed[:1] or variant
+                    if not variant:
+                        variant = (tmpl.product_variant_id
+                                   or tmpl.product_variant_ids[:1])
                 if not variant:
                     _logger.warning(
                         "[auto-arrange] corner SKU %s missing/no-variant — "

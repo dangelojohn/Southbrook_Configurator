@@ -32,3 +32,6 @@ from . import qr_kind_handlers
 from . import ptav_price_extra_seed
 # M1 rules-as-data corner cabinetry layer (09-rule-engine-spec.md §6-7).
 from . import placement_rule
+# T4a (kitchen templates) — SB-CORNER variant data repair helper
+# (shared by the 19.0.9.1.0 migration and the configurator tests).
+from . import corner_sku_repair

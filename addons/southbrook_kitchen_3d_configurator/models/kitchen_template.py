@@ -228,12 +228,38 @@ class SouthbrookKitchenTemplateResolve(models.Model):
         slots = self.line_ids.sorted(lambda s: (s.wall, s.run_seq, s.sequence))
         fixed = dict.fromkeys(run_len, 0.0)
         claimed = dict.fromkeys(run_len, 0.0)
+        # Corner slots claim the engine's leg footprint on BOTH legs of
+        # the junction: the slot's own wall plus every adjacent wall
+        # that carries floor slots. The engine SUBSTITUTES the corner
+        # for run-lead cabinets that fit fully inside its cell, so
+        # leading non-repeat floor slots are ABSORBED into the claim
+        # (not double-counted as fixed width) up to the corner size.
+        _ADJACENT = {"back": ("left", "right"), "front": ("left", "right"),
+                     "left": ("back", "front"), "right": ("back", "front")}
+        floor_walls = set(slots.filtered(
+            lambda s: s.cabinet_type not in ("wall", "corner")).mapped("wall"))
+        absorbed_ids = set()
+        for c in slots.filtered(lambda s: s.cabinet_type == "corner"):
+            legs = [c.wall] + [w for w in _ADJACENT[c.wall]
+                               if w in floor_walls]
+            for w in legs:
+                claimed[w] += corner_in
+        for w in [w for w, v in claimed.items() if v]:
+            cum = 0.0
+            for s in slots.filtered(
+                    lambda s, _w=w: s.wall == _w
+                    and s.cabinet_type in ("base", "tall")
+                    and not s.repeat_ok):
+                width = self._slot_fixed_width(s, module_w, appliance_widths)
+                if cum + width <= corner_in + 1e-6:
+                    absorbed_ids.add(s.id)
+                    cum += width
+                else:
+                    break
         for s in slots:
-            if s.cabinet_type == "wall":
-                continue  # upper tier — separate plane, engine-checked
-            if s.cabinet_type == "corner":
-                claimed[s.wall] += corner_in  # engine-claimed leg footprint
-            elif not s.repeat_ok:
+            if s.cabinet_type in ("wall", "corner"):
+                continue  # upper tier / claimed above
+            if not s.repeat_ok and s.id not in absorbed_ids:
                 fixed[s.wall] += self._slot_fixed_width(
                     s, module_w, appliance_widths)
         for w, ln in run_len.items():

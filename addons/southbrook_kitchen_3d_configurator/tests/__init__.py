@@ -79,3 +79,8 @@ from . import test_template_catalog
 # flip/rotate transform canonical (wall, run_seq) only, poses re-derived
 # by auto-arrange; swap/width/move are canonical-only and savepoint-atomic.
 from . import test_layout_manipulation
+
+# Kitchen Templates T4a (2026-07-27) — SB-CORNER data repair (variant
+# width 33->36, RH twin) + the L-10X8 flagship: engine-derived corner,
+# hand-aware variant pick, flip swaps LH->RH.
+from . import test_corner_repair

@@ -590,77 +590,60 @@ class TestTrackBEndToEnd(TransactionCase):
         )
 
     def test_preset_l_shape_creates_design_with_starters(self):
-        """5.6.12 regression pin -- picking the 'l_shape' preset creates
-        a 12'x12'x8' design with a starter cabinet run.
-
-        The starter cabinets are canonical southbrook_estimating
-        templates. In a full install those xmlids resolve and the
-        design gets >=1 cabinet line. In a bare test DB the xmlids
-        may not resolve; the contract in that case is a chatter note
-        listing the skipped starters so the rep isn't left guessing.
+        """5.6.12 pin, SUPERSEDED by Kitchen Templates T4a (5.31.0):
+        the 'l_shape' compat preset now maps to the SHIPPED L-10X8 data
+        template (data/kitchen_templates.xml) and instantiates it — the
+        legacy hardcoded 12'x12' starter dict is only the fallback for
+        compat codes with no loaded template. The design therefore
+        carries the TEMPLATE's room dims and canonical starter lines.
         """
         Picker = self.env["kitchen.design.template.picker"]
         wizard = Picker.create({"preset": "l_shape"})
-        spec = self.Design._get_preset_layout("l_shape")
-        self.assertTrue(spec, "'l_shape' preset must be defined")
-        self.assertTrue(spec["starter_cabinets"],
-                        "'l_shape' preset must declare starter cabinets")
+        tpl = self.env["southbrook.kitchen.template"].search(
+            [("code", "=", "L-10X8")], limit=1)
+        self.assertTrue(tpl, "T4a ships the L-10X8 flagship template")
 
         act = wizard.action_create()
         design_id = act["params"]["design_id"]
         design = self.Design.browse(design_id)
         self.assertTrue(design.exists(), "wizard must create a design")
-        self.assertEqual(design.room_width_in,  144.0)
-        self.assertEqual(design.room_depth_in,  144.0)
-        self.assertEqual(design.room_height_in, 96.0)
+        self.assertEqual(design.room_width_in,  tpl.default_room_width_in)
+        self.assertEqual(design.room_depth_in,  tpl.default_room_depth_in)
+        self.assertEqual(design.room_height_in, tpl.default_room_height_in)
 
         # Either starter cabinets landed OR a chatter note documents
         # the skips -- one of the two must hold so the rep always has
         # actionable feedback.
         seeded_count = len(design.cabinet_line_ids)
+        self.assertGreaterEqual(
+            seeded_count, 1,
+            "l_shape template must instantiate starter cabinet lines",
+        )
+        self.assertEqual(
+            design.state, "configured",
+            "state must advance to 'configured' once starters landed",
+        )
         note_msgs = design.message_ids.filtered(
-            lambda m: "template preset" in (m.body or "").lower()
+            lambda m: "instantiated from template" in (m.body or "").lower()
         )
         self.assertTrue(
             note_msgs,
-            "expected a chatter note documenting the preset application",
+            "expected a chatter note documenting the template "
+            "instantiation",
         )
-        if seeded_count == 0:
-            # No cabinets landed -- the audit note MUST list the skipped
-            # xmlids so the rep can install southbrook_estimating and
-            # retry, or manually add the equivalent cabinets.
-            self.assertTrue(
-                any("Skipped" in (m.body or "") for m in note_msgs),
-                "when no cabinets are seeded, chatter must document "
-                "the skipped xmlids",
-            )
-        else:
-            self.assertGreaterEqual(
-                seeded_count, 1,
-                "l_shape preset must seed at least 1 starter cabinet "
-                "when canonical xmlids are available",
-            )
-            # Design flipped to 'configured' once any starter landed.
-            self.assertEqual(
-                design.state, "configured",
-                "state must advance to 'configured' when starter "
-                "cabinets are seeded",
-            )
-            # PR3.0 — y/z field-semantics migration: wall-type starter
-            # cabinets from _KITCHEN_TEMPLATE_PRESETS must seed the
-            # canonical shape (mount height in y_position_in, z flush
-            # at 0), not the legacy z-as-height shape the migration
-            # cleans up. Otherwise every new l_shape/u_shape/galley
-            # design would immediately re-introduce the exact data
-            # shape this PR migrates away from.
-            wall_lines = design.cabinet_line_ids.filtered(
-                lambda l: l.cabinet_type == "wall")
-            for wl in wall_lines:
-                self.assertGreater(
-                    wl.y_position_in, 0,
-                    "starter wall cabinet %s must carry mount height in "
-                    "y_position_in" % wl.layout_key)
+        # PR3.0 — y/z field-semantics: wall-tier lines carry mount
+        # height in y_position_in (never the legacy z-as-height shape);
+        # z_position_in is the along/cross POSE, engine-derived, so it
+        # is only asserted flush for back-wall uppers.
+        wall_lines = design.cabinet_line_ids.filtered(
+            lambda l: l.cabinet_type == "wall")
+        for wl in wall_lines:
+            self.assertGreater(
+                wl.y_position_in, 0,
+                "starter wall cabinet %s must carry mount height in "
+                "y_position_in" % wl.layout_key)
+            if wl.wall == "back":
                 self.assertEqual(
                     wl.z_position_in, 0.0,
-                    "starter wall cabinet %s must be flush "
+                    "back-wall upper %s must be flush "
                     "(z_position_in=0)" % wl.layout_key)

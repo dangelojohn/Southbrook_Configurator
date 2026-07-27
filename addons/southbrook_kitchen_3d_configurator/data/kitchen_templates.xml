@@ -551,5 +551,151 @@
       <field name="priority">50</field>
     </record>
 
+    <!-- ═══ L-10X8 · L-Shape Kitchen (120" x 96") — T4a flagship ═══
+         THE template this feature exists for: the corner unit is the
+         hardest thing to quote/build from scratch, so it ships
+         pre-made. The CORNER slot is a PREFERENCE only — the corner
+         engine derives all corner geometry and picks the LH/RH corner
+         variant from the junction's handedness (SB-CORNER data repair,
+         T4a). No corner PRODUCT is templated; no line is created for
+         the slot. -->
+    <record id="ktpl_l_10x8" model="southbrook.kitchen.template">
+      <field name="name">L-Shape Kitchen 10' x 8'</field>
+      <field name="code">L-10X8</field>
+      <field name="layout_shape">l_shape</field>
+      <field name="sequence">5</field>
+      <field name="default_room_width_in">120.0</field>
+      <field name="default_room_depth_in">96.0</field>
+      <field name="default_room_height_in">96.0</field>
+      <field name="default_module_width_in">24.0</field>
+      <field name="min_cabinet_count">3</field>
+      <field name="description">The classic L: sink and range along the long wall, prep run around the corner — with the corner cabinet engineered in, not improvised.</field>
+    </record>
+    <record id="ktpl_l_10x8_corner" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">CORNER</field>
+      <field name="cabinet_type">corner</field>
+      <field name="wall">back</field>
+      <field name="run_seq">5</field>
+      <field name="priority">1</field>
+      <field name="notes">Preference slot only — corner geometry and the LH/RH product choice are engine-derived.</field>
+    </record>
+    <!-- Corner-buffer leads: the engine SUBSTITUTES the corner unit for
+         run-lead cabinets that fit fully inside its cell — these two
+         modules exist to be absorbed, exactly like the first cabinet a
+         designer places at the junction before auto-arrange swaps in
+         the corner. parametric_fit absorbs their width into the corner
+         claim so they are never double-counted. -->
+    <record id="ktpl_l_10x8_lead_b" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">LEAD-B</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">2</field>
+      <field name="notes">Absorbed by the corner unit at arrange time (engine substitution).</field>
+    </record>
+    <record id="ktpl_l_10x8_lead_l" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">LEAD-L</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">left</field>
+      <field name="run_seq">5</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">2</field>
+      <field name="notes">Absorbed by the corner unit at arrange time (engine substitution).</field>
+    </record>
+    <record id="ktpl_l_10x8_sink" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">SINK</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_l_10x8_range" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">RANGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">range</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_l_10x8_m1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">M1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">40</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <record id="ktpl_l_10x8_b2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">B2</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">left</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_l_10x8_m2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">M2</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">left</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">0.0</field>
+      <field name="repeat_ok" eval="True"/>
+      <field name="priority">50</field>
+    </record>
+    <!-- Uppers: the FIRST upper on each leg sits fully inside the wall-
+         layer corner cell and is substituted by the wall corner unit
+         (SB-WALL-CORNER, seeded by the T4a repair); the second upper on
+         each leg survives and reflows past the cell. -->
+    <record id="ktpl_l_10x8_w1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">W1</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+      <field name="notes">Absorbed by the wall corner unit at arrange time (engine substitution).</field>
+    </record>
+    <record id="ktpl_l_10x8_w1b" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">W1B</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_l_10x8_w2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">W2</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">left</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+      <field name="notes">Absorbed by the wall corner unit at arrange time (engine substitution).</field>
+    </record>
+    <record id="ktpl_l_10x8_w2b" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_l_10x8"/>
+      <field name="slot_code">W2B</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">left</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+
   </data>
 </odoo>

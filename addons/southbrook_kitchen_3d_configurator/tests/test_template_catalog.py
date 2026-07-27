@@ -8,13 +8,23 @@ are honest placeholders for engine capabilities that don't exist yet.
 """
 from odoo.tests import TransactionCase, tagged
 
-# Test-authored templates from the T2/T3 suites use these prefixes.
-_TEST_CODE_PREFIXES = ("T1-", "T2-", "T3-")
+from .test_corner_repair import ensure_repaired_corner
+
+# Test-authored templates from the T2/T3/T5 suites use these prefixes.
+_TEST_CODE_PREFIXES = ("T1-", "T2-", "T3-", "T5-")
 
 
 @tagged("post_install", "-at_install", "southbrook",
         "southbrook_kitchen_3d_configurator", "kitchen_templates")
 class TestShippedTemplateCatalog(TransactionCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # L-10X8 (T4a flagship) is active shipped data whose corner is
+        # engine-derived from the SB-CORNER catalog — bring a bare DB to
+        # the repaired prod state first (see test_corner_repair).
+        ensure_repaired_corner(cls.env)
 
     def _shipped(self, active_test=True):
         tpls = self.env["southbrook.kitchen.template"].with_context(
@@ -67,17 +77,23 @@ class TestShippedTemplateCatalog(TransactionCase):
         self.assertFalse(fit["ok"])
         self.assertIn("back wall", fit["message"])
 
-    def test_no_corner_or_filler_slots_templated(self):
-        # Corners are engine-derived; fillers aren't even a valid slot
-        # type (impossible state by schema). Starter set ships neither.
+    def test_corner_slots_are_preference_only(self):
+        # Corner GEOMETRY/products are engine-derived, never templated;
+        # fillers aren't even a valid slot type (impossible state by
+        # schema). A corner-bearing shape (L-10X8, T4a) may ship a
+        # corner PREFERENCE slot — but it must carry no product pin and
+        # must never become a design line (the resolver skips it).
         slots = self.env["southbrook.kitchen.template.line"].with_context(
             active_test=False).search([])
         shipped = slots.filtered(
             lambda s: not s.template_id.code.startswith(_TEST_CODE_PREFIXES))
         self.assertTrue(shipped)
-        self.assertFalse(
-            shipped.filtered(lambda s: s.cabinet_type == "corner"),
-            "corners are engine-derived — never templated (starter set)")
+        for slot in shipped.filtered(lambda s: s.cabinet_type == "corner"):
+            self.assertIn(slot.template_id.layout_shape,
+                          ("l_shape", "u_shape", "g_shape"),
+                          "corner slots only on corner-bearing shapes")
+            self.assertFalse(slot.product_id,
+                             "corner slots are preference-only — no pin")
 
     def test_engine_blocked_shapes_ship_inactive(self):
         placeholders = self._shipped(active_test=False).filtered(
