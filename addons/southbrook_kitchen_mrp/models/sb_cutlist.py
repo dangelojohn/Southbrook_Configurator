@@ -29,6 +29,14 @@ PANEL_NAMES = [
     ("back", "Back"),
     ("adjustable_shelf", "Adjustable Shelf"),
     ("door", "Door / Drawer Face"),
+    # R3 (PR #31) — explicit drawer-front cut for drawer banks. The legacy
+    # "door" panel is overloaded to mean "door or drawer face" but
+    # door() in shared.southbrook_dims returns None for door_count==0
+    # (drawer banks), leaving the cutlist short one row vs the
+    # test_p1_auto_emit_cutlist + test_build_from_order_line expectation.
+    # Emitting drawer_front explicitly closes that gap without disturbing
+    # shared.southbrook_dims (G2-locked) or the "door" panel contract.
+    ("drawer_front", "Drawer Front"),
 ]
 
 SUBSTRATE_CHOICES = [
@@ -64,6 +72,7 @@ DEFAULT_SUBSTRATE_BY_PANEL = {
     "back": "hardboard_1_4",
     "adjustable_shelf": "melamine_white_5_8",
     "door": "ply_3_4",
+    "drawer_front": "ply_3_4",
 }
 
 
@@ -141,6 +150,7 @@ class SbCutlist(models.Model):
         self,
         cutlist,
         panel_dict: Dict[str, Any],
+        drawer_count: int = 0,
     ):
         """Create sb.cutlist.line records from a shared.southbrook_dims
         panel_cut_list() output dict.
@@ -150,6 +160,15 @@ class SbCutlist(models.Model):
         tuple, and emitting it as a cutlist line would create a phantom
         panel that the shop floor would then try to cut. That contract is
         enforced here AND in the corresponding G1 test.
+
+        drawer_count (R3 PR #31) — when > 0, a single drawer_front line
+        is emitted in addition to the base panels. Geometry is derived
+        from the cabinet bounding box (side_L gives height/depth, top
+        gives inside_width) using the canonical DOOR_REVEAL convention.
+        This closes the test_p1_auto_emit_cutlist + test_build_from_order_line
+        gap (cutlist used to stop at 6 records for drawer banks because
+        shared.southbrook_dims.door() returns None for door_count==0)
+        without disturbing shared.southbrook_dims (G2-locked).
         """
         Line = self.env["sb.cutlist.line"]
         keys_to_emit = ("side_L", "side_R", "top", "bottom", "back",
@@ -191,6 +210,46 @@ class SbCutlist(models.Model):
                 ),
             })
 
+        # R3 — drawer-front emission for drawer banks (door_count==0,
+        # drawer_count>0). Derive geometry locally from the panel_dict's
+        # already-validated tuples so we never re-import the G2-locked
+        # shared module constants here.
+        if drawer_count and drawer_count > 0:
+            side = panel_dict.get("side_L")
+            top_panel = panel_dict.get("top")
+            if (side and top_panel
+                    and isinstance(side, tuple) and len(side) == 3
+                    and isinstance(top_panel, tuple) and len(top_panel) == 3):
+                cabinet_height_mm = side[0]
+                # top tuple is (inside_width_mm, depth_mm, thickness_mm).
+                cabinet_inside_width_mm = top_panel[0]
+                # Uniform 3mm reveal between drawer faces and at top/bottom
+                # mirrors shared.southbrook_dims.DOOR_REVEAL without
+                # importing it. Each face: (cabinet_h - (N+1)*reveal) / N.
+                reveal_mm = 3.0
+                door_th_mm = 18.0
+                face_height_mm = (
+                    cabinet_height_mm - (drawer_count + 1) * reveal_mm
+                ) / drawer_count
+                # Reuse the inside-width measurement — drawer faces span
+                # the full width minus side-reveal (handled in inside_width
+                # already; no further subtraction needed).
+                face_width_mm = cabinet_inside_width_mm
+                Line.create({
+                    "cutlist_id": cutlist.id,
+                    "panel_name": "drawer_front",
+                    "qty": drawer_count,
+                    "length_mm": face_height_mm,
+                    "width_mm": face_width_mm,
+                    "thickness_mm": door_th_mm,
+                    "substrate": DEFAULT_SUBSTRATE_BY_PANEL.get(
+                        "drawer_front", "ply_3_4"),
+                    "grain_dir": "with_grain",
+                    "edge_banding_config": json.dumps(
+                        self._default_edge_banding("drawer_front")
+                    ),
+                })
+
     def _default_edge_banding(self, panel_name: str) -> Dict[str, bool]:
         """Phase-1 edge-banding default per panel. Per-edge precision
         lands when the Accucutt-style nest spec is finalised (Module 4
@@ -199,7 +258,8 @@ class SbCutlist(models.Model):
             return {"front": True, "back": False, "left": False, "right": False}
         if panel_name in ("side_L", "side_R"):
             return {"front": True, "back": False, "left": False, "right": False}
-        if panel_name == "door":
+        if panel_name in ("door", "drawer_front"):
+            # Drawer faces band all four edges like doors.
             return {"front": True, "back": True, "left": True, "right": True}
         return {"front": False, "back": False, "left": False, "right": False}
 

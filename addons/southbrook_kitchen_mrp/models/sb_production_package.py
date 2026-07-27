@@ -164,7 +164,12 @@ class SbProductionPackage(models.Model):
             family=cabinet_family, door_count=door_count,
         )
         cutlist = Cutlist.create({"mo_id": mo.id})
-        Cutlist.generate_lines_from_panel_dict(cutlist, panel_dict)
+        # R3 PR #31 — pass drawer_count so the generator emits a drawer_front
+        # cutlist line for drawer banks (closes the 6-vs-7-row gap that
+        # test_p1_auto_emit_cutlist + test_build_from_order_line surfaced).
+        Cutlist.generate_lines_from_panel_dict(
+            cutlist, panel_dict, drawer_count=drawer_count or 0,
+        )
 
         # 2. Hardware — resolve picks and build the package. P2 threads
         # the configurator's chosen Drawer Slide SKU through so the BoM
