@@ -67,6 +67,25 @@ class TestTemplatePicker(TransactionCase):
         self.assertFalse(design.cabinet_line_ids)
         self.assertEqual(design.state, "draft")
 
+    def test_24in_range_option_instantiates(self):
+        # 2026-07-27 (John): 24" apartment-size range was missing from
+        # the appliance dropdown. Pin: option exists and flows through
+        # appliance_widths to the design line.
+        field = self.env["kitchen.design.template.picker"]._fields[
+            "range_width_in"]
+        self.assertIn("24", [k for k, _ in field.selection])
+        picker = self.env["kitchen.design.template.picker"].create({
+            "template_id": self.tpl.id,
+            "module_width_in": "24",
+            "range_width_in": "24",
+        })
+        picker.action_create()
+        design = self.env["southbrook.kitchen.design"].search(
+            [], order="id desc", limit=1)
+        appl = design.cabinet_line_ids.filtered(
+            lambda l: l.cabinet_type == "appliance")
+        self.assertEqual(appl.width_in, 24.0)
+
     def test_thumbnail_svg_generated(self):
         svg = self.tpl._generate_thumbnail_svg()
         self.assertTrue(svg.startswith("<svg"))

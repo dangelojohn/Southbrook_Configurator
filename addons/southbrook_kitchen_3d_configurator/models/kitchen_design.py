@@ -2632,7 +2632,10 @@ class SouthbrookKitchenDesignTemplatePicker(models.TransientModel):
         [("18", '18"'), ("21", '21"'), ("24", '24"'), ("30", '30"')],
         string="Cabinet Size", default="24", required=True)
     range_width_in = fields.Selection(
-        [("0", "No range"), ("30", '30"'), ("36", '36"'), ("48", '48"')],
+        # 24" apartment-size range added 2026-07-27 (John: missing from
+        # the sample-template picker).
+        [("0", "No range"), ("24", '24"'), ("30", '30"'), ("36", '36"'),
+         ("48", '48"')],
         string="Range / Stove", default="30")
     fridge_width_in = fields.Selection(
         [("0", "No fridge"), ("30", '30"'), ("33", '33"'), ("36", '36"')],
