@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.5.25.0",
+    "version": "19.0.5.26.0",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -39,6 +39,10 @@
         "views/product_template_views.xml",
         "views/kitchen_design_views.xml",
         "views/kitchen_configurator_views.xml",
+        # Kitchen Templates T1 — prebuilt sample kitchen data models.
+        # MUST LOAD AFTER kitchen_configurator_views.xml (menuitem
+        # parent="menu_sbk_root" is defined there).
+        "views/kitchen_template_views.xml",
         "data/demo_cabinets.xml",
         # v19.0.4.21.0 — audit P0#2 fix. Tags the 11 canonical
         # cabinet templates owned by southbrook_estimating with

@@ -62,3 +62,8 @@ from . import test_zone_corner_l_shape_fixes
 # concurrently-landed validator checks MOTION_ENVELOPE_COLLISION and
 # CORNER_FILLER_MISSING.
 from . import test_collision_matrix
+
+# Kitchen Templates T1 (2026-07-27) — southbrook.kitchen.template +
+# .line model regression pins: slot zone default, is_appliance_slot,
+# layout_shape lexicon reuse from southbrook.room, unique code.
+from . import test_kitchen_template_model

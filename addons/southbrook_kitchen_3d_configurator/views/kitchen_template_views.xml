@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kitchen Templates T1 — southbrook.kitchen.template + .line views + menu.
+  Slots reference archetype/role, not fixed SKUs; T2's resolver maps
+  slot -> product at instantiation. No geometry fields are edited here —
+  wall + run_seq is the spatial contract, the auto-arrange engine derives
+  every pose. See docs/superpowers/specs/2026-07-27-kitchen-templates-design.md
+-->
+<odoo>
+
+    <!-- Kitchen Template – List ─────────────────────────────────────────────── -->
+    <record id="view_sbk_kitchen_template_list" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.template.list</field>
+        <field name="model">southbrook.kitchen.template</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="not active">
+                <field name="active" column_invisible="1"/>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="layout_shape"/>
+                <field name="default_module_width_in" string="Module Width (in)"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Kitchen Template – Form ─────────────────────────────────────────────── -->
+    <record id="view_sbk_kitchen_template_form" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.template.form</field>
+        <field name="model">southbrook.kitchen.template</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon"
+                            title="Archived"
+                            bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <field name="thumbnail" widget="image" class="oe_avatar"
+                           options="{'size': [128, 128]}"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Template Name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="code"/>
+                            <field name="layout_shape"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group string="Default Room (in)">
+                            <field name="default_room_width_in"/>
+                            <field name="default_room_depth_in"/>
+                            <field name="default_room_height_in"/>
+                            <field name="default_module_width_in"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Cabinet Count Bounds">
+                            <field name="min_cabinet_count"/>
+                            <field name="max_cabinet_count"/>
+                        </group>
+                        <group string="Defaults">
+                            <field name="default_filler_strategy"/>
+                            <field name="default_wall_cab_top_alignment"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="Description…"/>
+                    <notebook>
+                        <page string="Slots" name="slots">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="slot_code"/>
+                                    <field name="cabinet_type"/>
+                                    <field name="appliance_type"
+                                           invisible="cabinet_type != 'appliance'"/>
+                                    <field name="wall"/>
+                                    <field name="run_seq"/>
+                                    <field name="nominal_width_in"/>
+                                    <field name="archetype_id"/>
+                                    <field name="product_id"/>
+                                    <field name="repeat_ok"/>
+                                    <field name="priority"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                    <field name="notes" placeholder="Template notes…"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Kitchen Template – Action ───────────────────────────────────────────── -->
+    <record id="action_sbk_kitchen_templates" model="ir.actions.act_window">
+        <field name="name">Kitchen Templates</field>
+        <field name="res_model">southbrook.kitchen.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_sbk_kitchen_templates"
+              name="Kitchen Templates"
+              parent="menu_sbk_root"
+              action="action_sbk_kitchen_templates"
+              sequence="35"/>
+
+</odoo>

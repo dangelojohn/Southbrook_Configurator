@@ -1,5 +1,8 @@
 from . import res_groups
 from . import product_template, kitchen_design
+# Kitchen Templates T1 — imports kitchen_design (ZONE_SELECTION,
+# _ZONE_FROM_CABINET_TYPE), so must load after it.
+from . import kitchen_template
 # Recommendation D · Sprint 1 unification bridge
 from . import sale_order_line, southbrook_room, reconcile
 # Recommendation D · Sprint 2c · sale.order "Open in 3D"
