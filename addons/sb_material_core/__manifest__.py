@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 {
     "name": "Southbrook Materials — Core",
-    "version": "19.0.1.9.0",
+    "version": "19.0.1.12.0",
     "category": "Manufacturing",
     "summary": "Material master (extends kitchen material): family taxonomy, "
                "effective density, weight_source, per-family waste.",
