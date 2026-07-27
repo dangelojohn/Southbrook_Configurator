@@ -31,12 +31,18 @@ SHELF_TOL: float = 1.5        # hand-placement clearance, subtracted from inside
 SHELF_VENT_GAP: float = 12.7  # 1/2" ventilation gap subtracted from depth at the back
 TOEKICK_H: float = 101.6      # 4" — toe-kick height (integrated into sides, see toe_kick())
 
-# Round-2 misc fix: `drawer` added to align with southbrook_estimating's
-# `mrp_bom.TOEKICK_FAMILIES` — drawer banks sit on the same toe-kick line
-# as base / sink / tall / vanity cabinets and therefore need toe-kick
-# panels. The G1 parity gate (test_bom_contents.test_constants_parity)
-# enforces this set is identical across the two sources of truth.
-TOEKICK_FAMILIES = frozenset({"base", "sink", "tall", "vanity", "drawer"})
+# Parity mirror of southbrook_estimating.mrp_bom.TOEKICK_FAMILIES; the G1
+# gate (test_bom_contents.test_constants_parity) enforces the two sets are
+# identical.
+#
+# `drawer` is deliberately ABSENT. It was present until 52339aa
+# (2026-06-30, "TOEKICK 'drawer' removal … per Q8 spec"), which removed it
+# from the estimating side on purpose. A later round-2 branch re-added it
+# here claiming it aligned with estimating — it did not, and re-adding it
+# both broke the parity gate and silently changed drawer-bank cut lists
+# (toe_kick() below emits a panel for every family in this set). Do not
+# re-add without a Q8 spec change on BOTH sides.
+TOEKICK_FAMILIES = frozenset({"base", "sink", "tall", "vanity"})
 
 PanelCut = Tuple[float, float, float]
 
