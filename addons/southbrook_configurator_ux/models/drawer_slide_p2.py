@@ -80,6 +80,36 @@ class DrawerSlideSeed(models.AbstractModel):
     _description = "P2 — Drawer Slide attribute + values + per-template wiring"
 
     @api.model
+    def _file_under_construction_step(self, tmpl, line, construction_attr):
+        """Put ``line`` in the same config step as Drawer Construction.
+
+        A ``product.template.attribute.line`` that belongs to no
+        ``product.config.step.line`` is not merely untidy — the wizard
+        renders every unstepped attribute as a flat-list scroll instead
+        of under its tab, so the option is effectively unreachable.
+        southbrook_estimating's
+        test_audit_phase2.test_03_step_lines_partition_all_attribute_lines
+        enforces the partition (every attribute line in exactly one step).
+
+        Drawer Slide is the same concern as Drawer Construction, so it
+        belongs in whichever step already holds it. Idempotent, and a
+        no-op when the template has no steps (nothing to violate) or
+        the line is already filed.
+        """
+        step_lines = tmpl.config_step_line_ids
+        if not step_lines:
+            return
+        target = step_lines.filtered(
+            lambda sl: construction_attr.id in
+            sl.attribute_line_ids.mapped("attribute_id").ids
+        )[:1]
+        if not target:
+            return
+        if line.id in target.attribute_line_ids.ids:
+            return
+        target.attribute_line_ids = [(4, line.id)]
+
+    @api.model
     def seed_drawer_slide_attribute(self):
         """Idempotent seed for the P2 Drawer Slide attribute.
 
@@ -138,12 +168,16 @@ class DrawerSlideSeed(models.AbstractModel):
                     existing_line.value_ids = [
                         (4, v.id) for v in values_by_name.values()
                     ]
-                    continue
-                TmplAttrLine.create({
-                    "product_tmpl_id": tmpl.id,
-                    "attribute_id": attribute.id,
-                    "value_ids": [(6, 0, [v.id for v in values_by_name.values()])],
-                })
+                    line = existing_line
+                else:
+                    line = TmplAttrLine.create({
+                        "product_tmpl_id": tmpl.id,
+                        "attribute_id": attribute.id,
+                        "value_ids": [
+                            (6, 0, [v.id for v in values_by_name.values()])],
+                    })
+                self._file_under_construction_step(
+                    tmpl, line, construction_attr)
 
         # Backfill price/weight on the per-template attribute values.
         for name, _sku, _is_sc, price, weight in DRAWER_SLIDE_OPTIONS:
