@@ -27,6 +27,7 @@
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="total_cabinets"/>
+                <field name="filler_count" optional="hide"/>
                 <field name="estimated_price" widget="monetary"/>
                 <field name="currency_id" column_invisible="1"/>
                 <field name="state" widget="badge"
@@ -325,6 +326,9 @@
                         <field name="base_count"      readonly="1"/>
                         <field name="wall_count"      readonly="1"/>
                         <field name="total_cabinets"  readonly="1"/>
+                        <!-- T6: fillers are counted separately — a 3"
+                             strip is not a cabinet on quote or floor. -->
+                        <field name="filler_count"    readonly="1"/>
                         <field name="remainder_in"    readonly="1"/>
                         <field name="estimated_price" readonly="1" widget="monetary"/>
                         <field name="currency_id"     invisible="1"/>

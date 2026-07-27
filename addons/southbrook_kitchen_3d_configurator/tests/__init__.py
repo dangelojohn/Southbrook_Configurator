@@ -84,3 +84,7 @@ from . import test_layout_manipulation
 # width 33->36, RH twin) + the L-10X8 flagship: engine-derived corner,
 # hand-aware variant pick, flip swaps LH->RH.
 from . import test_corner_repair
+
+# Kitchen Templates T6 (2026-07-27) — total_cabinets excludes fillers;
+# filler_count carries the strips; price semantics unchanged.
+from . import test_totals_filler_exclusion

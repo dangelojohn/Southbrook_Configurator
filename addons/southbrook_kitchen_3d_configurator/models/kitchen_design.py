@@ -98,7 +98,11 @@ class SouthbrookKitchenDesign(models.Model):
     )
 
     # ── Computed summary ────────────────────────────────────────────────────────
+    # T6 (kitchen templates): total_cabinets counts CABINETS only —
+    # filler strips are carried separately in filler_count. Price keeps
+    # filler lines (they are real BOM-reaching lines).
     total_cabinets   = fields.Integer(compute="_compute_totals", store=True)
+    filler_count     = fields.Integer(compute="_compute_totals", store=True)
     estimated_price  = fields.Monetary(compute="_compute_totals", store=True)
     base_count       = fields.Integer(compute="_compute_totals", store=True)
     wall_count       = fields.Integer(compute="_compute_totals", store=True)
@@ -387,9 +391,13 @@ class SouthbrookKitchenDesign(models.Model):
             if lines:
                 base_lines = lines.filtered(lambda l: l.cabinet_type == "base")
                 wall_lines = lines.filtered(lambda l: l.cabinet_type == "wall")
+                cab_lines = lines.filtered(
+                    lambda l: l.cabinet_type != "filler")
                 design.base_count      = sum(base_lines.mapped("quantity"))
                 design.wall_count      = sum(wall_lines.mapped("quantity"))
-                design.total_cabinets  = sum(lines.mapped("quantity"))
+                design.total_cabinets  = sum(cab_lines.mapped("quantity"))
+                design.filler_count    = sum(
+                    (lines - cab_lines).mapped("quantity"))
                 design.estimated_price = sum(
                     l.quantity * l.price_unit for l in lines
                 )
@@ -406,9 +414,15 @@ class SouthbrookKitchenDesign(models.Model):
                 wall_ol = order_lines.filtered(
                     lambda l: l.product_id.product_tmpl_id.southbrook_cabinet_type == "wall"
                 )
+                cab_ol = order_lines.filtered(
+                    lambda l: l.product_id.product_tmpl_id
+                    .southbrook_cabinet_type != "filler"
+                )
                 design.base_count      = sum(base_ol.mapped("product_uom_qty"))
                 design.wall_count      = sum(wall_ol.mapped("product_uom_qty"))
-                design.total_cabinets  = sum(order_lines.mapped("product_uom_qty"))
+                design.total_cabinets  = sum(cab_ol.mapped("product_uom_qty"))
+                design.filler_count    = sum(
+                    (order_lines - cab_ol).mapped("product_uom_qty"))
                 design.estimated_price = sum(order_lines.mapped("price_subtotal"))
             # Remainder: width minus base cabinet modules
             module_w = 24.0
