@@ -320,14 +320,16 @@
                     <td class="val" colspan="2" style="text-align:center;" t-out="o.sbk_label_hinge or ''"/>
                     <td class="val" style="text-align:center;" t-out="o.sbk_label_fin or ''"/>
                 </tr>
-                <!-- W007 — engineering revision row. Conditional on
-                     pg_revision_code being non-empty so MOs that pre-date
-                     the PG-112 traceability stamp render unchanged.
-                     `pg_revision_code` is a related field added by the
-                     sibling product_graph_release addon; on databases
-                     where that addon isn't installed `hasattr(o, ...)`
-                     short-circuits to False and the row is omitted. -->
-                <tr class="sbk-rev-row" t-if="hasattr(o, 'pg_revision_code') and o.pg_revision_code">
+                <!-- W007 — engineering revision row. The pg_revision_code
+                     field is declared on mrp.production by this addon's
+                     product-graph integration, so it always exists; we just
+                     gate on truthiness so MOs that pre-date the PG-112
+                     traceability stamp (or that haven't been stamped yet)
+                     render without the Rev row.
+                     NOTE: do NOT use `hasattr(o, ...)` here — QWeb does
+                     not expose Python's hasattr in template expressions
+                     and it raises KeyError: 'hasattr' at render time. -->
+                <tr class="sbk-rev-row" t-if="o.pg_revision_code">
                     <td colspan="4">Rev: <span t-out="o.pg_revision_code"/></td>
                 </tr>
             </table>
