@@ -2109,7 +2109,10 @@ SouthbrookKitchenConfigurator.template = xml`
           </div>
           <div class="o_sbk_prod_info">
             <strong t-esc="product.name"/>
-            <small><t t-esc="product.cabinet_type"/> | <t t-esc="product.material"/></small>
+            <!-- Typo-spec item 7 — this caption now ellipsizes on overflow
+                 (scss); the title= gives the full type/material on hover
+                 so the row-level title above only has to cover the name. -->
+            <small t-att-title="product.cabinet_type + ' | ' + product.material"><t t-esc="product.cabinet_type"/> | <t t-esc="product.material"/></small>
             <!-- D17 — Archetype taxonomy badge when the template is
                  mapped to a Southbrook cabinet archetype. -->
             <span t-if="product.archetype_code" class="o_sbk_arch_badge"

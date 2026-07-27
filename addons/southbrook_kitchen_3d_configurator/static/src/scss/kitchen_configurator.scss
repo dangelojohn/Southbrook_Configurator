@@ -3,7 +3,13 @@ $sbk-black:      #111111;
 $sbk-dark:       #1A1A1A;
 $sbk-ink:        #1A1A1A;  // alias for input/text foreground; used on lines 330/353/860 (added 2026-06-30 to unbreak web.assets_web SCSS compile)
 $sbk-mid:        #4A4E57;
-$sbk-muted:      #888D96;
+// Typo-spec item 6 — $sbk-muted (#888D96) measured ~3.34:1 on white, fails
+// AA (4.5:1) for small text. Pointing the variable at the shared
+// --sb-ink-dim token (#6B7280 in the design-tokens :root block) resolves
+// to ~4.83:1 and fixes every $sbk-muted consumer in this file in one edit
+// (.o_sbk_brand_label, .o_sbk_room_dim_label, .o_sbk_inv_header, etc.)
+// without redefining the token locally.
+$sbk-muted:      var(--sb-ink-dim);
 $sbk-border:     #DDD8D0;
 $sbk-bg:         #F5F2EE;
 $sbk-white:      #FFFFFF;
@@ -19,7 +25,10 @@ $sbk-amber:      #B45309;
     flex-direction: column;
     min-height: calc(100vh - 48px);
     background: $sbk-bg;
-    font-family: 'Space Mono', ui-monospace, monospace;
+    // Typo-spec item 1 — was a hardcoded monospace-family stack (the
+    // 70% fix per the audit). Display font for all text; numeric/code
+    // data opts into var(--sb-font-mono) explicitly per-class below.
+    font-family: var(--sb-font-display);
     color: $sbk-dark;
 }
 
@@ -58,16 +67,20 @@ $sbk-amber:      #B45309;
 }
 
 .o_sbk_brand_label {
-    font-size: 9px;
+    // Typo-spec item 4 — section-header (eyebrow) scale: 11px/700/uppercase/1px.
+    // The 3px letter-spacing was the outlier vs. the other eyebrow labels.
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 3px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
     color: $sbk-muted;
 }
 
 .o_sbk_title {
-    font-size: 15px;
+    // Typo-spec item 4 — page title: 16px/700/-0.1px.
+    font-size: 16px;
     font-weight: 700;
-    letter-spacing: 0.2px;
+    letter-spacing: -0.1px;
     margin: 0;
     color: $sbk-dark;
 }
@@ -92,9 +105,10 @@ $sbk-amber:      #B45309;
 }
 
 .o_sbk_room_dim_label {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 1.2px;
+    // Typo-spec item 4 — field-label scale: 12px/600/uppercase/0.5px.
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
     color: $sbk-muted;
 }
@@ -109,8 +123,9 @@ $sbk-amber:      #B45309;
     width: 62px;
     padding: 4px 6px;
     border: 1px solid $sbk-border;
-    border-radius: 3px;
-    font-family: inherit;
+    border-radius: var(--sb-radius);
+    // Typo-spec item 2 — room-dimension inputs are numeric data → mono token.
+    font-family: var(--sb-font-mono);
     font-size: 12px;
     font-weight: 600;
     color: $sbk-dark;
@@ -124,8 +139,8 @@ $sbk-amber:      #B45309;
     }
 
     &:focus-visible {
-        outline: 2px solid rgba(24, 102, 212, 0.4);
-        outline-offset: 0;
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
         border-color: $sbk-accent;
     }
 }
@@ -146,16 +161,24 @@ $sbk-amber:      #B45309;
 }
 
 .o_sbk_btn {
-    padding: 7px 14px;
+    // Typo-spec item 4 — body/control-text scale (13px/500) for buttons.
+    // Item 5 — shared button radius token + min-height 32px tap target.
+    padding: 8px 14px;
+    min-height: 32px;
     font-family: inherit;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.4px;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
     border: none;
-    transition: all 0.12s;
+    border-radius: var(--sb-radius-btn);
+    transition: var(--sb-transition);
 
     &:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
+    }
 
     &.o_sbk_btn_ghost {
         background: transparent;
@@ -224,9 +247,10 @@ $sbk-amber:      #B45309;
     overflow-y: auto;
 
     h3 {
+        // Typo-spec item 4 — section-header (eyebrow) scale: 11px/700/1px.
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 1.5px;
+        letter-spacing: 1px;
         color: $sbk-muted;
         text-transform: uppercase;
         margin: 0 0 16px;
@@ -241,19 +265,33 @@ $sbk-amber:      #B45309;
     color: $sbk-mid;
     cursor: default;
 
-    span { font-weight: 700; }
+    // Typo-spec item 4 — field-label scale: 12px/600/uppercase/0.5px.
+    span {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 
+    // Typo-spec item 4/5 — body/control-text scale (13px/500); shared
+    // input radius token + border color token; standardized focus ring.
     input {
         width: 100%;
-        border: 1px solid $sbk-border;
+        border: 1px solid var(--sb-border);
+        border-radius: var(--sb-radius);
         padding: 7px 10px;
         font-family: inherit;
         font-size: 13px;
+        font-weight: 500;
         color: $sbk-dark;
         background: $sbk-white;
         outline: none;
 
-        &:focus { border-color: $sbk-accent; }
+        &:focus-visible {
+            outline: 2px solid var(--sb-blue);
+            outline-offset: 2px;
+            border-color: $sbk-accent;
+        }
     }
 }
 
@@ -285,7 +323,11 @@ $sbk-amber:      #B45309;
 
     strong {
         display: block;
+        // Typo-spec item 4 — big metric numbers keep ~22px/700 but move to
+        // the display font (explicit, not just inherited from root).
+        font-family: var(--sb-font-display);
         font-size: 22px;
+        font-weight: 700;
         color: $sbk-dark;
         line-height: 1.1;
         margin-bottom: 2px;
@@ -346,8 +388,12 @@ $sbk-amber:      #B45309;
 }
 
 .o_sbk_mark {
+    // Typo-spec item 2 — numeric ruler tick, bare monospace → mono token.
+    // Left at 9px: this is a compact overlay label on the 3D canvas, not
+    // one of the inventory-row data fields the spec calls out for the
+    // 12px minimum bump.
     font-size: 9px;
-    font-family: monospace;
+    font-family: var(--sb-font-mono);
     color: rgba(26, 102, 212, 0.8);
     background: rgba(255,255,255,0.75);
     padding: 2px 5px;
@@ -393,9 +439,10 @@ $sbk-amber:      #B45309;
 }
 
 .o_sbk_inv_cat_label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1px;
+    // Typo-spec item 4 — field-label scale: 12px/600/uppercase/0.5px.
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
     color: $sbk-muted;
     white-space: nowrap;
@@ -404,19 +451,20 @@ $sbk-amber:      #B45309;
 .o_sbk_inv_cat_select {
     flex: 1;
     padding: 5px 8px;
-    border: 1px solid $sbk-border;
-    border-radius: 4px;
+    border: 1px solid var(--sb-border);
+    border-radius: var(--sb-radius);
     background: $sbk-white;
     color: $sbk-dark;
     font-family: inherit;
-    font-size: 12px;
-    font-weight: 600;
+    // Typo-spec item 4 — body/control-text scale (13px/500).
+    font-size: 13px;
+    font-weight: 500;
     line-height: 1.2;
     cursor: pointer;
 
     &:focus-visible {
-        outline: 2px solid rgba(24, 102, 212, 0.4);
-        outline-offset: 0;
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
         border-color: $sbk-accent;
     }
 }
@@ -428,15 +476,17 @@ $sbk-amber:      #B45309;
 .o_sbk_inv_search_input {
     width: 100%;
     padding: 7px 32px 7px 28px;
-    border: 1px solid rgba(0,0,0,0.15);
-    border-radius: 4px;
+    border: 1px solid var(--sb-border);
+    border-radius: var(--sb-radius);
     background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") 8px center no-repeat;
+    // Typo-spec item 4 — body/control-text scale (13px/500).
     font-size: 13px;
+    font-weight: 500;
     color: $sbk-ink;
     line-height: 1;
     &:focus-visible {
-        outline: 2px solid rgba(26, 102, 212, 0.55);
-        outline-offset: 0;
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
         border-color: rgba(26, 102, 212, 0.45);
     }
     &::-webkit-search-cancel-button { display: none; }
@@ -454,15 +504,20 @@ $sbk-amber:      #B45309;
     font-size: 16px;
     cursor: pointer;
     line-height: 1;
-    border-radius: 4px;
+    border-radius: var(--sb-radius);
+    transition: var(--sb-transition);
     &:hover { background: rgba(0,0,0,0.06); color: $sbk-ink; }
+    &:focus-visible {
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
+    }
 }
 .o_sbk_inv_draghint {
     margin: 0 0 8px;
     padding: 6px 10px;
     background: rgba(26, 102, 212, 0.06);
     border: 1px dashed rgba(26, 102, 212, 0.30);
-    border-radius: 4px;
+    border-radius: var(--sb-radius);
     font-size: 11px;
     color: #0f3a8a;
     text-align: center;
@@ -533,19 +588,26 @@ $sbk-amber:      #B45309;
     color: #4a5568;
 }
 .o_sbk_onboard_cta {
+    // Typo-spec item 5 — CTA button: shared button radius token, min-height
+    // tap target, standardized transition + focus ring.
     margin-top: 6px;
     padding: 7px 12px;
+    min-height: 32px;
     background: #1866d4;
     color: white;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--sb-radius-btn);
     cursor: pointer;
     font-weight: 600;
     font-size: 12px;
     text-align: left;
     align-self: flex-start;
-    transition: background-color 0.12s ease;
+    transition: var(--sb-transition);
     &:hover { background: #0f3a8a; }
+    &:focus-visible {
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
+    }
 }
 
 // D10 — BOM-missing banner in selected-cabinet drawer
@@ -566,14 +628,20 @@ $sbk-amber:      #B45309;
 .o_sbk_bom_warn_btn {
     margin-left: auto;
     padding: 4px 10px;
+    min-height: 32px;
     background: #c0492f;
     color: white;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--sb-radius-btn);
     cursor: pointer;
     font-size: 11px;
     font-weight: 600;
+    transition: var(--sb-transition);
     &:hover { background: #9c3a25; }
+    &:focus-visible {
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
+    }
 }
 
 // D8 (+forward-compat D12) — layout validation warnings panel
@@ -621,19 +689,20 @@ $sbk-amber:      #B45309;
     align-items: center;
     width: 100%;
     padding: 7px 10px;
+    min-height: 32px;
     background: rgba(30, 158, 106, 0.10);
     border: 1px solid rgba(30, 158, 106, 0.35);
     color: #1e9e6a;
-    border-radius: 4px;
+    border-radius: var(--sb-radius-btn);
     font-size: 12px;
     font-weight: 600;
     text-align: left;
     cursor: pointer;
-    transition: background-color 0.12s ease;
+    transition: var(--sb-transition);
     &:hover { background: rgba(30, 158, 106, 0.18); }
     &:focus-visible {
-        outline: 2px solid rgba(30, 158, 106, 0.55);
-        outline-offset: 1px;
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
     }
 }
 
@@ -646,10 +715,12 @@ $sbk-amber:      #B45309;
     line-height: 30px;
     font-size: 11px;
     color: #6c757d;
-    border-radius: 4px;
+    border-radius: var(--sb-radius);
     background: rgba(108, 117, 125, 0.10);
     margin-right: 8px;
-    font-family: -apple-system, "Inter", sans-serif;
+    // Typo-spec item 3 — was a system-UI font stack that rendered as the
+    // OS default display face on macOS. Use the shared display-font token.
+    font-family: var(--sb-font-display);
     white-space: nowrap;
     &.is-ok {
         color: #1e9e6a;
@@ -669,9 +740,10 @@ $sbk-amber:      #B45309;
     text-decoration: underline;
     cursor: pointer;
     align-self: flex-start;
+    transition: color var(--sb-transition);
     &:hover { color: #0f3a8a; }
     &:focus-visible {
-        outline: 2px solid rgba(26, 102, 212, 0.55);
+        outline: 2px solid var(--sb-blue);
         outline-offset: 2px;
         border-radius: 2px;
     }
@@ -723,21 +795,26 @@ $sbk-amber:      #B45309;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     z-index: 8;
 }
+// Typo-spec item 5 — .o_sbk_viewbtn aligned to the shared button radius
+// token (documented exception call-out in the spec); count-strip pill
+// (999px, below) is the only shape left as an intentional exception.
 .o_sbk_viewbtn {
     display: flex;
     align-items: center;
     gap: 6px;
     width: 56px;
+    min-height: 32px;
     padding: 6px 8px;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 5px;
+    border-radius: var(--sb-radius-btn);
     cursor: pointer;
     color: #1a2233;
-    font-family: -apple-system, "Inter", sans-serif;
+    // Typo-spec item 3 — was a system-UI font stack (macOS default display face).
+    font-family: var(--sb-font-display);
     font-size: 12px;
     line-height: 1;
-    transition: background-color 0.12s ease, border-color 0.12s ease;
+    transition: var(--sb-transition);
 }
 .o_sbk_viewbtn:hover {
     background: rgba(26, 102, 212, 0.08);
@@ -750,8 +827,8 @@ $sbk-amber:      #B45309;
     font-weight: 600;
 }
 .o_sbk_viewbtn:focus-visible {
-    outline: 2px solid rgba(26, 102, 212, 0.55);
-    outline-offset: 1px;
+    outline: 2px solid var(--sb-blue);
+    outline-offset: 2px;
 }
 .o_sbk_viewicon {
     font-size: 16px;
@@ -760,7 +837,8 @@ $sbk-amber:      #B45309;
 }
 .o_sbk_viewkey {
     margin-left: auto;
-    font-family: monospace;
+    // Typo-spec item 2 — keyboard-shortcut key label, bare monospace → mono token.
+    font-family: var(--sb-font-mono);
     font-size: 10px;
     opacity: 0.55;
 }
@@ -775,11 +853,12 @@ $sbk-amber:      #B45309;
     bottom: 12px;
     right: 14px;
     font-size: 9px;
-    font-family: monospace;
+    // Typo-spec item 2 — keyboard-shortcut hint text, bare monospace → mono token.
+    font-family: var(--sb-font-mono);
     color: rgba(0,0,0,0.55);
     background: rgba(255,255,255,0.85);
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--sb-radius);
     z-index: 5;
     pointer-events: none;
     max-width: 360px;
@@ -794,10 +873,11 @@ $sbk-amber:      #B45309;
     flex-direction: column;
     overflow: hidden;
 
+    // Typo-spec item 4 — section-header (eyebrow) scale: 11px/700/1px.
     h3 {
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 1.5px;
+        letter-spacing: 1px;
         color: $sbk-muted;
         text-transform: uppercase;
         margin: 0;
@@ -809,12 +889,16 @@ $sbk-amber:      #B45309;
 
 .o_sbk_inv_header {
     display: grid;
-    grid-template-columns: 1fr 38px 36px 34px 52px;
+    // Typo-spec item 7 — minmax floor on the name column so it can't be
+    // squeezed to near-zero by the fixed data columns to its right.
+    grid-template-columns: minmax(60px, 1fr) 38px 36px 34px 52px;
     padding: 5px 10px;
     background: #F8F5F1;
-    font-size: 9px;
+    // Typo-spec item 4 — section-header (eyebrow) scale: 11px/700/1px.
+    font-size: 11px;
+    font-weight: 700;
     color: $sbk-muted;
-    letter-spacing: 0.6px;
+    letter-spacing: 1px;
     border-bottom: 1px solid $sbk-border;
     text-transform: uppercase;
     flex-shrink: 0;
@@ -827,7 +911,9 @@ $sbk-amber:      #B45309;
 
 .o_sbk_product_row {
     display: grid;
-    grid-template-columns: 36px 1fr 38px 36px 34px 52px;
+    // Typo-spec item 7 — same minmax floor as .o_sbk_inv_header so the
+    // name/material column keeps enough room to avoid mid-word clipping.
+    grid-template-columns: 36px minmax(60px, 1fr) 38px 36px 34px 52px;
     align-items: center;
     gap: 6px;
     padding: 8px 10px;
@@ -838,13 +924,20 @@ $sbk-amber:      #B45309;
     text-align: left;
     cursor: pointer;
     width: 100%;
-    transition: background 0.1s;
+    transition: var(--sb-transition);
 
     &:hover  { background: #FAFAF7; }
 
     &.is-selected {
         background: $sbk-accent-bg;
         border-left-color: $sbk-accent;
+    }
+
+    // Typo-spec item 5/acceptance — every interactive element needs a
+    // visible focus ring; this row is a <button> with no prior :focus style.
+    &:focus-visible {
+        outline: 2px solid var(--sb-blue);
+        outline-offset: -2px;
     }
 }
 
@@ -870,25 +963,40 @@ $sbk-amber:      #B45309;
     overflow: hidden;
 
     strong, small { display: block; }
+    // Typo-spec item 4 — product names are body/control text: 13px/500.
     strong {
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 13px;
+        font-weight: 500;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         color: $sbk-dark;
     }
-    small { font-size: 9px; color: $sbk-muted; }
+    // Typo-spec item 7 — the cabinet_type | material caption had no
+    // overflow handling of its own, so long values (e.g. a material name)
+    // were hard-clipped mid-word by the parent's `overflow: hidden`
+    // instead of ellipsizing. Give it the same single-line ellipsis
+    // treatment as `strong`; the JS side adds a title= with the full text.
+    small {
+        font-size: 9px;
+        color: $sbk-muted;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
 
-.o_sbk_prod_sku   { font-size: 9px; color: $sbk-mid; font-family: monospace; }
-.o_sbk_prod_dim   { font-size: 10px; font-family: monospace; color: $sbk-mid; }
-.o_sbk_prod_price { font-size: 11px; font-weight: 700; text-align: right; color: $sbk-dark; }
+// Typo-spec item 4 — data (mono) scale: bump 9/10px to the 12px minimum.
+.o_sbk_prod_sku   { font-size: 12px; font-weight: 600; color: $sbk-mid; font-family: var(--sb-font-mono); }
+.o_sbk_prod_dim   { font-size: 12px; font-weight: 600; font-family: var(--sb-font-mono); color: $sbk-mid; }
+// Price is a numeral too (item 2's "price/metric numerals"); it previously
+// relied on inheriting the root's mono stack, which item 1 removes.
+.o_sbk_prod_price { font-size: 12px; font-weight: 600; font-family: var(--sb-font-mono); text-align: right; color: $sbk-dark; }
 
 .o_sbk_prod_qty {
-    font-size: 10px;
-    font-family: monospace;
-    font-weight: 700;
+    font-size: 12px;
+    font-family: var(--sb-font-mono);
+    font-weight: 600;
     &.ok  { color: $sbk-success; }
     &.low { color: $sbk-warn; }
 }
@@ -900,10 +1008,13 @@ $sbk-amber:      #B45309;
     flex-shrink: 0;
     background: #FAFAF7;
 
+    // Typo-spec item 4 — consolidated onto the same eyebrow scale as the
+    // other section headers (.o_sbk_controls h3 / .o_sbk_inventory h3):
+    // 11px/700/uppercase/1px, was the odd-one-out at 9px/1.5px.
     h4 {
-        font-size: 9px;
+        font-size: 11px;
         font-weight: 700;
-        letter-spacing: 1.5px;
+        letter-spacing: 1px;
         color: $sbk-muted;
         text-transform: uppercase;
         margin: 0 0 10px;
@@ -925,13 +1036,17 @@ $sbk-amber:      #B45309;
     width: 24px;
     height: 24px;
     line-height: 22px;
-    border-radius: 4px;
+    border-radius: var(--sb-radius-btn);
     cursor: pointer;
     font-size: 13px;
     text-align: center;
     padding: 0;
-    transition: background-color 0.12s ease;
+    transition: var(--sb-transition);
     &:hover { background: rgba(192, 73, 47, 0.12); }
+    &:focus-visible {
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
+    }
 }
 .o_sbk_edit_grid {
     display: flex;
@@ -947,25 +1062,28 @@ $sbk-amber:      #B45309;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    // Typo-spec item 4 — field-label scale: 12px/600/uppercase/0.5px.
     span {
-        font-size: 10px;
+        font-size: 12px;
         text-transform: uppercase;
         color: $sbk-muted;
         font-weight: 600;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.5px;
     }
 }
 .o_sbk_edit_select,
 .o_sbk_edit_input {
     padding: 6px 8px;
-    border: 1px solid rgba(0,0,0,0.15);
-    border-radius: 4px;
+    border: 1px solid var(--sb-border);
+    border-radius: var(--sb-radius);
     background: white;
+    // Typo-spec item 4 — body/control-text scale (13px/500).
     font-size: 13px;
+    font-weight: 500;
     color: $sbk-ink;
     &:focus-visible {
-        outline: 2px solid rgba(26, 102, 212, 0.55);
-        outline-offset: 0;
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
         border-color: rgba(26, 102, 212, 0.45);
     }
 }
@@ -998,7 +1116,8 @@ $sbk-amber:      #B45309;
 .o_sbk_detail_img_placeholder { font-size: 26px; }
 
 .o_sbk_detail_name {
-    font-weight: 700;
+    // Typo-spec item 4 — product names are body/control text: 13px/500.
+    font-weight: 500;
     font-size: 13px;
     margin: 0 0 3px;
     color: $sbk-dark;
@@ -1025,7 +1144,8 @@ $sbk-amber:      #B45309;
         color: $sbk-dark;
         &.ok    { color: $sbk-success; }
         &.low   { color: $sbk-warn; }
-        &.price { color: $sbk-accent; font-size: 13px; }
+        // Typo-spec item 2 — price numeral gets the mono data token.
+        &.price { color: $sbk-accent; font-size: 13px; font-family: var(--sb-font-mono); font-weight: 600; }
     }
 }
 
@@ -1212,14 +1332,15 @@ $sbk-amber:      #B45309;
 .o_sbk_customer_input {
     width: 200px;
     padding: 6px 10px;
-    border: 1px solid $sbk-border;
-    border-radius: 3px;
+    border: 1px solid var(--sb-border);
+    border-radius: var(--sb-radius);
     font-family: inherit;
-    font-size: 12px;
+    // Typo-spec item 4 — body/control-text scale (13px/500).
+    font-size: 13px;
     font-weight: 500;
     color: $sbk-ink;
     background: $sbk-white;
-    transition: border-color 0.15s;
+    transition: border-color var(--sb-transition), box-shadow var(--sb-transition);
 
     &::placeholder {
         color: $sbk-muted;
@@ -1230,6 +1351,11 @@ $sbk-amber:      #B45309;
         outline: none;
         border-color: $sbk-accent;
         box-shadow: 0 0 0 2px $sbk-accent-bg;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-blue);
+        outline-offset: 2px;
     }
 }
 
@@ -1243,7 +1369,7 @@ $sbk-amber:      #B45309;
     overflow-y: auto;
     background: $sbk-white;
     border: 1px solid $sbk-border;
-    border-radius: 3px;
+    border-radius: var(--sb-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     display: flex;
     flex-direction: column;
@@ -1267,14 +1393,23 @@ $sbk-amber:      #B45309;
     border-bottom: 1px solid $sbk-bg;
     text-align: left;
     font-family: inherit;
-    font-size: 12px;
+    // Typo-spec item 4 — body/control-text scale (13px/500).
+    font-size: 13px;
+    font-weight: 500;
     color: $sbk-ink;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: var(--sb-transition);
 
-    &:hover, &:focus {
+    &:hover {
         background: $sbk-accent-bg;
-        outline: none;
+    }
+
+    // Typo-spec item 5/acceptance — was `outline: none` on :focus with no
+    // replacement ring, so keyboard users got no visible focus indicator.
+    &:focus-visible {
+        background: $sbk-accent-bg;
+        outline: 2px solid var(--sb-blue);
+        outline-offset: -2px;
     }
 
     &[aria-selected="true"] {
@@ -1323,14 +1458,22 @@ $sbk-amber:      #B45309;
     border: none;
     text-align: left;
     font-family: inherit;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: $sbk-accent;
     cursor: pointer;
+    transition: var(--sb-transition);
 
-    &:hover, &:focus {
+    &:hover {
         background: $sbk-accent-bg;
-        outline: none;
+    }
+
+    // Typo-spec item 5/acceptance — was `outline: none` on :focus with no
+    // replacement ring.
+    &:focus-visible {
+        background: $sbk-accent-bg;
+        outline: 2px solid var(--sb-blue);
+        outline-offset: -2px;
     }
 }
 
@@ -1343,7 +1486,7 @@ $sbk-amber:      #B45309;
     gap: 6px;
     padding: 6px 10px;
     background: $sbk-accent-bg;
-    border-radius: 3px;
+    border-radius: var(--sb-radius);
     font-size: 11px;
     color: $sbk-mid;
     flex-shrink: 0;
@@ -1376,6 +1519,8 @@ $sbk-amber:      #B45309;
     padding: 6px 14px;
     background: rgba(255, 255, 255, 0.94);
     border: 1px solid $sbk-border;
+    // Typo-spec item 5 — pill shape is an intentional exception to the
+    // button/input radius tokens (documented, not converted).
     border-radius: 999px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     font-size: 11px;
@@ -1413,6 +1558,8 @@ $sbk-amber:      #B45309;
 }
 
 .o_sbk_count_price strong {
+    // Typo-spec item 2 — estimate total is a price numeral → mono token.
+    font-family: var(--sb-font-mono);
     color: $sbk-accent;
 }
 
