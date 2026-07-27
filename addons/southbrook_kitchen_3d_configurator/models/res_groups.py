@@ -37,8 +37,13 @@ class ResGroups(models.Model):
         base_user = self.env.ref("base.group_user", raise_if_not_found=False)
         if not mgr or not base_user:
             return
+        # all_group_ids, NOT group_ids (106f71d): Odoo 19 splits the
+        # concept — group_ids is "explicitly assigned", implied groups
+        # live in all_group_ids (queryable via _search_all_group_ids).
+        # base.group_user is normally held by IMPLICATION, so searching
+        # group_ids returned 0 users and the sweep granted nothing.
         users = self.env["res.users"].search([
-            ("group_ids", "in", [base_user.id]),
+            ("all_group_ids", "in", [base_user.id]),
             ("share", "=", False),
         ])
         if users:

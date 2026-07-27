@@ -1,6 +1,6 @@
 # Prebuilt Sample Kitchen Templates Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement task-by-task. Steps use checkbox (`- [ ]`) syntax.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement task-by-task. Steps use checkbox (`- [x]`) syntax.
 
 **Spec (the authority):** `docs/superpowers/specs/2026-07-27-kitchen-templates-design.md`
 **Gap investigation (file:line ground truth):** `/private/tmp/claude-502/-Users-naadmin/30f764c9-d9ab-4b10-9bc7-d9348ab43200/scratchpad/sdd-briefs/ktmpl-investigation.md`
@@ -44,7 +44,7 @@
 - Produces: `southbrook.kitchen.template` (fields below) and `southbrook.kitchen.template.line`. **No geometry fields on slots** — `wall` + `run_seq` is the whole spatial contract; the engine owns poses.
 - Consumed by: T2 (resolver/instantiate), T3 (picker), T4 (data records).
 
-- [ ] **Step 1: Write failing tests** (`tests/test_kitchen_template_model.py`):
+- [x] **Step 1: Write failing tests** (`tests/test_kitchen_template_model.py`):
 
 ```python
 from psycopg2.errors import UniqueViolation
@@ -109,8 +109,8 @@ class TestKitchenTemplateModel(TransactionCase):
             self._mk_template("T1-DUP")
 ```
 
-- [ ] **Step 2: Run to verify FAIL** (models missing). Port **8301**.
-- [ ] **Step 3: Implement** `models/kitchen_template.py`:
+- [x] **Step 2: Run to verify FAIL** (models missing). Port **8301**.
+- [x] **Step 3: Implement** `models/kitchen_template.py`:
 
 ```python
 from odoo import api, fields, models
@@ -234,8 +234,8 @@ access_sbk_kitchen_template_line_manager,southbrook.kitchen.template.line (manag
 
 `views/kitchen_template_views.xml`: list (name, code, layout_shape, default_module_width_in, sequence, active) + form (header fields, notebook page "Slots" with editable inline list of line_ids: slot_code, cabinet_type, appliance_type, wall, run_seq, nominal_width_in, archetype_id, product_id, repeat_ok, priority) + `<menuitem id="menu_sbk_kitchen_templates" parent="menu_sbk_root" action="..." sequence="35"/>` (parent `menu_sbk_root` is in `views/kitchen_configurator_views.xml:20`). Manifest: add the view file to `data` (after `kitchen_design_views.xml`), bump version. v19 view-validation traps: only reference fields present in the view; no manual fields in domains.
 
-- [ ] **Step 4: Run to verify PASS** — new class green + full module install clean. Port **8302**.
-- [ ] **Step 5: Merge + Commit** — `git fetch origin && git merge origin/main` (re-check version), then `git commit -m "feat(kitchen_3d): southbrook.kitchen.template data models + ACL + views (templates T1)"`.
+- [x] **Step 4: Run to verify PASS** — new class green + full module install clean. Port **8302**.
+- [x] **Step 5: Merge + Commit** — `git fetch origin && git merge origin/main` (re-check version), then `git commit -m "feat(kitchen_3d): southbrook.kitchen.template data models + ACL + views (templates T1)"`.
 
 ---
 
@@ -256,7 +256,7 @@ access_sbk_kitchen_template_line_manager,southbrook.kitchen.template.line (manag
   - `template.parametric_fit(cabinet_count=None, module_width_in=None, appliance_widths=None) -> {"ok", "message", "count", "n_max", "module_width_in", "slots": [(slot, width_in), ...]}` — pure math per spec: per run `usable = wall_len − corner_claims − Σ appliance_widths; n_max = floor(usable / module_width)`; corner claims approximated with `kitchen_layout_engine._CORNER_FOOTPRINT_MM / 25.4` per junction touched (UI bound only — the AUTHORITATIVE fit check remains `LayoutCapacityExceeded` at arrange time). Count trimming drops highest-`priority` module slots first; growth clones `repeat_ok` slots; growth with no `repeat_ok` slot → `ok=False`.
   - `template.action_instantiate(partner_id=False, cabinet_count=None, module_width_in=None, appliance_widths=None) -> southbrook.kitchen.design` (savepoint-atomic; `appliance_widths` = `{"range": 36.0, "fridge": 36.0, "dishwasher": 24.0, ...}` keyed by `appliance_type`, overriding slot nominal widths).
 
-- [ ] **Step 1: Write failing tests** (`tests/test_template_instantiate.py`):
+- [x] **Step 1: Write failing tests** (`tests/test_template_instantiate.py`):
 
 ```python
 from odoo.exceptions import UserError
@@ -351,8 +351,8 @@ class TestTemplateInstantiate(TransactionCase):
 
 (Adjust the archetype `create` kwargs to `southbrook.cabinet.archetype`'s real required fields — read `cabinet_archetype.py:121-200` first; `body_class`/`collection` are Selections, use valid keys.)
 
-- [ ] **Step 2: Run to verify FAIL.** Port **8303**.
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run to verify FAIL.** Port **8303**.
+- [x] **Step 3: Implement.**
 
 (a) `data/template_support_products.xml` (`noupdate="0"`): five products — `product_tmpl_appl_range` (SBK-APPL-RANGE, "Appliance Space — Range"), `..._fridge`, `..._dishwasher`, `..._hood`, and `product_tmpl_unresolved_slot` (SBK-UNRESOLVED, "Unresolved Template Slot"). All: `type=consu`, `list_price=0.0`, `sale_ok=True`, `purchase_ok=False`, `southbrook_is_cabinet=False` (never in the drag catalog), `southbrook_cabinet_type="appliance"` (appliances) / unset (placeholder), sensible default dims (`southbrook_width_in` 30/36/24/30, height 36/70/34.5/12, depth 25/30/24/18). Plus three `southbrook.placement.rule` records (`anchor_class="run"`, `tier="base"`, `product_tmpl_id` → the appliance template, `payload='{"clearance_front_mm": 610}'` for range/dishwasher, 914 for fridge) so the existing M4 motion-envelope validator enforces appliance clearances with ZERO new validator code.
 
@@ -445,8 +445,8 @@ IMPORTANT: verify the `action_auto_arrange` cab-list loop (`:483-501`) picks app
 
 (`from odoo.addons.southbrook_estimating.models import kitchen_layout_engine` at top — same import kitchen_design.py:11 uses.) Corner slots (`cabinet_type="corner"`): create NO design line — the engine inserts corners itself; instead a corner slot only expresses preference, which is already rule-`sequence`-ranked — log a chatter note if a template carries one. Bump manifest, add the data file BEFORE the views entry.
 
-- [ ] **Step 4: Run to verify PASS** — new suite + `test_auto_arrange_service` + `test_collision_matrix` still green (we touched the cab-list neighbourhood). Port **8304**.
-- [ ] **Step 5: Merge origin/main + Commit** — `feat(kitchen_3d): template resolver + action_instantiate + appliance design lines (templates T2)`.
+- [x] **Step 4: Run to verify PASS** — new suite + `test_auto_arrange_service` + `test_collision_matrix` still green (we touched the cab-list neighbourhood). Port **8304**.
+- [x] **Step 5: Merge origin/main + Commit** — `feat(kitchen_3d): template resolver + action_instantiate + appliance design lines (templates T2)`.
 
 ---
 
@@ -464,7 +464,7 @@ IMPORTANT: verify the `action_auto_arrange` cab-list loop (`:483-501`) picks app
 - Consumes: T2 `action_instantiate` / `parametric_fit`; `action_open_configurator` (existing).
 - Produces: picker fields `template_id` (m2o, required unless legacy `preset="empty"`), `cabinet_count` (Integer, 0=template default, live-clamped to `[min, n_max]`), `module_width_in` Selection `[("18","18\""),("21","21\""),("24","24\""),("30","30\"")]` default `"24"`, `range_width_in` `[("0","No range"),("30","30\""),("36","36\""),("48","48\"")]`, `fridge_width_in` `[("0","No fridge"),("30","30\""),("33","33\""),("36","36\"")]`, `dishwasher_width_in` `[("0","No dishwasher"),("24","24\"")]`; computed `count_max` + `fit_summary` (Text) + `template_preview` (Html, sanitize=False, server-generated SVG only); legacy `preset` Selection KEPT for compat, mapped via `_COMPAT_PRESET_CODES = {"empty": None, "l_shape": "L-10X8", "u_shape": "U-10X8X10", "galley": "GAL-10"}` (codes reconciled against the actual T4 catalog — see T4 Step 4).
 
-- [ ] **Step 1: Write failing tests** (`tests/test_template_picker.py`) — reuse T2's fixture builder (extract it into a small mixin/helper in the T2 file and import it):
+- [x] **Step 1: Write failing tests** (`tests/test_template_picker.py`) — reuse T2's fixture builder (extract it into a small mixin/helper in the T2 file and import it):
 
 ```python
     def test_confirm_instantiates_and_opens_configurator(self):
@@ -507,8 +507,8 @@ IMPORTANT: verify the `action_auto_arrange` cab-list loop (`:483-501`) picks app
 
 (Fix the first assertion to what `action_open_configurator()` really returns — read it first and assert on its actual `tag`/`res_model`.)
 
-- [ ] **Step 2: Run to verify FAIL.** Port **8305**.
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run to verify FAIL.** Port **8305**.
+- [x] **Step 3: Implement.**
   - Picker: new fields per Interfaces; `_onchange_parametrics` (`@api.onchange("template_id", "cabinet_count", "module_width_in", "range_width_in", "fridge_width_in", "dishwasher_width_in")`) recomputes `count_max`/`fit_summary` via `template_id.parametric_fit(...)` and clamps `cabinet_count` (greying via clamp + summary message — Selection fields can't be dynamically constrained in a transient; the clamp + `fit_summary` warning IS the spec's "constrain or flag"); `_appliance_widths()` helper builds the dict skipping `"0"` values; `action_create` resolves `template_id or _COMPAT_PRESET_CODES[preset]` by `search([("code", "=", code)])` (missing record → `UserError` naming the code — honesty, no silent fallback), calls `action_instantiate(partner_id=..., cabinet_count=self.cabinet_count or None, module_width_in=float(self.module_width_in), appliance_widths=...)`, returns `design.action_open_configurator()`; `preset="empty"`/no template keeps today's plain-draft path (create + open).
   - Delete `_KITCHEN_TEMPLATE_PRESETS`, `_get_preset_layout`, `_apply_kitchen_template`; `grep -rn "_apply_kitchen_template\|_get_preset_layout\|_KITCHEN_TEMPLATE_PRESETS" addons/ tests/` and re-point every hit (the picker was the only production caller; fix any test that pinned the dict).
   - `_generate_thumbnail_svg` on the template (server-generated top view, floor slots only — walls layer skipped):
@@ -565,8 +565,8 @@ IMPORTANT: verify the `action_auto_arrange` cab-list loop (`:483-501`) picks app
 ```
 
   Keep the OWL expression trivial (lint hook).
-- [ ] **Step 4: Run to verify PASS** + `node_js` suite still green (`cd addons/southbrook_kitchen_3d_configurator/tests/node_js && npm test`). Port **8306**.
-- [ ] **Step 5: Merge origin/main + Commit** — `feat(kitchen_3d): four-dropdown template picker + toolbar entry + SVG thumbnails (templates T3)`.
+- [x] **Step 4: Run to verify PASS** + `node_js` suite still green (`cd addons/southbrook_kitchen_3d_configurator/tests/node_js && npm test`). Port **8306**.
+- [x] **Step 5: Merge origin/main + Commit** — `feat(kitchen_3d): four-dropdown template picker + toolbar entry + SVG thumbnails (templates T3)`.
 
 ---
 
@@ -584,7 +584,7 @@ IMPORTANT: verify the `action_auto_arrange` cab-list loop (`:483-501`) picks app
 - Stable xmlids: template `ktpl_<code_lowercased_underscored>` (e.g. `ktpl_l_10x8`), lines `ktpl_<code>_<slot_code_lower>`.
 - Any island/peninsula template the catalog keeps ships `active="False"` with a note (free-anchor ORM support not wired — investigation §C/§task-6), unless the catalog doc explicitly re-scopes it to wall runs only.
 
-- [ ] **Step 1: Write failing test** (`tests/test_template_catalog.py`) — generic over whatever T4 ships:
+- [x] **Step 1: Write failing test** (`tests/test_template_catalog.py`) — generic over whatever T4 ships:
 
 ```python
 @tagged("post_install", "-at_install", "southbrook",
@@ -619,11 +619,11 @@ class TestShippedTemplateCatalog(TransactionCase):
 ```
 
 (If the catalog doc documents expected-unresolved slots for a specific template, encode that exact allowlist in the test instead of blanket-zero, with a comment citing the doc.)
-- [ ] **Step 2: Run to verify FAIL** (no shipped templates). Port **8307**.
-- [ ] **Step 3: Author the data XML from the catalog doc.** One `<record model="southbrook.kitchen.template">` + child `<record model="southbrook.kitchen.template.line">` per kept row; `layout_shape` values MUST be `_LAYOUT_SHAPES` keys (`straight`/`l_shape`/`u_shape`/`galley`/…; the catalog's `single_wall` ≈ `straight`; an `l_with_island` row composes `l_shape` + island slots, or ships inactive per Interfaces). Add file to manifest.
-- [ ] **Step 4: Reconcile the T3 compat map** — set `_COMPAT_PRESET_CODES`'s three codes to the ACTUAL shipped codes for the l/u/galley shapes and update the T3 test if codes differ.
-- [ ] **Step 5: Run to verify PASS** — catalog suite + T2/T3 suites. Port **8308**.
-- [ ] **Step 6: Merge origin/main + Commit** — `feat(kitchen_3d): starter kitchen template catalog data (templates T4)`.
+- [x] **Step 2: Run to verify FAIL** (no shipped templates). Port **8307**.
+- [x] **Step 3: Author the data XML from the catalog doc.** One `<record model="southbrook.kitchen.template">` + child `<record model="southbrook.kitchen.template.line">` per kept row; `layout_shape` values MUST be `_LAYOUT_SHAPES` keys (`straight`/`l_shape`/`u_shape`/`galley`/…; the catalog's `single_wall` ≈ `straight`; an `l_with_island` row composes `l_shape` + island slots, or ships inactive per Interfaces). Add file to manifest.
+- [x] **Step 4: Reconcile the T3 compat map** — set `_COMPAT_PRESET_CODES`'s three codes to the ACTUAL shipped codes for the l/u/galley shapes and update the T3 test if codes differ.
+- [x] **Step 5: Run to verify PASS** — catalog suite + T2/T3 suites. Port **8308**.
+- [x] **Step 6: Merge origin/main + Commit** — `feat(kitchen_3d): starter kitchen template catalog data (templates T4)`.
 
 ---
 
@@ -638,7 +638,7 @@ class TestShippedTemplateCatalog(TransactionCase):
 - Every action mutates ONLY canonical semantics (wall/run_seq/product/width) then re-runs `action_auto_arrange(sync=True)` — poses are always re-derived, never transformed numerically; `_compute_totals` recomputes price/counts automatically via its depends. `LayoutCapacityExceeded` inside auto-arrange rolls the whole action back (its savepoint) → wrap in a `UserError` with a plain message (same honesty contract as T2).
 - Name is `action_flip_layout` — NOT "mirror" (reconcile owns that word).
 
-- [ ] **Step 1: Write failing tests** (`tests/test_layout_manipulation.py`; reuse the T2 fixture helper; build one straight + one l_shape design via `action_instantiate`):
+- [x] **Step 1: Write failing tests** (`tests/test_layout_manipulation.py`; reuse the T2 fixture helper; build one straight + one l_shape design via `action_instantiate`):
 
 ```python
     def test_flip_x_round_trip_is_identity(self):
@@ -696,8 +696,8 @@ class TestShippedTemplateCatalog(TransactionCase):
             corner[:1].action_set_width(30.0)
 ```
 
-- [ ] **Step 2: Run to verify FAIL.** Port **8309**.
-- [ ] **Step 3: Implement** on the design:
+- [x] **Step 2: Run to verify FAIL.** Port **8309**.
+- [x] **Step 3: Implement** on the design:
 
 ```python
     def action_reflow(self):
@@ -757,8 +757,8 @@ class TestShippedTemplateCatalog(TransactionCase):
 ```
 
 The room is NEVER resized by rotate — a non-fitting rotation raises (honesty; documented). Line actions (`action_swap_product(product_id)`, `action_set_width(width_in)`, `action_move(wall, run_seq)`): guard `self.layout_role == "canonical"` (else `UserError("Derived lines are engine-owned…")`); write the semantic fields (swap also rewrites `price_unit`/dims from the new product's template — same field set `_create_line` `:2039` uses; clear `is_unresolved` on swap); then `return self.design_id.action_auto_arrange(sync=True)` wrapped in the same `LayoutCapacityExceeded → UserError` translation. These formalize the client-only `_swapSelectedProduct`/`_updateSelectedWidth` (kitchen_configurator.js:1103/1082) server-side — do NOT remove the client paths in this task.
-- [ ] **Step 4: Run to verify PASS** + `test_auto_arrange_service` green (idempotence untouched). Port **8310**.
-- [ ] **Step 5: Merge origin/main + Commit** — `feat(kitchen_3d): server-side layout manipulation API — flip/rotate/swap/width/move/reflow (templates T5)`.
+- [x] **Step 4: Run to verify PASS** + `test_auto_arrange_service` green (idempotence untouched). Port **8310**.
+- [x] **Step 5: Merge origin/main + Commit** — `feat(kitchen_3d): server-side layout manipulation API — flip/rotate/swap/width/move/reflow (templates T5)`.
 
 ---
 
@@ -776,7 +776,7 @@ The room is NEVER resized by rotate — a non-fitting rotation raises (honesty; 
 - New contract: `total_cabinets` = Σ quantity of lines with `cabinet_type != "filler"`; `filler_count` = Σ quantity of `cabinet_type == "filler"` lines. The sale-order fallback branch (`:396-412`) applies the same exclusion via `southbrook_cabinet_type != "filler"`. `base_count`/`wall_count`/`estimated_price` semantics UNCHANGED (price still includes filler lines — they are real BOM-reaching lines).
 - Consumer audit (do in Step 3, in-repo greps, fix or explicitly clear each): `views/kitchen_design_views.xml` (display only — add filler_count), `models/reconcile.py` (greps show NO total_cabinets use — confirm), `tests/test_m1_m2_reconcile_fixes.py:100/148/164` (order-line fallback assertions — verify fixtures contain no filler products; if one does, update the expected number WITH a comment citing this plan), kanban `t-esc` at `:143`, and `southbrook_estimating_website` JS greps for `total_cabinets`.
 
-- [ ] **Step 1: Write failing test:**
+- [x] **Step 1: Write failing test:**
 
 ```python
 @tagged("post_install", "-at_install", "southbrook",
@@ -805,8 +805,8 @@ class TestTotalsFillerExclusion(TransactionCase):
 ```
 
 (Verify the FP3 xmlid — `data/demo_cabinets.xml:114` defines `product_tmpl_fp3`; adjust module prefix to the record's real one.)
-- [ ] **Step 2: Run to verify FAIL** (`total_cabinets == 3`, no `filler_count`). Port **8311**.
-- [ ] **Step 3: Implement** — in `_compute_totals`:
+- [x] **Step 2: Run to verify FAIL** (`total_cabinets == 3`, no `filler_count`). Port **8311**.
+- [x] **Step 3: Implement** — in `_compute_totals`:
 
 ```python
                 cab_lines = lines.filtered(lambda l: l.cabinet_type != "filler")
@@ -816,8 +816,8 @@ class TestTotalsFillerExclusion(TransactionCase):
 ```
 
 mirror in the order-line fallback (filter `southbrook_cabinet_type != "filler"`; `filler_count` from the filler order lines). New field `filler_count = fields.Integer(compute="_compute_totals", store=True)`. Migration `post-migrate.py` (idiom: `def migrate(cr, version):` guard `if not version: return`, build env): `env["southbrook.kitchen.design"].with_context(active_test=False).search([])._compute_totals()`. Views: add `filler_count` beside each `total_cabinets` display. JS summary count parity. Run the consumer audit list above; note each verdict in the commit body.
-- [ ] **Step 4: Run to verify PASS** — new test + `test_m1_m2_reconcile_fixes` + full `kitchen_templates` suite; grep upgrade log for `19.0.5.31.0` migration firing. Port **8312**.
-- [ ] **Step 5: Merge origin/main + Commit** — `fix(kitchen_3d): total_cabinets excludes fillers; add filler_count (templates T6, isolated)`.
+- [x] **Step 4: Run to verify PASS** — new test + `test_m1_m2_reconcile_fixes` + full `kitchen_templates` suite; grep upgrade log for `19.0.5.31.0` migration firing. Port **8312**.
+- [x] **Step 5: Merge origin/main + Commit** — `fix(kitchen_3d): total_cabinets excludes fillers; add filler_count (templates T6, isolated)`.
 
 ---
 
@@ -837,12 +837,12 @@ mirror in the order-line fallback (filter `southbrook_cabinet_type != "filler"`;
 - Room-resize regen honesty: when `state.designId` is set, `_changeRoom`/`_stretchWidth`/depth-resize call the NEW `rearrange` route (writes room dims, runs `action_auto_arrange(sync=False)` — the corner engine, NOT the naive `/layout` single-wall generator at `controllers/main.py:61`), then re-hydrate items from its response (reuse the `load_design_lines` emission shape). Fresh unsaved sessions keep the `/layout` path unchanged. On `ROOM_TOO_SMALL`: revert the room field in state + warning toast — never persist a non-fitting resize.
 - Auto-grow removal (`:983-988`): the silent `state.room.width_in = Math.ceil(required/6)*6` on add is REPLACED by a warning toast ("Run needs %s in — room is %s in. Remove a cabinet or widen the room.") with NO room mutation — this is the spec's "54→60→84 growth" defect fix.
 
-- [ ] **Step 1: Write failing node contract tests** (mirror an existing `contracts/*.test.mjs` for harness imports):
+- [x] **Step 1: Write failing node contract tests** (mirror an existing `contracts/*.test.mjs` for harness imports):
   - `13_sbk_getlayout.test.mjs`: mount the component shim with 2 items (one filler), assert `window.__sbk.getLayout()` returns exactly the 7 contract keys, `is_filler` true for the filler, and that mutating the returned array does NOT mutate `state.items`.
   - `14_autosave_first_action_gate.test.mjs`: after mount + programmatic `_refreshLayout`, `_queueAutoSave()` schedules nothing; after simulating a user add (`_addCabinetFromProduct(...)` via the shim), `_queueAutoSave()` schedules. Also assert `_addCabinetFromProduct` no longer mutates `state.room.width_in` when the run exceeds it.
-- [ ] **Step 2: Run to verify FAIL** — `cd addons/southbrook_kitchen_3d_configurator/tests/node_js && npm test`.
-- [ ] **Step 3: Write failing python test** (`tests/test_rearrange_route.py`, TransactionCase on the model seam): build a 2-wall design via T2's fixture, write new room dims + `action_auto_arrange(sync=False)`, assert poses changed and derived corner regenerated; assert shrinking below capacity raises `LayoutCapacityExceeded` and leaves lines' poses unchanged (savepoint). Run — expect the route-shape parts to fail. Port **8313**.
-- [ ] **Step 4: Implement** — controller route (mirror `save_design`'s auth/ACL pattern at `controllers/main.py:302-575`, including the `LayoutCapacityExceeded` → `error_code` mapping the file already does at `:11-26`):
+- [x] **Step 2: Run to verify FAIL** — `cd addons/southbrook_kitchen_3d_configurator/tests/node_js && npm test`.
+- [x] **Step 3: Write failing python test** (`tests/test_rearrange_route.py`, TransactionCase on the model seam): build a 2-wall design via T2's fixture, write new room dims + `action_auto_arrange(sync=False)`, assert poses changed and derived corner regenerated; assert shrinking below capacity raises `LayoutCapacityExceeded` and leaves lines' poses unchanged (savepoint). Run — expect the route-shape parts to fail. Port **8313**.
+- [x] **Step 4: Implement** — controller route (mirror `save_design`'s auth/ACL pattern at `controllers/main.py:302-575`, including the `LayoutCapacityExceeded` → `error_code` mapping the file already does at `:11-26`):
 
 ```python
     @http.route("/southbrook_kitchen/configurator/rearrange",
@@ -867,8 +867,8 @@ mirror in the order-line fallback (filter `southbrook_cabinet_type != "filler"`;
 ```
 
 (`_design_lines_payload` = extract/reuse the existing `load_design_lines` line-emission helper — do NOT re-implement the item dict shape; refactor-extract if it's inline.) JS changes per Interfaces; ghost preview: on dragover with a hovered wall, add ONE translucent box mesh (product w/h/d, existing material palette) at the hovered wall's run end, disposed on dragleave/drop/deselect — visual affordance only, no placement math (the drop still goes through the existing server-side placement). Every touched template expression must pass `python3 scripts/lint-owl-expr.py` (pre-commit runs it anyway).
-- [ ] **Step 5: Run to verify PASS** — npm suite + python suites + full-module tag pass. Port **8314**.
-- [ ] **Step 6: Merge origin/main + Commit** — `feat(kitchen_3d): __sbk.getLayout, autosave first-action gate, engine-routed room resize, ghost preview, no silent room growth (templates T7)`.
+- [x] **Step 5: Run to verify PASS** — npm suite + python suites + full-module tag pass. Port **8314**.
+- [x] **Step 6: Merge origin/main + Commit** — `feat(kitchen_3d): __sbk.getLayout, autosave first-action gate, engine-routed room resize, ghost preview, no silent room growth (templates T7)`.
 
 ---
 
@@ -879,9 +879,9 @@ mirror in the order-line fallback (filter `southbrook_cabinet_type != "filler"`;
 - Modify: `docs/superpowers/specs/2026-07-27-kitchen-templates-design.md` (append `## Delivery note` — what shipped per task, versions, deviations if any, the reconciled compat-preset→code map, any templates shipped `active=False` and why)
 - Modify: `docs/superpowers/plans/2026-07-27-kitchen-templates.md` (tick checkboxes; note any renumbered versions)
 
-- [ ] **Step 1: Write the three docs.** Delivery note must be honest: list anything cut/deferred (undo/redo, island free-anchor, drag mis-grab non-repro) with the reason.
-- [ ] **Step 2: Final verification** — full-module pass: `-u southbrook_kitchen_3d_configurator --test-enable --test-tags southbrook_kitchen_3d_configurator -d test_sbgeo_b1 --stop-after-init --no-http --http-port=8315` (grep log: 0 failed, 0 error, and confirm the `kitchen_templates` classes all ran) + `npm test` in `tests/node_js` + `pre-commit run -a` (OWL lint included) + cold-install sanity: `-i southbrook_kitchen_3d_configurator -d test_ktpl_cold --stop-after-init --no-http --http-port=8316` (v19 cold-install ParseError traps are real — see memory `odoo19_view_validation_v19_traps`).
-- [ ] **Step 3: Merge origin/main + Commit** — `docs(kitchen_3d): kitchen templates README + spec delivery note (templates T8)`. Then run the superpowers:requesting-code-review flow on the whole branch before any merge decision (merge/deploy remains gated on John per house rules).
+- [x] **Step 1: Write the three docs.** Delivery note must be honest: list anything cut/deferred (undo/redo, island free-anchor, drag mis-grab non-repro) with the reason.
+- [x] **Step 2: Final verification** — full-module pass: `-u southbrook_kitchen_3d_configurator --test-enable --test-tags southbrook_kitchen_3d_configurator -d test_sbgeo_b1 --stop-after-init --no-http --http-port=8315` (grep log: 0 failed, 0 error, and confirm the `kitchen_templates` classes all ran) + `npm test` in `tests/node_js` + `pre-commit run -a` (OWL lint included) + cold-install sanity: `-i southbrook_kitchen_3d_configurator -d test_ktpl_cold --stop-after-init --no-http --http-port=8316` (v19 cold-install ParseError traps are real — see memory `odoo19_view_validation_v19_traps`).
+- [x] **Step 3: Merge origin/main + Commit** — `docs(kitchen_3d): kitchen templates README + spec delivery note (templates T8)`. Then run the superpowers:requesting-code-review flow on the whole branch before any merge decision (merge/deploy remains gated on John per house rules).
 
 ---
 
@@ -900,11 +900,19 @@ mirror in the order-line fallback (filter `southbrook_cabinet_type != "filler"`;
 
 **Files:** southbrook_estimating data (the Q8 `southbrook.corner` product template + attribute values) and/or a data migration; then ONE new template data record `L-10x8` in the T4 file.
 
-- [ ] **Step 1 — ground-truth**: read the live SB-CORNER product/template/variant fields + its archetype link (code CC-CHL, width_default_mm/depth_default_mm in `southbrook.cabinet.archetype`); enumerate every inconsistent field with current values. Do NOT guess the correct dims — take them from the archetype record; if the archetype itself is ambiguous, STOP and report (controller escalates to user).
-- [ ] **Step 2 — repair as data/migration**: align `southbrook_width_in` / depth / dimensions / variant width values to the archetype; fix the description; keep xmlids stable; idempotent (only rewrite when matching the known-bad values — never clobber a later hand edit).
-- [ ] **Step 3 — RH variant**: add the RH hand as an attribute value (mirroring the existing LH mechanism — read how hand is modeled first; if hand is NOT modeled at all, add the attribute minimally per the configurator's existing attribute idioms).
-- [ ] **Step 4 — L-10x8 template record**: back(120″)+left(96″) runs meeting at the corner slot (cabinet_type='corner', engine claims both legs); slots per the catalog formula (SB30+range on the long leg, fridge slot on the short leg, modules+fillers computed); knobs: module_width, per-wall run lengths.
-- [ ] **Step 5 — tests**: instantiate L-10x8 → corner line present with both-leg claim (assert via the engine's outputs), no placeholder for the corner, price computes; RH flip via action_flip_layout keeps corner valid (hand swapped).
-- [ ] **Step 6 — commit.**
+- [x] **Step 1 — ground-truth**: read the live SB-CORNER product/template/variant fields + its archetype link (code CC-CHL, width_default_mm/depth_default_mm in `southbrook.cabinet.archetype`); enumerate every inconsistent field with current values. Do NOT guess the correct dims — take them from the archetype record; if the archetype itself is ambiguous, STOP and report (controller escalates to user).
+- [x] **Step 2 — repair as data/migration**: align `southbrook_width_in` / depth / dimensions / variant width values to the archetype; fix the description; keep xmlids stable; idempotent (only rewrite when matching the known-bad values — never clobber a later hand edit).
+- [x] **Step 3 — RH variant**: add the RH hand as an attribute value (mirroring the existing LH mechanism — read how hand is modeled first; if hand is NOT modeled at all, add the attribute minimally per the configurator's existing attribute idioms).
+- [x] **Step 4 — L-10x8 template record**: back(120″)+left(96″) runs meeting at the corner slot (cabinet_type='corner', engine claims both legs); slots per the catalog formula (SB30+range on the long leg, fridge slot on the short leg, modules+fillers computed); knobs: module_width, per-wall run lengths.
+- [x] **Step 5 — tests**: instantiate L-10x8 → corner line present with both-leg claim (assert via the engine's outputs), no placeholder for the corner, price computes; RH flip via action_flip_layout keeps corner valid (hand swapped).
+- [x] **Step 6 — commit.**
 
 Sequencing: runs after T4 (catalog templates) and T5 (flip exists for Step 5); L-10x8 is the whole-feature acceptance benchmark.
+
+
+---
+**Delivery (2026-07-27):** all tasks complete inline (T1–T8 + T4a).
+Version renumbering vs this plan: T4a shipped as 5.31.0 (+
+southbrook_estimating 19.0.9.1.0), T6 as 5.32.0, T7 as 5.33.0. Full
+deviation list: spec's Delivery note
+(docs/superpowers/specs/2026-07-27-kitchen-templates-design.md).

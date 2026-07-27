@@ -75,3 +75,65 @@ Corner SKU creation/repair; Prodboard geometry import; archetype backfill on the
 - Undersized room ⇒ blocking validation (or priority-based slot drop), never silent room growth.
 - Unresolved slots visible as placeholders, never silently dropped/substituted.
 - Tests: per-template instantiation + manipulation round-trips; JS layout assertions via `getLayout()`.
+
+## Delivery note (2026-07-27)
+
+Shipped on branch `feat/kitchen-templates` (all tasks INLINE after the
+session's subagent cap):
+
+| Task | Version | Commit | What shipped |
+|---|---|---|---|
+| T1 | 5.28.0 | 9ceac65 | template + slot models (slots-not-pins, room lexicon reuse) |
+| T2 | 5.28.0 | 4dab395 | resolver, parametric_fit, action_instantiate, appliance stand-ins + placement rules, unresolved honesty |
+| T3 | 5.28.0 | 4fbd6c5 | four-dropdown picker, top-frame button, generated SVG thumbnails, compat preset map |
+| T4 | 5.29.0 | 9bb9e79 | starter catalog data (4 active + 2 inactive), PER-WALL fit math, variant-bearing resolver filter, legacy 5.6.12 fallback restored |
+| T5 | 5.30.0 | 39e558d | flip/rotate/reflow + swap/width/move (canonical-only, savepoint-atomic, engine-rederived poses) |
+| T4a | 5.31.0 + estimating 9.1.0 | f8a36bf | SB-CORNER repair (33"→36", RH twin SB-CORNER-R, SB-WALL-CORNER seeded), hand-aware corner variant pick, L-10X8 flagship |
+| T6 | 5.32.0 | 21d677d | total_cabinets excludes fillers; filler_count; migration recompute; consumer audit |
+| T7 | 5.33.0 | 589c307 | __sbk.getLayout, autosave first-action gate, /rearrange engine-routed resize, ghost preview, no silent room growth |
+| T8 | — | (this commit) | README, delivery note, plan tick |
+
+**Reconciled compat-preset → code map:** empty → (legacy blank-canvas
+dims, 5.6.12 contract preserved); galley → GAL-10; l_shape → L-10X8;
+u_shape → U-10X8X10 (NOT shipped — blocked on 2-corner inventory;
+falls back to the legacy preset seeding until it exists).
+
+**Shipped inactive (honest placeholders):** PEN-10X10 (engine lacks
+free-anchor peninsula runs — the peninsula segment is deliberately not
+authored); H-14X12 (engine supports one run per wall; needs
+run_length_in/gap_width_in knobs — catalog blocker #7).
+
+**Deviations / discoveries:**
+- Widths retargeted to the VARIANT-BEARING demo catalog (SB30 30" sink,
+  B24/DB24 24", T24, W24): the canonical Q8 templates are OCA
+  config_ok with zero variants and cannot back a slot. The resolver
+  now filters on `product_variant_ids` (both rungs).
+- parametric_fit went per-wall (galley is two independent runs) and
+  gained corner leg claims + lead absorption; also fixed a latent
+  multi-repeat-slot clone bug in the T2 math.
+- The corner engine SUBSTITUTES run-lead cabinets fully inside its
+  cell; L-10X8 is authored with explicit corner-buffer leads
+  (LEAD-B/LEAD-L, W1/W2) so the promised kitchen survives.
+- The engine "fits" impossible changes by ARCHIVING lines, not
+  raising — every mutation surface (T5 actions, T7 /rearrange) adds a
+  post-arrange honesty guard.
+- T3's picker UserError on unloaded compat codes had silently broken
+  two track_b 5.6.12 pins — restored via a legacy-preset fallback
+  (T4); the l_shape pin itself is now SUPERSEDED by the shipped
+  L-10X8 template and was updated with citation (T4a).
+- action_move writes `sequence` alongside `run_seq` (the engine's
+  auto-assign path orders by flat input order on all-back designs).
+- T7's engine-resize gate is `designId AND hydrated` (brief said
+  designId only): rearranging a lineless template draft would wipe the
+  generated preview.
+- Version renumbering vs the plan: T4a took 5.31.0, pushing T6→5.32.0
+  and T7→5.33.0.
+
+**Cut/deferred (with reason):** undo/redo (investigation E-f — the
+autosave gate is the safe half); island/peninsula free-anchor ORM
+support (engine capability, not data); U/G-shape templates (2-corner
+inventory + wall-corner variants); drag mis-grab (non-reproducible in
+this session); linked-vs-independent per-wall module width knob and
+run_length_in/gap_width_in (needed only by the inactive H-14X12);
+SB-WALL-CORNER placeholder price ($295) flagged for the shop to
+reprice.

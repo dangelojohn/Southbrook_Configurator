@@ -59,24 +59,17 @@
              <value> so obj() browses an empty res.users recordset,
              then call .search(...) on it directly — matches the
              canonical_catalog_tag.xml precedent exactly. -->
-        <function model="res.groups" name="write">
-            <value eval="[ref('group_kitchen_manager')]"/>
-            <!-- all_group_ids, NOT group_ids. The fix above made this block
-                 PARSE; this line makes it actually DO something. Odoo 19 split
-                 the concept on res.users: group_ids is "Groups explicitly
-                 assigned to the user", while implied groups live in
-                 all_group_ids (which carries search='_search_all_group_ids',
-                 so it is queryable). base.group_user is normally held by
-                 implication, not explicitly — verified against a live database,
-                 where searching group_ids returned 0 users and all_group_ids
-                 returned the expected set. Searching group_ids here therefore
-                 granted nothing at all, silently. -->
-            <value model="res.users" eval="{'user_ids': [(4, u.id) for u in
-                obj().search([
-                    ('all_group_ids', 'in', [ref('base.group_user')]),
-                    ('share', '=', False),
-                ])]}"/>
-        </function>
+        <!-- T8 (kitchen templates) cold-install fix — the inline
+             `<function name="write">` two-value form no longer binds on
+             this v19 build (models/res_groups.py's docstring already
+             said the data file "now calls it argument-free", but this
+             block was never switched over — the drift left FRESH -i
+             raising `ResGroups.write() takes 2 positional arguments but
+             3 were given`, proven pre-existing at main 4e25f39). The
+             @api.model helper carries the whole sweep, including the
+             all_group_ids-not-group_ids lesson from 106f71d. -->
+        <function model="res.groups"
+                  name="_southbrook_kitchen_sweep_managers"/>
 
     </data>
 </odoo>
