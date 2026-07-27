@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sbk_wc_load_user,mrp.workcenter.load user,model_mrp_workcenter_load,base.group_user,1,0,0,0
+access_sbk_wc_load_mrp,mrp.workcenter.load mrp,model_mrp_workcenter_load,mrp.group_mrp_user,1,1,1,1
+access_sbk_floating_user,mrp.floating.times user,model_mrp_floating_times,base.group_user,1,0,0,0
+access_sbk_floating_mgr,mrp.floating.times manager,model_mrp_floating_times,mrp.group_mrp_manager,1,1,1,1
