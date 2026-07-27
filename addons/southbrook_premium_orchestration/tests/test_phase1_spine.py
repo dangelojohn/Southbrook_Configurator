@@ -25,6 +25,16 @@ class TestPhase1Spine(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Bypass the MO availability gate (southbrook_premium_orchestration
+        # blocks mo.action_confirm() when component moves can't be fully
+        # reserved). The approval-flow test below adds a BoM and confirms
+        # an MO without seeding stock quants, so the gate fires with
+        # "Cannot confirm — N component move(s) cannot be fully reserved".
+        # The gate is correct for production and stays ON elsewhere; the
+        # bypass is scoped to this test class only.
+        cls.env["ir.config_parameter"].sudo().set_param(
+            "southbrook.mo_availability_gate.enabled", "0",
+        )
         cls.partner = cls.env["res.partner"].create({
             "name": "Phase1 Test Customer",
         })
