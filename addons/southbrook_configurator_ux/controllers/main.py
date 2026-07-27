@@ -139,7 +139,7 @@ class SouthbrookConfiguratorAPI(http.Controller):
     # ------------------------------------------------------------------
     @http.route(
         "/southbrook/api/configurator/state",
-        type="json",
+        type="jsonrpc",
         auth="public",
         methods=["POST"],
         website=True,
@@ -308,19 +308,48 @@ class SouthbrookConfiguratorAPI(http.Controller):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _get_or_create_session(self, tmpl):
-        """Search for an existing session for (user, template); create if absent.
+    # HTTP-session key holding the config-session ids THIS browser session
+    # created. Anonymous visitors all share base.public_user, so user_id can't
+    # isolate them — we scope anon sessions by the HTTP session cookie instead.
+    _UX_SESSION_KEY = "sb_ux_config_session_ids"
 
-        Sessions are tied to res.users. Public visitors land on
-        base.public_user; portal / internal users get their own
-        session. The OCA configurator's cleanup cron handles
-        abandoned public sessions on a TTL.
+    def _http_owned_session_ids(self):
+        """The set of config-session ids this HTTP session owns (public flow)."""
+        raw = request.session.get(self._UX_SESSION_KEY) or []
+        return {int(x) for x in raw}
+
+    def _remember_http_session(self, session_id):
+        ids = self._http_owned_session_ids()
+        ids.add(int(session_id))
+        request.session[self._UX_SESSION_KEY] = list(ids)
+
+    def _get_or_create_session(self, tmpl):
+        """Search for an existing draft session for this visitor; create if absent.
+
+        Authenticated users bind to their res.users id (ir.rule scopes them).
+        Anonymous visitors are ALL base.public_user, so binding on user_id
+        would make two anon shoppers on the same template collide on one draft
+        session (state corruption + IDOR). Isolate anon sessions by the HTTP
+        session cookie instead — mirroring the OCA public-buyer flow.
         """
         Session = request.env["product.config.session"]
-        # Search as the actual user first — if they have draft sessions
-        # we want to honour their ACL. If the search returns empty AND
-        # we have to create, that's where we sudo (so public users can
-        # create their own session row).
+        if request.env.user._is_public():
+            owned = self._http_owned_session_ids()
+            if owned:
+                existing = Session.sudo().search([
+                    ("product_tmpl_id", "=", tmpl.id),
+                    ("id", "in", list(owned)),
+                    ("state", "=", "draft"),
+                ], limit=1, order="create_date desc")
+                if existing:
+                    return existing
+            session = Session.sudo().create({
+                "product_tmpl_id": tmpl.id,
+                "user_id": request.env.user.id,
+            })
+            self._remember_http_session(session.id)
+            return session
+        # Authenticated: search as the actual user so their ACL is honoured.
         existing = Session.search([
             ("product_tmpl_id", "=", tmpl.id),
             ("user_id", "=", request.env.user.id),
@@ -338,7 +367,7 @@ class SouthbrookConfiguratorAPI(http.Controller):
     # ------------------------------------------------------------------
     @http.route(
         "/southbrook/api/configurator/select",
-        type="json",
+        type="jsonrpc",
         auth="public",
         methods=["POST"],
         website=True,
@@ -560,7 +589,7 @@ class SouthbrookConfiguratorAPI(http.Controller):
     # ------------------------------------------------------------------
     @http.route(
         "/southbrook/api/configurator/commit",
-        type="json",
+        type="jsonrpc",
         auth="public",
         methods=["POST"],
         website=True,
@@ -789,7 +818,14 @@ class SouthbrookConfiguratorAPI(http.Controller):
         session = Session.browse(session_id).exists()
         if not session:
             return {"ok": False, "error": "session_not_found"}
-        if session.user_id.id != request.env.user.id:
+        if request.env.user._is_public():
+            # Anonymous: every visitor is base.public_user, so a user_id
+            # compare is porous. The session must belong to THIS HTTP session.
+            if session.id not in self._http_owned_session_ids():
+                return {"ok": False, "error": "forbidden",
+                        "message": "This configuration session belongs to a "
+                                   "different visitor."}
+        elif session.user_id.id != request.env.user.id:
             return {"ok": False, "error": "forbidden",
                     "message": "This configuration session belongs to a "
                                "different user."}

@@ -12,9 +12,13 @@ compute time on a new record. This also sidesteps the "wrong field name in
 @api.depends silently breaks the registry" trap entirely, by not using
 compute here at all.
 """
+from datetime import timedelta
+
 from odoo import api, fields, models
 
 PREVIEW_MAX_LEN = 2000
+DEFAULT_RETENTION_DAYS = 90
+PRUNE_CHUNK = 1000
 
 
 class SouthbrookOsAiRequest(models.Model):
@@ -23,6 +27,9 @@ class SouthbrookOsAiRequest(models.Model):
     _order = "create_date desc"
 
     name = fields.Char(readonly=True, copy=False)
+    # High-volume ledger: index create_date (the _order key and a search
+    # group-by) — Odoo does not index the magic create_date field by default.
+    create_date = fields.Datetime(index=True)
     feature = fields.Char(required=True, index=True)
     provider = fields.Char()
     model_name = fields.Char()
@@ -36,7 +43,7 @@ class SouthbrookOsAiRequest(models.Model):
         index=True,
     )
     user_id = fields.Many2one(
-        "res.users", default=lambda self: self.env.user
+        "res.users", default=lambda self: self.env.user, index=True
     )
     source_model = fields.Char()
     source_res_id = fields.Integer()
@@ -72,3 +79,38 @@ class SouthbrookOsAiRequest(models.Model):
             if not rec.name:
                 rec.name = "AI-%05d · %s" % (rec.id, rec.feature or "")
         return records
+
+    @api.model
+    def autovacuum(self):
+        """Prune ledger rows older than the configured retention window.
+
+        This table grows one row per kernel ``run()`` call (success, error,
+        or blocked) and has no natural upper bound, so without pruning it
+        bloats monotonically. Retention (in days) comes from the
+        ``os.ai.ledger_retention_days`` config parameter; a value <= 0 keeps
+        rows forever (opt-out). Deletion is chunked so a large backlog does
+        not delete in one oversized statement. Called by the daily
+        ``ir_cron_os_kernel_prune_ledger`` cron. Never raises.
+        """
+        try:
+            days = int(
+                self.env["ir.config_parameter"].sudo().get_param(
+                    "os.ai.ledger_retention_days", DEFAULT_RETENTION_DAYS
+                )
+                or 0
+            )
+        except (TypeError, ValueError):
+            days = DEFAULT_RETENTION_DAYS
+        if days <= 0:
+            return 0
+        cutoff = fields.Datetime.now() - timedelta(days=days)
+        pruned = 0
+        while True:
+            rows = self.sudo().search(
+                [("create_date", "<", cutoff)], limit=PRUNE_CHUNK
+            )
+            if not rows:
+                break
+            pruned += len(rows)
+            rows.unlink()
+        return pruned

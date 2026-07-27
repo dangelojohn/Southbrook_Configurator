@@ -21,6 +21,27 @@ class TestNcrWorkflow(TransactionCase):
             }
         )
 
+    def test_raw_write_state_is_guarded(self):
+        """A raw write() cannot launder state past the transition graph
+        (regression N1: draft -> released skips quarantine + disposition)."""
+        ncr = self._new_ncr()
+        with self.assertRaises(UserError):
+            ncr.write({"state": "released"})
+        self.assertEqual(ncr.state, "draft")
+
+    def test_critical_release_requires_manager(self):
+        """Use-as-is release of a CRITICAL NCR needs a Quality Manager
+        (regression N2)."""
+        ncr = self._new_ncr()
+        ncr.severity = "critical"
+        ncr.action_quarantine()
+        ncr.disposition_reason = "Use as-is: cosmetic only."
+        # Current test user lacks the quality-manager group.
+        mgr = "southbrook_quality.group_southbrook_quality_manager"
+        if not self.env.user.has_group(mgr):
+            with self.assertRaises(UserError):
+                ncr.action_release()
+
     def test_draft_to_quarantine(self):
         ncr = self._new_ncr()
         self.assertEqual(ncr.state, "draft")
@@ -69,18 +90,10 @@ class TestNcrWorkflow(TransactionCase):
         ncr = self._new_ncr()
         ncr.action_quarantine()
         ncr.disposition_reason = "Scrap."
-        # Force a known create_date deterministically. Odoo 19's log_access
-        # field write-path can silently drop create_date overrides via
-        # .write() (field is automatic=True, readonly=True), leaving the
-        # delta in the microseconds → assertGreater(0, 3.0) fails. Bypass
-        # the ORM by writing directly to the column, then invalidate the
-        # cache so the @api.depends recompute reads the new value.
-        old_create = datetime.now() - timedelta(hours=4)
-        self.env.cr.execute(
-            "UPDATE southbrook_ncr SET create_date = %s WHERE id = %s",
-            (old_create, ncr.id),
-        )
-        ncr.invalidate_recordset(["create_date"])
+        # Back-date opened_at so the delta is deterministic. (create_date is not
+        # writable in v19 — the ORM silently ignores it — which is exactly why
+        # the model tracks its own opened_at as the SLA start.)
+        ncr.write({"opened_at": datetime.now() - timedelta(hours=4)})
         ncr.action_scrap()
         ncr.invalidate_recordset(["time_to_close_hours"])
         self.assertGreater(ncr.time_to_close_hours, 3.0)

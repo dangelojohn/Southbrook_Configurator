@@ -59,6 +59,31 @@ class TestApprovalFlow(HttpCase):
         self.assertTrue(self.opt_b.is_selected)
         self.assertFalse(self.opt_a.is_selected)
 
+    def test_select_option_blocked_after_approval(self):
+        """F1: once the project leaves the editable states, the select route
+        must refuse to change the design option (server-side gate, not just the
+        hidden button). Uses a real CSRF token from another owned page so CSRF
+        passes and the STATE gate is what blocks."""
+        import re
+        self.opt_b.sudo().write({"is_selected": True})
+        self.project.sudo().action_customer_approves()
+        self.project.invalidate_recordset(["state"])
+        self.assertEqual(self.project.state, "approved")
+        self.authenticate("approval@example.com", "approval-strong-pw")
+        page = self.url_open("/my/fabio").text
+        m = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', page)
+        csrf = m.group(1) if m else ""
+        self.url_open(
+            f"/my/kitchen-project/{self.project.id}/select/{self.opt_a.id}",
+            data={"csrf_token": csrf}, allow_redirects=False,
+        )
+        self.opt_a.invalidate_recordset(["is_selected"])
+        self.opt_b.invalidate_recordset(["is_selected"])
+        # The gate refused: the approved selection (opt_b) is untouched.
+        self.assertFalse(self.opt_a.is_selected,
+                         "select must be blocked once the project is approved")
+        self.assertTrue(self.opt_b.is_selected)
+
     def test_approve_advances_state_and_creates_approval_record(self):
         # Pre-select an option via the model (avoids CSRF coupling).
         self.opt_b.with_user(self.user.id).sudo().write({"is_selected": True})

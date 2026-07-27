@@ -15,6 +15,18 @@ class TestBridge(TransactionCase):
         ), (
             4, cls.env.ref("southbrook_plm.group_southbrook_plm_approver").id,
         )]
+        # product_graph_revision enforces Segregation of Duties: the user who
+        # submits a revision/EBOM for review may not also release it. Use a
+        # SECOND pg-admin user for every release step so the fixture isn't
+        # rejected by that governance rule (submit = current user, release =
+        # this user).
+        cls.releaser = cls.env["res.users"].create({
+            "name": "PG Bridge Releaser",
+            "login": "pg_bridge_releaser_test",
+            "group_ids": [(6, 0, [
+                cls.env.ref("product_graph_base.group_pg_admin").id,
+            ])],
+        })
 
         # Build a released cabinet item + its EBOM (root only, no children,
         # to keep the test self-contained — the validator passes because
@@ -32,7 +44,7 @@ class TestBridge(TransactionCase):
             "change_summary": "Bridge test — initial cabinet revision.",
         })
         cls.cab_rev.action_submit_for_review()
-        cls.cab_rev.action_release()
+        cls.cab_rev.with_user(cls.releaser).action_release()
 
         # A real component so the EBOM has at least one line.
         cls.hinge = cls.env["pg.item"].create({
@@ -47,7 +59,7 @@ class TestBridge(TransactionCase):
             "change_summary": "Bridge test — initial hinge component.",
         })
         cls.hinge_rev.action_submit_for_review()
-        cls.hinge_rev.action_release()
+        cls.hinge_rev.with_user(cls.releaser).action_release()
         tmpl = cls.env["product.template"].create({
             "name": cls.hinge.name,
             "type": "consu",
@@ -66,7 +78,7 @@ class TestBridge(TransactionCase):
             })],
         })
         cls.ebom.action_submit_for_review()
-        cls.ebom.action_release()
+        cls.ebom.with_user(cls.releaser).action_release()
 
         # Use a rule-kind ECO so _apply_rule is the PLM-side handler — it
         # only requires a git_ref (no mrp.bom mutation, no cut_spec touch,

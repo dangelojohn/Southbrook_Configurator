@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  The scan log is append-only and grows one row per QR scan (including every
+  failure result) with no natural upper bound. Prune rows past the retention
+  window (config param southbrook.qr_kit.scan_log_retention_days, default 180;
+  <= 0 = keep forever). v19: ir.cron inherits ir.actions.server; numbercall/
+  doall are gone — schedule via interval_number/interval_type only.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="ir_cron_qr_scan_log_prune" model="ir.cron">
+            <field name="name">QR Kit: prune scan log</field>
+            <field name="model_id" ref="model_southbrook_qr_scan_log"/>
+            <field name="state">code</field>
+            <field name="code">model.autovacuum()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

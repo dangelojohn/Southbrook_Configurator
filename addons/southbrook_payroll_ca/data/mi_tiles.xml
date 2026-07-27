@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Seed a single Payroll Snapshot record so the Manufacturing Intelligence
+      dashboard (which reads southbrook.payroll.mi_tiles) has a row to render.
+      The tile fields are computed on read from live payroll/cert/employee data,
+      so this one record is the whole snapshot. Without a seed the model had
+      perm_create=0 for every group AND no record → the MI dashboard's payroll
+      tiles were permanently absent. noupdate so a rename survives upgrades.
+    -->
+    <data noupdate="1">
+        <record id="mi_tiles_default" model="southbrook.payroll.mi_tiles">
+            <field name="label">Payroll Snapshot</field>
+        </record>
+    </data>
+</odoo>

@@ -80,8 +80,14 @@
             <field name="name">Course 7 — Sysadmin</field>
             <field name="description">Maintaining the platform — the 6 nightly orchestration crons, the QNAP backup pipeline, and the external Hermes Console recommendation queue.</field>
             <field name="channel_type">training</field>
-            <field name="visibility">connected</field>
-            <field name="enroll">public</field>
+            <!-- SECURITY: this course's lessons embed real infrastructure detail
+                 (SSH hosts, the internal server IP, the backup share path). With
+                 visibility=connected + enroll=public, ANY signed-in user —
+                 including portal/dealer customers — could self-enroll and read
+                 it. Restrict to members-only + on-invitation so only an admin-
+                 enrolled sysadmin sees the content. -->
+            <field name="visibility">members</field>
+            <field name="enroll">invite</field>
             <field name="sequence">70</field>
             <field name="is_published" eval="True"/>
             <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>

@@ -29,11 +29,25 @@ class SouthbrookCpkReport(models.Model):
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
+        # Rolling window is configurable (documented in the module header).
+        # Read it here and bake it into the view DDL; action_refresh_view
+        # re-runs init() to pick up a changed value. Cast to int so the
+        # interpolation can carry no injection.
+        param = self.env["ir.config_parameter"].sudo().get_param(
+            "southbrook_quality.cpk_window_days", "30")
+        try:
+            window_days = int(param)
+        except (TypeError, ValueError):
+            window_days = 30
+        if window_days <= 0:
+            window_days = 30
         # We treat (dimension_key, workcenter_id) as the natural key.
         # The synthesised primary id is hashtext(...) of that pair, which is
         # stable across refreshes and lets Odoo's ORM cache the rows.
-        # stddev_pop is used (population) rather than stddev_samp because
-        # for n=1 stddev_samp returns NULL and we want a defined zero.
+        # STDDEV_SAMP (Bessel n-1) is the correct SAMPLE estimate of process
+        # sigma; STDDEV_POP (n) understates variation and inflates Cpk, making
+        # an incapable process look capable. n=1 → SAMP is NULL, and the
+        # COALESCE→0.0 + the CASE below already yield a conservative Cpk 0.
         self.env.cr.execute(
             f"""
             CREATE OR REPLACE VIEW {self._table} AS (
@@ -45,7 +59,8 @@ class SouthbrookCpkReport(models.Model):
                         s.usl,
                         s.lsl
                     FROM southbrook_quality_spc_sample s
-                    WHERE s.taken_at >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '30 days'
+                    WHERE s.taken_at >= (NOW() AT TIME ZONE 'UTC')
+                                        - INTERVAL '{window_days} days'
                       AND s.dimension_key IS NOT NULL
                       AND s.workcenter_id IS NOT NULL
                 )
@@ -58,17 +73,17 @@ class SouthbrookCpkReport(models.Model):
                     workcenter_id,
                     COUNT(*)                                     AS sample_count,
                     AVG(measured_value)                          AS mean,
-                    COALESCE(STDDEV_POP(measured_value), 0.0)    AS stddev,
+                    COALESCE(STDDEV_SAMP(measured_value), 0.0)   AS stddev,
                     MAX(usl)                                     AS usl,
                     MIN(lsl)                                     AS lsl,
                     CASE
-                        WHEN COALESCE(STDDEV_POP(measured_value), 0.0) = 0.0
+                        WHEN COALESCE(STDDEV_SAMP(measured_value), 0.0) = 0.0
                             THEN 0.0
                         ELSE LEAST(
                             (MAX(usl) - AVG(measured_value))
-                                / (3.0 * STDDEV_POP(measured_value)),
+                                / (3.0 * STDDEV_SAMP(measured_value)),
                             (AVG(measured_value) - MIN(lsl))
-                                / (3.0 * STDDEV_POP(measured_value))
+                                / (3.0 * STDDEV_SAMP(measured_value))
                         )
                     END                                          AS cpk
                 FROM window_samples

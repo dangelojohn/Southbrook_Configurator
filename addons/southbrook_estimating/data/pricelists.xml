@@ -136,12 +136,21 @@
 
   <!-- ============================================================== -->
   <!-- 6 · Refacing (per-SF, 35% margin target — computed routine #2) -->
-  <!-- Items intentionally empty; _compute_refacing_price returns the -->
-  <!-- live-cost-targeting price via the computed pricelist.item.     -->
+  <!-- A single global item flagged is_refacing_margin_target; the     -->
+  <!-- product.pricelist.item._compute_price override intercepts it and -->
+  <!-- returns the live cost→35%-margin price. Without a matched item   -->
+  <!-- Odoo never reaches the override and the channel resolves to bare -->
+  <!-- list_price (the pre-2026-07 no-op bug).                          -->
   <!-- ============================================================== -->
   <record id="pricelist_refacing" model="product.pricelist">
     <field name="name">Refacing (CTHS)</field>
     <field name="currency_id" ref="base.CAD"/>
+  </record>
+  <record id="pricelist_refacing_item_global" model="product.pricelist.item">
+    <field name="pricelist_id" ref="pricelist_refacing"/>
+    <field name="applied_on">3_global</field>
+    <field name="compute_price">formula</field>
+    <field name="is_refacing_margin_target" eval="True"/>
   </record>
 
 </odoo>

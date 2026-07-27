@@ -120,7 +120,7 @@ class ProductConfigSession(models.Model):
                     )
                     values2 = updates.get("value", {})
                     values2 = self.get_vals_to_write(
-                        values=values, model="mrp.bom.line"
+                        values=values2, model="mrp.bom.line"
                     )
                     values2.update(parent_bom_line_vals)
                     bom_lines.append((0, 0, values2))

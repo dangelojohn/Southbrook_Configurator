@@ -4,7 +4,7 @@
     "summary": "Hand-rolled bi-weekly Canadian payroll engine "
                "(CRA 2026 brackets, CPP/EI/WSIB/EHT) for Odoo 19 CE "
                "without Enterprise hr_payroll",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry / OdooIQ",
     "category": "Human Resources/Payroll",
@@ -21,6 +21,7 @@
         "data/cra_brackets_2026.xml",
         "data/wsib_rates.xml",
         "data/ir_sequence.xml",
+        "data/mi_tiles.xml",
         "data/cron_cert_expiry_alert.xml",
         "views/contract_views.xml",
         "views/payroll_run_views.xml",

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Seed a single Integrations Snapshot record so the Snapshot menu (and the
+      MI dashboard that reads southbrook.integrations.mi_tiles) render on
+      install. The tile fields are computed on read from live MCP-call /
+      Homag / ASN / label-print data, so this one record is the whole snapshot.
+      Without a seed AND with perm_create=0 for every group, the tile model was
+      uninstantiable and the snapshot never rendered. noupdate so a rename
+      survives upgrades.
+    -->
+    <data noupdate="1">
+        <record id="mi_tiles_default" model="southbrook.integrations.mi_tiles">
+            <field name="label">Integrations Snapshot</field>
+        </record>
+    </data>
+</odoo>

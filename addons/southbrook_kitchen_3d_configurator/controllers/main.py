@@ -17,7 +17,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
     # ── Products catalogue ───────────────────────────────────────────────────────
     @http.route(
         "/southbrook_kitchen/configurator/products",
-        type="json", auth="user", methods=["POST"],
+        type="jsonrpc", auth="user", methods=["POST"],
     )
     def products(self, partner_id=False):
         """Return all cabinet products available to the configurator.
@@ -47,7 +47,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
     # ── Layout calculation ───────────────────────────────────────────────────────
     @http.route(
         "/southbrook_kitchen/configurator/layout",
-        type="json", auth="user", methods=["POST"],
+        type="jsonrpc", auth="user", methods=["POST"],
     )
     def layout(self, room_width_in=12, room_depth_in=24, room_height_in=96,
                partner_id=False, filler_strategy="split",
@@ -292,7 +292,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
     # ── Save design ──────────────────────────────────────────────────────────────
     @http.route(
         "/southbrook_kitchen/configurator/save",
-        type="json", auth="user", methods=["POST"],
+        type="jsonrpc", auth="user", methods=["POST"],
     )
     def save_design(self, name, room, items, partner_id=False, design_id=False):
         """
@@ -333,13 +333,18 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         room_w = room.get("width_in",  12)
         room_d = room.get("depth_in",  24)
         room_h = room.get("height_in", 96)
+        # Resolve the partner through the ACL-checked helper (empty recordset
+        # if the caller may not read it) and persist THAT validated id — never
+        # the raw client partner_id, which a user could point at any partner to
+        # drive channel-pricelist resolution off someone else's record.
+        partner = self._browse_partner(partner_id)
         if not design_id and (not name or name.strip() in (
             "", "Kitchen Design", "New Kitchen Design", "Untitled Kitchen",
         )):
-            name = self._auto_name(self._browse_partner(partner_id), room_w, room_d)
+            name = self._auto_name(partner, room_w, room_d)
         vals = {
             "name":           name or "Kitchen Design",
-            "partner_id":     partner_id or False,
+            "partner_id":     partner.id if partner else False,
             "room_width_in":  room_w,
             "room_depth_in":  room_d,
             "room_height_in": room_h,
@@ -352,7 +357,15 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         # the backend form, origin='manual') are NEVER touched.
         Line = request.env["southbrook.kitchen.design.line"]
         if design_id:
-            design = Design.browse(int(design_id))
+            # IDOR guard mirroring save_position/delete_line: verify existence
+            # + write access, degrade gracefully (no AccessError 500 oracle).
+            design = Design.browse(int(design_id or 0))
+            if not design.exists():
+                return {"ok": False, "reason": "not_found"}
+            try:
+                design.check_access("write")
+            except Exception:
+                return {"ok": False, "reason": "forbidden"}
             design.write(vals)
             configurator_lines = design.cabinet_line_ids.filtered(
                 lambda l: l.origin == "configurator"
@@ -393,7 +406,32 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         # save proceeds. This mirrors the ACL discipline already used
         # by save_position / delete_line / load_design_lines
         # (check_access at :420 / :459 / :492).
+        # Server-side pricing: resolve the channel pricelist ONCE; each line is
+        # priced from it below — the client's item["price"] is NEVER trusted
+        # (HIGH-1 money vector: a tampered client could otherwise persist an
+        # arbitrary price that flows verbatim into the quotation via
+        # action_create_quotation, whose explicit price_unit is honoured over
+        # the pricelist per its own kitchen_design.py comment).
+        pricelist = self._resolve_pricelist(partner)
         Product = request.env["product.product"]
+        # Batch the ACL-respecting catalog lookup into ONE search (was a
+        # search() per item — 40-60 queries on a large save). Preserves the
+        # /products contract: southbrook_is_cabinet=True AND sale_ok=True AND
+        # readable by the caller.
+        wanted_ids = []
+        for item in items:
+            try:
+                wanted_ids.append(int(item["product_id"]))
+            except (KeyError, TypeError, ValueError):
+                pass
+        products_by_id = {}
+        if wanted_ids:
+            for _p in Product.search([
+                ("id", "in", wanted_ids),
+                ("product_tmpl_id.southbrook_is_cabinet", "=", True),
+                ("sale_ok", "=", True),
+            ]):
+                products_by_id[_p.id] = _p
         incoming_keys = set()
         # PR4 — track every line this save actually created/wrote (by
         # layout_key) so the non-back-wall engine-placement pass below
@@ -409,11 +447,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                     seq, item.get("product_id"),
                 )
                 continue
-            product = Product.search([
-                ("id", "=", pid),
-                ("product_tmpl_id.southbrook_is_cabinet", "=", True),
-                ("sale_ok", "=", True),
-            ], limit=1)
+            product = products_by_id.get(pid)
             if not product:
                 # Either the id doesn't exist, the caller can't read
                 # it, the template isn't tagged as a Southbrook cabinet,
@@ -437,7 +471,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "sequence":       seq * 10,
                 "product_id":     product.id,
                 "quantity":       1,
-                "price_unit":     item.get("price") or product.lst_price,
+                "price_unit":     self._channel_price(product, pricelist, partner),
                 "cabinet_type":   tmpl.southbrook_cabinet_type,
                 "width_in":       item.get("width_in",  tmpl.southbrook_width_in or 24.0),
                 "height_in":      item.get("height_in", tmpl.southbrook_height_in or 34.5),
@@ -536,7 +570,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
     # the drag UX.
     @http.route(
         "/southbrook_kitchen/configurator/load_design_lines",
-        type="json", auth="user", methods=["POST"],
+        type="jsonrpc", auth="user", methods=["POST"],
     )
     def load_design_lines(self, design_id):
         design = request.env["southbrook.kitchen.design"].browse(int(design_id or 0))
@@ -596,7 +630,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
 
     @http.route(
         "/southbrook_kitchen/configurator/save_position",
-        type="json", auth="user", methods=["POST"],
+        type="jsonrpc", auth="user", methods=["POST"],
     )
     def save_position(self, design_id, layout_key, x_position_in=None,
                       y_position_in=None, z_position_in=None,
@@ -631,7 +665,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
 
     @http.route(
         "/southbrook_kitchen/configurator/delete_line",
-        type="json", auth="user", methods=["POST"],
+        type="jsonrpc", auth="user", methods=["POST"],
     )
     def delete_line(self, design_id, layout_key):
         design = request.env["southbrook.kitchen.design"].browse(int(design_id or 0))
@@ -859,7 +893,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
     # ─── D4 — auto-name + per-user sticky room defaults ─────────────────────────
     @http.route(
         "/southbrook_kitchen/configurator/user_defaults",
-        type="json", auth="user", methods=["POST"],
+        type="jsonrpc", auth="user", methods=["POST"],
     )
     def user_defaults(self, save=False, width=None, depth=None, height=None):
         """Read or write the current user's preferred room dimensions.

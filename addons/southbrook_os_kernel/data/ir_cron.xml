@@ -30,5 +30,20 @@
             <field name="active" eval="True"/>
         </record>
 
+        <!--
+          The AI request ledger grows one row per kernel.run() call with no
+          natural upper bound. Prune rows past the retention window (config
+          param os.ai.ledger_retention_days, default 90; <= 0 = keep forever).
+        -->
+        <record id="ir_cron_os_kernel_prune_ledger" model="ir.cron">
+            <field name="name">OS Kernel: prune AI request ledger</field>
+            <field name="model_id" ref="model_southbrook_os_ai_request"/>
+            <field name="state">code</field>
+            <field name="code">model.autovacuum()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
     </data>
 </odoo>

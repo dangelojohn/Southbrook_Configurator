@@ -90,8 +90,12 @@ class TestW056FloorQueueJson(TransactionCase):
             "W056 JSON polling endpoint method must exist on the "
             "controller class",
         )
-        # The wrapped routing rule is on .routing in Odoo 19.
-        routing = getattr(method, "routing", None)
+        # v19 stores the @http.route metadata on `.original_routing`
+        # (the `.routing` attribute used by earlier versions is gone — even a
+        # known-decorated endpoint has no `.routing` on this build). Accept
+        # either so the check is version-robust.
+        routing = getattr(method, "original_routing", None) or getattr(
+            method, "routing", None)
         self.assertTrue(
             routing,
             "southbrook_floor_workcenter_queue_json must carry @http.route "

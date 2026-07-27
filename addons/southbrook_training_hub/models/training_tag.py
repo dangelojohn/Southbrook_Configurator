@@ -55,9 +55,10 @@ class SouthbrookTrainingTag(models.Model):
         for tag in self:
             tag.item_count = len(tag.item_ids)
 
-    def name_get(self):
-        result = []
+    @api.depends("kind", "name")
+    def _compute_display_name(self):
+        # v19 dropped name_get() — the framework calls _compute_display_name.
+        # The old name_get was silently dead (tags showed the bare name).
         for tag in self:
             kind_label = dict(KIND_SELECTION).get(tag.kind, tag.kind)
-            result.append((tag.id, f"[{kind_label}] {tag.name}"))
-        return result
+            tag.display_name = f"[{kind_label}] {tag.name}" if tag.name else ""

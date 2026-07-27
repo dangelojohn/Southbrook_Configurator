@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """QR kind handlers for kitchen_mrp models."""
 from odoo import _, api, models
+from odoo.exceptions import UserError
 
 
 class CutlistQrKind(models.AbstractModel):
@@ -44,6 +45,14 @@ class ProductionPackageQrKind(models.AbstractModel):
     def handle_action(self, record, action, params):
         if action == "scan":
             wc = (params or {}).get("workcenter_code")
+            # record_scan lives in southbrook_floor_traveler, which can't be a
+            # hard dep here (it depends on this addon → dependency loop). Guard
+            # so a pkg scan degrades gracefully instead of AttributeError'ing
+            # when floor_traveler isn't installed.
+            if not hasattr(record, "record_scan"):
+                raise UserError(_(
+                    "Shop-floor scan handling (southbrook_floor_traveler) is "
+                    "not installed on this instance."))
             wo = record.record_scan(workcenter_code=wc)
             return {"record_name": record.display_name,
                     "record_id": record.id, "model": self._target_model,

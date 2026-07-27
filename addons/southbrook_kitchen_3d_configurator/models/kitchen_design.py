@@ -44,8 +44,9 @@ class SouthbrookKitchenDesign(models.Model):
         required=True,
         default="New Kitchen Design",
     )
-    partner_id  = fields.Many2one("res.partner",  string="Customer")
-    sale_order_id = fields.Many2one("sale.order", string="Quotation", readonly=True)
+    partner_id  = fields.Many2one("res.partner",  string="Customer", index=True)
+    sale_order_id = fields.Many2one(
+        "sale.order", string="Quotation", readonly=True, index=True)
     notes = fields.Text(string="Design Notes")
 
     # ── Recommendation D · Sprint 1 bridge field ────────────────────────
@@ -1561,7 +1562,12 @@ class SouthbrookKitchenDesign(models.Model):
                 is_sales_manager = self.env.user.has_group(
                     "sales_team.group_sale_manager"
                 )
-                if is_sales_manager:
+                # `force_production_release` is defined by southbrook_mrp_pm
+                # (Tier 5), which this Tier-3 module must NOT hard-depend on
+                # (that would invert the tier order). Guard the write so the
+                # configurator still creates quotations when mrp_pm isn't
+                # installed — the field just isn't set in that config.
+                if is_sales_manager and "force_production_release" in order._fields:
                     order.sudo().write({"force_production_release": True})
                     _logger.info(
                         "Sales Manager %s auto-set force_production_release on %s "

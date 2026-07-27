@@ -169,15 +169,32 @@ class SouthbrookMiEngine(models.AbstractModel):
             )
         return checks
 
+    # Categories the engine (re)creates on every recompute. FAI checks and
+    # manual 'production' NCRs are NOT in this set — they must survive the sweep.
+    _ENGINE_CHECK_CATEGORIES = ("cut", "cad", "install", "assembly", "hardware")
+
     @api.model
     def _unlink_existing_checks(self, production=None, package=None):
-        domain = []
+        # H1/H2: only delete engine-derived checks, and never a FAI check (the
+        # gate's sign-off surface), a manual 'production' NCR (an inspector's
+        # quality record), or a check a deviation waiver references. The old
+        # unconditional delete-all (a) destroyed the pending FAI check within
+        # one 5-min cron sweep — permanently gating the MO with no sign-off
+        # surface — and every manual NCR, and (b) FK-crashed the whole
+        # recompute for any MO with a waivered check
+        # (deviation_waiver.mi_check_id is ondelete=restrict; sudo does NOT
+        # bypass a DB FK), freezing that MO's MI status forever.
+        if not (production or package):
+            return
+        domain = [
+            ("category", "in", list(self._ENGINE_CHECK_CATEGORIES)),
+            ("deviation_waiver_id", "=", False),
+        ]
         if production:
             domain.append(("production_id", "=", production.id))
         if package:
             domain.append(("production_package_id", "=", package.id))
-        if domain:
-            self.env["southbrook.mi.check"].sudo().search(domain).unlink()
+        self.env["southbrook.mi.check"].sudo().search(domain).unlink()
 
     @api.model
     def _create_check(self, values):

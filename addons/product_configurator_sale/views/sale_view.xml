@@ -21,7 +21,7 @@
                 position="after"
             >
                 <field column_invisible="1" name="config_ok" />
-                <field name="config_session_id" />
+                <field name="config_session_id" readonly="1"/>
             </xpath>
             <xpath
                 expr="//field[@name='order_line']/list//field[@name='product_template_id']"
@@ -38,7 +38,7 @@
                     type="object"
                     title="Reconfigure"
                 />
-                <field name="config_session_id" />
+                <field name="config_session_id" readonly="1"/>
             </xpath>
         </field>
     </record>

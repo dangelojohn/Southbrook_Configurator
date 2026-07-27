@@ -356,9 +356,9 @@ export class CentralCommand extends Component {
             return; // subscription failed — stay in manual mode
         }
         try {
-            this.busService.addEventListener("connect", this._onBusConnect);
-            this.busService.addEventListener("disconnect", this._onBusDisconnect);
-            this.busService.addEventListener("reconnect", this._onBusReconnect);
+            this.busService.addEventListener("BUS:CONNECT", this._onBusConnect);
+            this.busService.addEventListener("BUS:DISCONNECT", this._onBusDisconnect);
+            this.busService.addEventListener("BUS:RECONNECT", this._onBusReconnect);
         } catch {
             // bus lifecycle-event API differs — leave the badge on "manual".
         }
@@ -374,9 +374,9 @@ export class CentralCommand extends Component {
             // best effort
         }
         try {
-            this.busService.removeEventListener("connect", this._onBusConnect);
-            this.busService.removeEventListener("disconnect", this._onBusDisconnect);
-            this.busService.removeEventListener("reconnect", this._onBusReconnect);
+            this.busService.removeEventListener("BUS:CONNECT", this._onBusConnect);
+            this.busService.removeEventListener("BUS:DISCONNECT", this._onBusDisconnect);
+            this.busService.removeEventListener("BUS:RECONNECT", this._onBusReconnect);
         } catch {
             // best effort
         }

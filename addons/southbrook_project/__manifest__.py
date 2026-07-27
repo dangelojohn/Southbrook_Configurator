@@ -16,8 +16,9 @@ project instance. Four tiers, each in a separate commit:
   desktop widths (>=1280 px) and eager card load for projects with
   small task counts. Pure SCSS asset; no JS patching.
 * **Tier 2** — Configuration data: 6 `project.tags` (Rush, Custom,
-  Warranty, Repair, Kitchen, Vanity); description + planned date +
-  email alias on project ID 1. Stages were already seeded.
+  Warranty, Repair, Kitchen, Vanity); description + planned dates on
+  project ID 1 (backfilled by the post_init hook). Stages were already
+  seeded. (No email alias is set — that was descoped.)
 * **Tier 3** — Feature toggles: `allow_task_dependencies` +
   `allow_milestones` enabled on project 1. Recurring + billable
   left as operator toggles.

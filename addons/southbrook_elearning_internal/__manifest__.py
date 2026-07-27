@@ -2,17 +2,19 @@
 {
     "name": "Southbrook Internal E-Learning",
     "summary": "Internal training series for Southbrook custom modules — "
-               "29 lessons across 7 courses, auto-installed into "
+               "28 courses (~198 lessons), auto-installed into "
                "Odoo's eLearning portal.",
     "description": """
 Southbrook Internal E-Learning
 ==============================
 
-Installs a 7-course, 29-lesson internal training series into Odoo's
-website_slides eLearning portal at /odoo/e-learning, covering ONLY the
-Southbrook custom modules (the OOTB Odoo courses are taught separately).
+Installs a multi-course internal training series (28 courses, ~198
+lessons) into Odoo's website_slides eLearning portal at
+/odoo/e-learning, covering ONLY the Southbrook custom modules (the OOTB
+Odoo courses are taught separately).
 
-Course matrix
+Course matrix (representative subset — the series has since grown to 28
+courses; see data/elearning_courses.xml for the full list)
 -------------
 
   Course 1 — Workcenter Operators (7 lessons): edge banding (SB-EDGE),
@@ -45,13 +47,18 @@ southbrook_elearning_internal`` refreshes the live records.
 Why the channels + slides are published by default
 --------------------------------------------------
 
-``visibility=public`` + ``enroll=public`` + ``is_published=True`` so
-the courses appear at /odoo/e-learning the moment the addon is
-installed. Internal staff can navigate the catalogue without any
-group-membership setup. If you want the courses behind a login,
-flip ``visibility`` to ``members`` in the XML and re-upgrade.
+Most courses ship ``visibility=connected`` + ``enroll=public`` +
+``is_published=True`` so they appear at /odoo/e-learning for any
+signed-in user the moment the addon is installed — no group setup
+needed. NOTE: ``connected`` includes portal/dealer logins, so this
+series is visible to customers, not just internal staff; if that's
+undesirable, flip the relevant courses to ``visibility=members``.
+The **Sysadmin** course is the exception — it is ``visibility=members``
++ ``enroll=invite`` because its lessons embed real infrastructure
+detail (SSH hosts, internal IP, backup paths) that must not be
+self-enrollable by non-sysadmins.
 """,
-    "version": "19.0.1.3.0",
+    "version": "19.0.1.4.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",

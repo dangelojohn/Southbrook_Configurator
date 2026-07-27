@@ -173,6 +173,37 @@ class TestSaveDesignAcl(TransactionCase):
         _, lines = self._save([garbage_id])
         self.assertEqual(len(lines), 0)
 
+    def test_07_client_price_is_ignored_server_reprices(self):
+        """HIGH-1 money-vector regression: the client-supplied item['price']
+        must NOT be trusted. save_design reprices every line server-side from
+        the resolved channel pricelist, so a tampered price cannot flow into
+        the design line (and thence verbatim into the quotation)."""
+        controller = self._controller()
+        with stubbed_request(self.env):
+            controller.save_design(
+                name=self.design.name,
+                room={"width_in": 120, "depth_in": 96, "height_in": 96},
+                items=[{
+                    "product_id": self.good_variant.id,
+                    "layout_key": "cheap",
+                    "price": 1.00,  # attacker-chosen bargain price
+                }],
+                partner_id=self.partner.id,
+                design_id=self.design.id,
+            )
+        line = self.env["southbrook.kitchen.design.line"].search([
+            ("design_id", "=", self.design.id),
+            ("origin", "=", "configurator"),
+            ("layout_key", "=", "cheap"),
+        ], limit=1)
+        self.assertTrue(line)
+        self.assertNotEqual(
+            line.price_unit, 1.00,
+            "client-supplied price must NOT be persisted onto the design line")
+        self.assertEqual(
+            line.price_unit, self.good_variant.lst_price,
+            "line must be repriced server-side to the catalog/pricelist price")
+
     def test_06_missing_product_id_key_does_not_crash(self):
         """Malformed payload: a dict without product_id must be
         skipped rather than KeyError'd."""

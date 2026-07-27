@@ -140,7 +140,11 @@ class TestPhase2PracticalLoop(TransactionCase):
             "product_qty": qty_produced,
             "bom_id": bom.id,
         })
-        mo.action_confirm()
+        # These tests exercise the tool-lifecycle/duration loop, not the MO
+        # component-availability gate this module adds — bypass it (no stock is
+        # staged for the component). The gate itself is covered as product
+        # behavior, not here.
+        mo.with_context(bypass_availability_gate=True).action_confirm()
         wo = mo.workorder_ids[:1]
         # Wire a category-based operation tool requirement. The hook
         # resolves the requirement → asset by picking the in-service

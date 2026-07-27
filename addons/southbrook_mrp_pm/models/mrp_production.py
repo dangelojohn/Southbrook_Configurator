@@ -339,6 +339,7 @@ class MrpProduction(models.Model):
             return super().create(vals_list)
         SaleOrder = self.env["sale.order"].sudo()
         SaleLine = self.env["sale.order.line"].sudo()
+        bypassed = SaleOrder.browse()
         for vals in vals_list:
             source_so = SaleOrder.browse()
             sol_id = vals.get("sale_line_id")
@@ -359,6 +360,7 @@ class MrpProduction(models.Model):
                 # customer-driven path.
                 continue
             if source_so.force_production_release:
+                bypassed |= source_so
                 continue
             if source_so.production_approval_state == "approved":
                 continue
@@ -372,4 +374,13 @@ class MrpProduction(models.Model):
                 name=source_so.name,
                 state=source_so.production_approval_state,
             ))
-        return super().create(vals_list)
+        mos = super().create(vals_list)
+        # Audit the manager bypass at the point it actually takes effect —
+        # once per order, not once per MO. Previously the only bypass log
+        # lived in the (now dead) SO-confirm gate, so force-released MOs were
+        # created with no trail. Chatter is the durable audit record.
+        for so in bypassed:
+            so.message_post(body=_(
+                "Production-approval gate bypassed via Force Production "
+                "Release when creating manufacturing order(s)."))
+        return mos

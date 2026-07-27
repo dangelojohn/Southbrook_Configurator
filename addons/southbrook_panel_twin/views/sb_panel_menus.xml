@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_sb_panel_twin_root" name="Panel Twin"
+              parent="mrp.menu_mrp_root" sequence="90"/>
+    <menuitem id="menu_sb_panel" name="Panels"
+              parent="menu_sb_panel_twin_root"
+              action="action_sb_panel" sequence="10"/>
+</odoo>

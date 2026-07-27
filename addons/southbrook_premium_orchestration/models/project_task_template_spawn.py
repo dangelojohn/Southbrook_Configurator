@@ -79,7 +79,14 @@ class ProjectTask(models.Model):
         tasks = super().create(vals_list)
         for task in tasks:
             try:
-                task._auto_resolve_and_apply_template()
+                if task.x_kitchen_job_template_id:
+                    # A template set explicitly at create time must spawn its
+                    # subtasks — write() already does this, so create was
+                    # asymmetric (a task imported/created WITH a template got no
+                    # subtasks). _apply_job_template is idempotent.
+                    task._apply_job_template()
+                else:
+                    task._auto_resolve_and_apply_template()
             except Exception:  # noqa: BLE001
                 # Never block task creation on template resolution
                 # failure — the readiness recompute cron will sweep

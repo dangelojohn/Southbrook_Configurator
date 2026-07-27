@@ -31,7 +31,8 @@ class SouthbrookOsMemory(models.Model):
     value_json = fields.Text()
     source = fields.Char(help="Who/what wrote this value.")
     user_id = fields.Many2one("res.users")
-    expires_at = fields.Datetime()
+    # Scanned in full by the daily vacuum_expired cron — index it.
+    expires_at = fields.Datetime(index=True)
     active = fields.Boolean(default=True)
 
     _unique_ns_key = models.Constraint(

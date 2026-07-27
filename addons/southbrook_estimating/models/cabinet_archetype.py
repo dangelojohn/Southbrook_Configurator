@@ -21,10 +21,12 @@ import json
 import logging
 import base64
 import hashlib
+import ipaddress
 import mimetypes
 import os
 import re
-from urllib.parse import unquote
+import socket
+from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
 from odoo import api, fields, models
@@ -65,7 +67,6 @@ _TYPE_LABELS = {
     "OE": "Open End",
     "CV": "Curved",
     "DG": "Dresser Glass",
-    "DL": "Dresser Larder",
     "DO": "Dresser Open",
     "DT": "Dresser Tambour",
     "DW": "Dresser Worktop",
@@ -78,7 +79,6 @@ _TYPE_LABELS = {
     "WV": "Wall Vertical",
     "WB": "Wall Bridging",
     "WW": "Wall Wine",
-    "WO": "Wall Open Display",
     "TA": "Tall Appliance Housing",
     "TF": "Tall Fridge / Freezer",
     "TL": "Tall Larder",
@@ -93,6 +93,19 @@ _TYPE_LABELS = {
     "CH": "Corner Highline",
     "CD": "Corner Drawerline",
     "CL": "Corner L-Shape",
+}
+
+# A couple of two-letter type codes are overloaded across body classes
+# (e.g. DL = Drawerline on a base body, but Dresser Larder on a dresser
+# body; WO = Wine Open on a wine body, but Wall Open Display on a wall
+# body). _TYPE_LABELS above keeps the base/wine meaning as the default;
+# this table resolves the body-specific meaning so BOTH are reachable.
+# (Previously these lived as DUPLICATE keys in _TYPE_LABELS, where Python
+# silently kept only the last definition and the first meaning was
+# unreachable — see _compute_cabinet_type_label.)
+_TYPE_LABELS_BY_BODY = {
+    ("dresser", "DL"): "Dresser Larder",
+    ("wall", "WO"): "Wall Open Display",
 }
 
 # Image-URL pattern: blobs.prodboard.com/betterkitchens/icon/{uuid}/{filename}
@@ -233,12 +246,14 @@ class SouthbrookCabinetArchetype(models.Model):
         "Each archetype's external_id must be unique within the catalogue.",
     )
 
-    @api.depends("cabinet_type")
+    @api.depends("cabinet_type", "body_class")
     def _compute_cabinet_type_label(self):
         for rec in self:
-            rec.cabinet_type_label = (
-                _TYPE_LABELS.get(rec.cabinet_type or "", "") or rec.cabinet_type
-            )
+            code = rec.cabinet_type or ""
+            label = _TYPE_LABELS_BY_BODY.get((rec.body_class, code))
+            if not label:
+                label = _TYPE_LABELS.get(code, "") or code
+            rec.cabinet_type_label = label
 
 
 class SouthbrookProdboardTaxonomy(models.AbstractModel):
@@ -528,7 +543,41 @@ class SouthbrookProdboardAssetImporter(models.AbstractModel):
         return None
 
     @api.model
+    def _assert_safe_public_url(self, url):
+        """SSRF guard for operator-supplied ``image_url`` values.
+
+        ``import_assets(allow_network=True)`` is an AbstractModel method, so it
+        bypasses ir.model.access and any authenticated internal user can invoke
+        it via RPC after writing an arbitrary ``image_url``. Without this guard,
+        ``urlopen`` would happily follow ``file://`` (local-file disclosure) or
+        an internal/RFC1918/metadata HTTP target (SSRF). Only allow http(s) to a
+        host that resolves exclusively to public unicast addresses. Raises
+        ValueError (caught + recorded as a per-archetype failure by _import_one).
+        """
+        parsed = urlparse(url or "")
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(
+                "Refusing to fetch non-http(s) URL: %r" % (url,))
+        host = parsed.hostname
+        if not host:
+            raise ValueError("Refusing to fetch URL with no host: %r" % (url,))
+        try:
+            addrinfo = socket.getaddrinfo(host, parsed.port or None)
+        except socket.gaierror as exc:
+            raise ValueError(
+                "Cannot resolve host %r: %s" % (host, exc)) from exc
+        for family, _type, _proto, _canon, sockaddr in addrinfo:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if (ip.is_private or ip.is_loopback or ip.is_link_local
+                    or ip.is_reserved or ip.is_multicast
+                    or ip.is_unspecified):
+                raise ValueError(
+                    "Refusing to fetch non-public address %s (host %r)"
+                    % (ip, host))
+
+    @api.model
     def _fetch_url(self, url):
+        self._assert_safe_public_url(url)
         request = Request(
             url,
             headers={"User-Agent": "Southbrook-Odoo-Prodboard-Importer/1.0"},

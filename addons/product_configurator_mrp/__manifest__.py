@@ -3,7 +3,7 @@
 
 {
     "name": "Product Configurator Manufacturing",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Manufacturing",
     "summary": "BOM Support for configurable products",
     "author": "Pledra, Odoo Community Association (OCA)",
@@ -27,7 +27,6 @@
         ],
     },
     "demo": ["demo/product_template.xml"],
-    "qweb": ["static/src/xml/mrp_production_views.xml"],
     "installable": True,
     "auto_install": False,
     "development_status": "Beta",

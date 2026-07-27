@@ -67,18 +67,25 @@ class SouthbrookFinanceMiTiles(models.Model):
         HstReturn = self.env["southbrook.finance.hst_return"]
         AML = self.env["account.move.line"]
         Account = self.env["account.account"]
+        # Scope every tile to the active company — this is a per-company
+        # snapshot. Without this, cash-position and 30-day-revenue summed every
+        # company's ledger into the current company's dashboard on a
+        # multi-company DB.
+        company = self.env.company
 
         today = fields.Date.today()
         cutoff_30 = today - timedelta(days=30)
         year_start = date(today.year, 1, 1)
 
         # Most-recent WIP report by as_of_date.
-        wip_latest = WipReport.search([], order="as_of_date desc, id desc", limit=1)
+        wip_latest = WipReport.search(
+            [("company_id", "=", company.id)],
+            order="as_of_date desc, id desc", limit=1)
         wip_value = wip_latest.total_wip_value if wip_latest else 0.0
 
         # Most-recent active budget; pct = (actual_ytd - budget_ytd) / budget_ytd.
         budget = Budget.search(
-            [("state", "=", "active")],
+            [("state", "=", "active"), ("company_id", "=", company.id)],
             order="period_from desc, id desc",
             limit=1,
         )
@@ -94,13 +101,17 @@ class SouthbrookFinanceMiTiles(models.Model):
         # Current-quarter HST.
         current_q = str(((today.month - 1) // 3) + 1)
         hst = HstReturn.search(
-            [("tax_year", "=", today.year), ("quarter", "=", current_q)],
+            [("tax_year", "=", today.year), ("quarter", "=", current_q),
+             ("company_id", "=", company.id)],
             limit=1,
         )
         hst_owing = hst.net_hst_owing if hst else 0.0
 
         # Cash position: sum of balance on accounts of type asset_cash.
-        cash_accounts = Account.search([("account_type", "=", "asset_cash")])
+        # v19 account.account is multi-company: filter on company_ids (M2M).
+        cash_accounts = Account.search(
+            [("account_type", "=", "asset_cash"),
+             ("company_ids", "in", company.id)])
         cash = 0.0
         if cash_accounts:
             cash_lines = AML.search(
@@ -108,6 +119,7 @@ class SouthbrookFinanceMiTiles(models.Model):
                     ("account_id", "in", cash_accounts.ids),
                     ("parent_state", "=", "posted"),
                     ("date", "<=", today),
+                    ("company_id", "=", company.id),
                 ]
             )
             cash = sum(cash_lines.mapped("balance"))
@@ -121,6 +133,7 @@ class SouthbrookFinanceMiTiles(models.Model):
                 ("move_id.move_type", "in", ("out_invoice", "out_refund")),
                 ("tax_line_id", "=", False),
                 ("display_type", "in", (False, "product")),
+                ("company_id", "=", company.id),
             ]
         )
         revenue_30d = -sum(rev_lines.mapped("balance"))

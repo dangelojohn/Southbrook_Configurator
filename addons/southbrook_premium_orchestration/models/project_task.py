@@ -25,7 +25,11 @@ remains installable if a future southbrook_project_mrp release renames
 the public method. Both common spellings (``action_recompute_readiness``
 and the v19-shipped ``action_recompute_readiness_lines``) are probed.
 """
+import logging
+
 from odoo import _, api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 # Stage states that count as "done" — we skip these in the cron picker,
@@ -94,13 +98,20 @@ class ProjectTask(models.Model):
         now = fields.Datetime.now()
         flipped = 0
         for task in tasks:
-            previous = task._readiness_snapshot()
-            task._invoke_readiness_recompute()
-            task.readiness_last_recomputed_at = now
-            current = task._readiness_snapshot()
-            if previous != current and any(previous) and any(current):
-                task._log_readiness_flip(previous, current)
-                flipped += 1
+            # Per-row isolation — this cron runs as root over every open kitchen
+            # job; without this a single raising task aborts the whole sweep
+            # (the analytics + DQ crons already isolate per row).
+            try:
+                previous = task._readiness_snapshot()
+                task._invoke_readiness_recompute()
+                task.readiness_last_recomputed_at = now
+                current = task._readiness_snapshot()
+                if previous != current and any(previous) and any(current):
+                    task._log_readiness_flip(previous, current)
+                    flipped += 1
+            except Exception:  # noqa: BLE001 — one bad task must not abort the sweep
+                _logger.exception(
+                    "readiness sweep: task %s recompute failed", task.id)
         return len(tasks)
 
     # ------------------------------------------------------------------

@@ -104,6 +104,11 @@ class SouthbrookMesMpsBottleneckReport(models.Model):
                             ("workcenter_id", "=", wc.id),
                             ("date_start", ">=", week_start),
                             ("date_start", "<", week_end),
+                            # Match the capacity model's filter — without it
+                            # the fallback summed done/cancelled workorders too,
+                            # inflating load and disagreeing with the capacity
+                            # path for the same workcenter.
+                            ("state", "in", ("blocked", "ready", "progress")),
                         ]
                     )
                     planned_h = (
@@ -149,7 +154,9 @@ class SouthbrookMesMpsBottleneckReport(models.Model):
             raise_if_not_found=False,
         )
         if sup_group and report.top_bottleneck_workcenter_id:
-            partner_ids = sup_group.users.mapped(
+            # v19 renamed res.groups.users -> user_ids (the old name
+            # AttributeError'd here, crashing the daily cron every run).
+            partner_ids = sup_group.user_ids.mapped(
                 "partner_id"
             ).ids
             if partner_ids:

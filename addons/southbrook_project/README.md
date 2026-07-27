@@ -19,8 +19,9 @@ the findings from the manual QA pass against the live
   starting position.
 * Phone (<480 px): full-viewport-width single column; preserves
   swipe-to-next behaviour.
-* Scoped to `.o_kanban_view.o_kanban_project_task` and
-  `[data-model="project.task"]` so other models' kanbans are
+* Scoped to `.o_kanban_project_tasks` (note: plural — the Odoo 19
+  class; an earlier singular `.o_kanban_project_task` selector was
+  corrected in `kanban_responsive.scss`) so other models' kanbans are
   untouched.
 
 ### Tier 2 — Tags + Project 1 defaults
@@ -36,8 +37,11 @@ the findings from the manual QA pass against the live
 | Kitchen | 5 (dark blue) | Kitchen scope |
 | Vanity | 6 (light purple) | Bathroom vanity scope |
 
-`data/project_1_defaults.xml` — populates the blank fields on
-project ID 1 (`Test`):
+`hooks.py` (`post_init_backfill_project_1`, a `post_init_hook`) —
+populates the blank fields on project ID 1 (`Test`). A data XML record
+can't be used because project 1 was created in the UI and has no xmlid;
+the hook fills blanks only (idempotent) and safely no-ops on a fresh DB
+where project 1 doesn't exist:
 
 * `description` — paragraph explaining the 5-stage pipeline +
   tagging convention.

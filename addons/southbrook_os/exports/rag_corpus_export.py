@@ -17,7 +17,7 @@ class RagCorpusExport(models.AbstractModel):
         return {
             "tenant": tenant,
             "build_hash": build_hash,
-            "built_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "built_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "documents": [
                 {
                     "slug": s.slug,

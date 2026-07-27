@@ -32,17 +32,25 @@ import io
 import logging
 from typing import Any
 
+from psycopg2 import IntegrityError
+
 from odoo import _, fields, models
 from odoo.exceptions import UserError, ValidationError
+
+from ..models.product_product import HARDWARE_CATEGORIES
 
 _logger = logging.getLogger(__name__)
 
 
 REQUIRED_COLS = ("marathon_sku", "name", "brand_code", "category")
-HARDWARE_CATEGORY_KEYS = {
-    "hinge", "slide", "pin", "screw", "handle",
-    "leveler", "cam_lock", "bumper", "other",
-}
+# Derive from the model's single source of truth so the wizard never drifts
+# out of sync (it previously hard-coded a stale set missing end_panel/filler/
+# corner_mech, and rejected those valid categories on import).
+HARDWARE_CATEGORY_KEYS = {key for key, _label in HARDWARE_CATEGORIES}
+
+# Guard against a pathological multi-MB upload materialising every row in
+# memory. Manager-gated, so this is defense-in-depth, not a hard threat.
+MAX_IMPORT_ROWS = 20000
 
 
 def _to_bool(val: str | None) -> bool:
@@ -94,6 +102,11 @@ class SouthbrookHardwareImport(models.TransientModel):
         rows = list(reader)
         if not rows:
             raise UserError(_("CSV has a header but no data rows."))
+        if len(rows) > MAX_IMPORT_ROWS:
+            raise UserError(_(
+                "CSV has %(n)d data rows; the import is capped at %(max)d. "
+                "Split the file and import in batches.")
+                % {"n": len(rows), "max": MAX_IMPORT_ROWS})
 
         created = updated = errors = 0
         log_lines: list[str] = []
@@ -104,28 +117,29 @@ class SouthbrookHardwareImport(models.TransientModel):
         # Preload brands by code so we don't search per row.
         brand_by_code = {b.code: b for b in Brand.search([])}
 
-        # Per-row processing wrapped in savepoint so a single bad row
-        # rolls back only itself, not the whole import.
+        # Per-row processing wrapped in a REAL savepoint so a single bad row
+        # rolls back only itself, not the whole import. Without it, a DB-level
+        # error (IntegrityError from a constraint / duplicate default_code) at
+        # create() aborts the whole transaction AND poisons the cursor, so
+        # every subsequent row also fails ("transaction is aborted"). The
+        # broadened except catches that DB error too — the savepoint rollback
+        # restores a usable cursor before we continue.
         for idx, row in enumerate(rows, start=2):  # row 1 is the header
+            sku = (row.get("marathon_sku") or "").strip()
             try:
-                # Check existence BEFORE _process_row mutates state.
-                # The post-row search-back pattern this replaces always
-                # found the freshly-created product and counted every
-                # row as "updated" — created_count stayed at 0 and the
-                # wizard misreported a happy path as a no-op.
-                sku = (row.get("marathon_sku") or "").strip()
-                pre_existing = Product.search(
-                    [("x_marathon_sku", "=", sku)], limit=1)
-                self._process_row(row, brand_by_code, Product, idx,
-                                  dry_run=self.dry_run)
-                if not pre_existing:
-                    # Either created live, OR in dry-run "would create".
+                with self.env.cr.savepoint():
+                    # _process_row does the single existence search and
+                    # returns "created"/"updated" — no separate pre-search.
+                    status = self._process_row(
+                        row, brand_by_code, Product, idx, dry_run=self.dry_run)
+                if status == "created":
                     created += 1
                     log_lines.append(f"row {idx}: created {sku}")
                 else:
                     updated += 1
                     log_lines.append(f"row {idx}: updated {sku}")
-            except (UserError, ValidationError, KeyError, ValueError) as exc:
+            except (UserError, ValidationError, KeyError, ValueError,
+                    IntegrityError) as exc:
                 errors += 1
                 log_lines.append(f"row {idx} ERROR: {exc}")
                 _logger.warning("Hardware import row %d failed: %s", idx, exc)
@@ -197,17 +211,19 @@ class SouthbrookHardwareImport(models.TransientModel):
                     _("Row %d: standard_price '%s' is not numeric.")
                     % (line_no, std))
 
-        if dry_run:
-            return
-
+        # Single existence search (was duplicated in the caller). Done before
+        # the dry-run return so dry-run reports created-vs-updated accurately.
         existing = Product.search(
             [("x_marathon_sku", "=", sku)], limit=1)
+        if dry_run:
+            return "updated" if existing else "created"
         if existing:
             existing.write(vals)
-        else:
-            # Defaults for a fresh placeholder product matching the seed.
-            vals.update({
-                "type": "consu",
-                "is_storable": True,
-            })
-            Product.create(vals)
+            return "updated"
+        # Defaults for a fresh placeholder product matching the seed.
+        vals.update({
+            "type": "consu",
+            "is_storable": True,
+        })
+        Product.create(vals)
+        return "created"

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_panel_list" model="ir.ui.view">
+        <field name="name">sb.panel.list</field>
+        <field name="model">sb.panel</field>
+        <field name="arch" type="xml">
+            <list string="Panels">
+                <field name="name"/>
+                <field name="barcode"/>
+                <field name="production_id"/>
+                <field name="cabinet_ref"/>
+                <field name="kitchen_ref"/>
+                <field name="customer_id"/>
+                <field name="state"/>
+                <field name="qc_result"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sb_panel_form" model="ir.ui.view">
+        <field name="name">sb.panel.form</field>
+        <field name="model">sb.panel</field>
+        <field name="arch" type="xml">
+            <form string="Panel Passport">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="barcode"/>
+                            <field name="product_id"/>
+                            <field name="material"/>
+                            <field name="production_id"/>
+                        </group>
+                        <group>
+                            <field name="customer_id"/>
+                            <field name="kitchen_ref"/>
+                            <field name="cabinet_ref"/>
+                            <field name="state"/>
+                            <field name="qc_result"/>
+                            <field name="install_date"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Operations">
+                            <field name="cycle_ids">
+                                <list>
+                                    <field name="timestamp"/>
+                                    <field name="operation"/>
+                                    <field name="workcenter_id"/>
+                                    <field name="program"/>
+                                    <field name="tool_ref"/>
+                                    <field name="operator_id"/>
+                                    <field name="duration_s"/>
+                                    <field name="qc_result"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Machine Events">
+                            <field name="event_ids">
+                                <list>
+                                    <field name="timestamp"/>
+                                    <field name="event_type"/>
+                                    <field name="machine_code"/>
+                                    <field name="workcenter_id"/>
+                                    <field name="payload"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sb_panel_search" model="ir.ui.view">
+        <field name="name">sb.panel.search</field>
+        <field name="model">sb.panel</field>
+        <field name="arch" type="xml">
+            <search string="Panels">
+                <field name="name"/>
+                <field name="barcode"/>
+                <field name="production_id"/>
+                <field name="customer_id"/>
+                <filter name="failed_qc" string="Failed QC"
+                        domain="[('qc_result','=','fail')]"/>
+                <group>
+                    <filter name="group_state" string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_mo" string="Manufacturing Order"
+                            context="{'group_by': 'production_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_sb_panel" model="ir.actions.act_window">
+        <field name="name">Panels</field>
+        <field name="res_model">sb.panel</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_sb_panel_search"/>
+    </record>
+</odoo>

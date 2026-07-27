@@ -241,7 +241,7 @@ class SouthbrookKitchenPlanner(_SouthbrookOrderAccessMixin, http.Controller):
     # ==================================================================
     @http.route(
         "/southbrook/api/kitchen-planner/state",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -607,7 +607,7 @@ class SouthbrookKitchenPlanner(_SouthbrookOrderAccessMixin, http.Controller):
     # ==================================================================
     @http.route(
         "/southbrook/api/kitchen-planner/session/create",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -677,7 +677,7 @@ class SouthbrookKitchenPlanner(_SouthbrookOrderAccessMixin, http.Controller):
 
     @http.route(
         "/southbrook/api/kitchen-planner/session/<int:session_id>/cancel",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -731,7 +731,7 @@ class SouthbrookKitchenPlanner(_SouthbrookOrderAccessMixin, http.Controller):
     # ==================================================================
     @http.route(
         "/southbrook/api/kitchen-planner/session/<int:session_id>/set-value",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -890,12 +890,20 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     # ==================================================================
     @http.route(
         "/my/southbrook/order-builder/<int:order_id>/set-customer",
-        type="json",
+        type="jsonrpc",
         auth="user",
         website=True,
     )
     def southbrook_set_order_customer(self, order_id, **kw):
         order = self._southbrook_resolve_order(order_id)  # access-checked
+        # Security (2026-07-11 audit MEDIUM-1): this is a staff/dealer Order
+        # Builder tool. It resolves-or-backfills a res.partner by email with
+        # trusted=True (fills a matched partner's blank name/phone/street from
+        # the payload). A portal customer (share=True) must not be able to use
+        # it to tamper with another contact's PII — restrict to internal users.
+        if request.env.user.share:
+            return {"ok": False,
+                    "error": "Only staff may set the order's customer."}
         name = (kw.get("name") or "").strip()
         email = (kw.get("email") or "").strip()
         if not name and not email:
@@ -1041,7 +1049,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     # the order's resolver via line.order_id.
     @http.route(
         "/southbrook/api/line/<int:line_id>/update",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1087,7 +1095,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     # for the OWL code to know about the qty=0 convention).
     @http.route(
         "/southbrook/api/line/<int:line_id>/delete",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1169,7 +1177,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/line/<int:line_id>/attributes",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1308,7 +1316,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/line/<int:line_id>/set-attribute",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1450,7 +1458,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/add-line",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1662,7 +1670,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     # draft" with overrides. Replaces N×/add-line calls.
     @http.route(
         "/southbrook/api/order/<int:order_id>/lines/bulk-add",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1800,7 +1808,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/lines/bulk-delete",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1821,7 +1829,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/lines/bulk-move-zone",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1847,7 +1855,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/lines/bulk-set-attribute",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1935,7 +1943,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     # avoids one route per button.
     @http.route(
         "/southbrook/api/order/<int:order_id>/action",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -1966,6 +1974,29 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             # button. Distinct from action_confirm so dealers can
             # review the confirmed order before kicking off MOs.
             # State-guarded: only confirmed (sale) orders can fire.
+            #
+            # Security (2026-07-11 audit HIGH-1): releasing an order to the shop
+            # floor is a STAFF action. _southbrook_resolve_order grants a portal
+            # customer / dealer / parent partner (share=True) access to the
+            # order for review — but they must NOT be able to create MOs under
+            # sudo. Reject share callers, and honour the production-approval
+            # gate when the southbrook_mrp_pm layer (which owns
+            # production_approval_state) is installed — guard on field presence
+            # since this Tier-3 module can't hard-depend on Tier-5 mrp_pm.
+            if request.env.user.share:
+                return {
+                    "error": "forbidden",
+                    "message": "Only staff may send an order to manufacturing.",
+                }
+            if ("production_approval_state" in order._fields
+                    and order.production_approval_state != "approved"):
+                return {
+                    "error": "not_approved",
+                    "message": (
+                        "Order has not passed production approval (state: %s)."
+                        % order.production_approval_state
+                    ),
+                }
             if order.state != "sale":
                 return {
                     "error": "wrong_state",
@@ -2238,7 +2269,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     # without payload translation.
     @http.route(
         "/southbrook/api/order/<int:order_id>/kitchen-3d",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -2276,7 +2307,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -2510,7 +2541,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d/move",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -2603,7 +2634,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d/room",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -2647,7 +2678,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d/catalog",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -2748,7 +2779,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d/add",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -2944,7 +2975,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d/remove",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -2976,7 +3007,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>/design-3d/swap",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -3090,7 +3121,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
 
     @http.route(
         "/southbrook/api/order/<int:order_id>",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -3126,7 +3157,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     # from the gate (per the backend reviewer's P1 #7).
     @http.route(
         "/southbrook/api/order/<int:order_id>/preflight-confirm",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -3213,7 +3244,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     # can advance the order without bouncing into the backend form.
     @http.route(
         "/southbrook/api/order/<int:order_id>/request-production-approval",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )

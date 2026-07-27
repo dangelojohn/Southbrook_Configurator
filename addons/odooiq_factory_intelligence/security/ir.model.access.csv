@@ -11,3 +11,5 @@ access_oiq_completion_observation_user,oiq.completion.observation.user,model_oiq
 access_oiq_completion_observation_manager,oiq.completion.observation.manager,model_oiq_completion_observation,group_odooiq_manager,1,1,1,1
 access_oiq_calibration_factor_user,oiq.calibration.factor.user,model_oiq_calibration_factor,group_odooiq_user,1,0,0,0
 access_oiq_calibration_factor_manager,oiq.calibration.factor.manager,model_oiq_calibration_factor,group_odooiq_manager,1,1,1,1
+access_oiq_delivery_estimate_user,oiq.delivery.estimate.user,model_oiq_delivery_estimate,group_odooiq_user,1,0,0,0
+access_oiq_delivery_estimate_manager,oiq.delivery.estimate.manager,model_oiq_delivery_estimate,group_odooiq_manager,1,1,1,1

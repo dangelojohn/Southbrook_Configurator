@@ -1,48 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Named CSS variables shared by all 3 QWeb reports.
+  Shared inline styles for all 3 QWeb reports.
 
-  Per NF15 (commit 10): SIGNATURE_SERIES_TOKENS.md is gated on #7 (the
-  Signature Series spec book PDF), so the canonical hex values can't
-  land yet. We ship named CSS variables with TBD-marked placeholders so
-  the swap, when #7 lands, is a single-file variable update — same
-  discipline as NF14's named-constants pattern in mrp_bom.py.
+  Sky / Walnut / Linen palette from the prior intranet design language
+  (Brief section 2.1). Hex values are placeholders until SIGNATURE_SERIES_TOKENS.md
+  (#7, the Signature Series spec book PDF) lands; when it does, swap the hex
+  literals below.
 
-  Naming follows the Sky / Walnut / Linen palette from the prior intranet
-  design language (Brief section 2.1). When SIGNATURE_SERIES_TOKENS.md is
-  authored, replace each TBD with the canonical hex and update this
-  comment block to remove the TBD markers.
+  IMPORTANT: wkhtmltopdf (QtWebKit) CANNOT resolve CSS custom properties.
+  A prior version defined these as ":root" CSS variables and consumed them via
+  the css var() function, which silently rendered Shop Copy / Door Order with NO
+  colours, borders, or zone highlights. Values are inlined as literal hex here,
+  the same wkhtmltopdf-compat discipline already documented in
+  southbrook_room.py:to_svg() and signature_spec_sheet.xml. Do NOT reintroduce
+  CSS variables in report styles.
 -->
 <odoo>
 
   <template id="southbrook_report_styles" name="Southbrook Report Styles">
     <style>
-      :root {
-        /* === Sky / Walnut / Linen — TBD until #7 lands === */
-        --southbrook-display-font: "Cardo", "Times New Roman", serif;  /* TBD */
-        --southbrook-body-font:    "Source Sans Pro", "Helvetica", sans-serif;  /* TBD */
-        --southbrook-walnut:       #5C4033;   /* TBD — warm walnut accent */
-        --southbrook-sky:          #C8D9E0;   /* TBD — cool sky background */
-        --southbrook-linen:        #F8F4EC;   /* TBD — paper-warm body bg */
-        --southbrook-ink:          #2A2A2A;   /* TBD — ink-and-paper body text */
-        --southbrook-rule-color:   #D6CFC1;   /* TBD — table rule, page divider */
-        --southbrook-muted:        #8A8478;   /* TBD — secondary text */
-      }
-
       .southbrook-report {
-        font-family: var(--southbrook-body-font);
-        color: var(--southbrook-ink);
-        background: var(--southbrook-linen);
+        font-family: "Source Sans Pro", "Helvetica", sans-serif;
+        color: #2A2A2A;
+        background: #F8F4EC;
         padding: 1.5cm;
       }
       .southbrook-report h1, .southbrook-report h2 {
-        font-family: var(--southbrook-display-font);
-        color: var(--southbrook-walnut);
+        font-family: "Cardo", "Times New Roman", serif;
+        color: #5C4033;
         margin: 0 0 0.4em 0;
       }
       .southbrook-report .sb-rule {
         border: 0;
-        border-top: 1px solid var(--southbrook-rule-color);
+        border-top: 1px solid #D6CFC1;
         margin: 1em 0;
       }
       .southbrook-report table {
@@ -52,25 +42,25 @@
       .southbrook-report th {
         text-align: left;
         font-weight: 600;
-        border-bottom: 2px solid var(--southbrook-walnut);
+        border-bottom: 2px solid #5C4033;
         padding: 0.4em 0.6em;
       }
       .southbrook-report td {
-        border-bottom: 1px solid var(--southbrook-rule-color);
+        border-bottom: 1px solid #D6CFC1;
         padding: 0.3em 0.6em;
       }
       .southbrook-report .sb-zone-header {
-        background: var(--southbrook-sky);
-        color: var(--southbrook-ink);
+        background: #C8D9E0;
+        color: #2A2A2A;
         font-weight: 600;
       }
       .southbrook-report .sb-muted {
-        color: var(--southbrook-muted);
+        color: #8A8478;
         font-size: 0.9em;
       }
       .southbrook-report .sb-total-row td {
         font-weight: 700;
-        border-top: 2px solid var(--southbrook-walnut);
+        border-top: 2px solid #5C4033;
       }
       .southbrook-report .sb-illustrative-banner {
         background: #FFF3CD;

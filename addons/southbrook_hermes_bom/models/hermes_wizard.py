@@ -11,8 +11,11 @@ never embed the API key in the wizard record (the key is read fresh from
 ir.config_parameter every dispatch).
 """
 import base64
+import ipaddress
 import json
 import logging
+import socket
+from urllib.parse import urlparse
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -743,6 +746,10 @@ class HermesWizard(models.TransientModel):
             bom_payload = json.loads(self.proposed_bom_json or "{}")
         except json.JSONDecodeError as exc:
             raise UserError(_("Proposed BOM JSON is invalid: %s") % exc) from exc
+        # A reviewer can hand-edit proposed_bom_json — valid JSON that isn't an
+        # object (e.g. `["x"]`) would AttributeError on .get() below.
+        if not isinstance(bom_payload, dict):
+            raise UserError(_("Proposed BOM JSON must be an object."))
         lines_payload = bom_payload.get("lines") or []
         if not lines_payload:
             _logger.info("Hermes BOM payload empty — skipping BOM apply.")
@@ -789,6 +796,9 @@ class HermesWizard(models.TransientModel):
         new_line_vals = []
         missing = []
         for line in lines_payload:
+            if not isinstance(line, dict):
+                missing.append(str(line)[:60])
+                continue
             sku = (line.get("sku") or "").strip()
             name = (line.get("name") or "").strip()
             # qty is required and must be positive. Silently defaulting
@@ -885,6 +895,34 @@ class HermesWizard(models.TransientModel):
             )))
         return applied
 
+    @staticmethod
+    def _is_safe_public_url(url):
+        """SSRF guard: True only if every IP the host resolves to is a
+        global/public address. Hermes is an AI agent (prompt-injectable,
+        explicitly untrusted), so a manipulated source_url could point at
+        cloud-metadata (169.254.169.254), loopback, or an internal service.
+        Rejects private/loopback/link-local/reserved/multicast ranges.
+        """
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https"):
+                return False
+            host = parsed.hostname
+            if not host:
+                return False
+            infos = socket.getaddrinfo(host, None)
+        except (ValueError, OSError):
+            return False
+        for info in infos:
+            ip_str = info[4][0]
+            try:
+                ip = ipaddress.ip_address(ip_str)
+            except ValueError:
+                return False
+            if not ip.is_global or ip.is_reserved or ip.is_multicast:
+                return False
+        return True
+
     def _attach_documents(self):
         """Fetch each source URL and attach the response to the template.
 
@@ -917,9 +955,15 @@ class HermesWizard(models.TransientModel):
 
         skipped = []
         for url in urls:
+            # SSRF guard: block private/loopback/metadata hosts, and disable
+            # redirects (a public URL could 3xx-bounce to an internal host).
+            if not self._is_safe_public_url(url):
+                skipped.append("%s (blocked: non-public host)" % url)
+                continue
             try:
                 resp = requests.get(
                     url, timeout=ATTACH_TIMEOUT_SECONDS, stream=True,
+                    allow_redirects=False,
                 )
                 resp.raise_for_status()
                 # Read with a hard size cap; abort if the source is too big.

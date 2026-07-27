@@ -20,6 +20,10 @@
         "southbrook_estimating",
         "website_product_configurator",   # OCA — public-facing wizard base
         "portal",                          # /my/... portal layout + auth
+        # views/auth_template.xml inherits auth_passkey.auth_passkey_login_oauth;
+        # it is auto_install upstream, but declare it so the inherit is explicit
+        # (avoids an install-order ParseError if auto_install ever changes).
+        "auth_passkey",
         # 2026-07-03 T1 — the new "3D Design" tab reuses the standalone
         # Configurator's KitchenCanvas OWL engine + persists cabinet
         # positions to the existing southbrook.kitchen.design(.line)

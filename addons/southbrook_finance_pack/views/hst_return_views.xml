@@ -27,7 +27,8 @@
             <form string="HST Return">
                 <header>
                     <button name="action_compute" type="object"
-                            string="Compute" class="oe_highlight"/>
+                            string="Compute" class="oe_highlight"
+                            invisible="state != 'draft'"/>
                     <button name="action_file" type="object"
                             string="Mark Filed" invisible="state != 'draft'"/>
                     <button name="action_mark_paid" type="object"
@@ -41,10 +42,10 @@
                     </div>
                     <group>
                         <group string="Period">
-                            <field name="tax_year"/>
-                            <field name="quarter"/>
-                            <field name="period_from"/>
-                            <field name="period_to"/>
+                            <field name="tax_year" readonly="state != 'draft'"/>
+                            <field name="quarter" readonly="state != 'draft'"/>
+                            <field name="period_from" readonly="state != 'draft'"/>
+                            <field name="period_to" readonly="state != 'draft'"/>
                         </group>
                         <group string="Totals">
                             <field name="total_sales" readonly="1"/>

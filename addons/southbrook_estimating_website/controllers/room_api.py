@@ -202,7 +202,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     # ------------------------------------------------------------------
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/get",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -222,7 +222,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     # ------------------------------------------------------------------
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/create",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -349,7 +349,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     # ------------------------------------------------------------------
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/<int:room_id>/update",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -550,7 +550,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/<int:room_id>"
         "/wall/<int:wall_id>/constraint/add",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -644,7 +644,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/<int:room_id>"
         "/wall/<int:wall_id>/constraint/<int:constraint_id>/delete",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -684,7 +684,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     @http.route(
         "/southbrook/api/order/<int:order_id>/line/<int:line_id>"
         "/place-on-wall",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -860,7 +860,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     @http.route(
         "/southbrook/api/order/<int:order_id>/room/<int:room_id>"
         "/wall/<int:wall_id>/recommend",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )
@@ -970,7 +970,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     # templates to show.
     @http.route(
         "/southbrook/api/room-templates/list",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )

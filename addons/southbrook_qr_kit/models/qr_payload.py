@@ -109,6 +109,17 @@ class QrPayload(models.AbstractModel):
             raise UserError(
                 _("Malformed payload — missing kind or ident: %s") % payload)
         query = parse_qs(parsed.query)
+        # The HMAC only covers `kind/ident?t=<ts>` — any other query key would
+        # ride along UNSIGNED yet still be present in the raw payload string
+        # that downstream HTML/JS renderers echo, enabling query-param
+        # smuggling (e.g. appending `&x=</script>...` to a validly-signed QR).
+        # Reject unexpected keys so a "valid_signature" payload is also
+        # structurally canonical. build() only ever emits t + s.
+        extra_keys = set(query) - {"t", "s"}
+        if extra_keys:
+            raise UserError(
+                _("Unexpected QR query parameter(s): %s")
+                % ", ".join(sorted(extra_keys)))
         ts_raw = (query.get("t") or [""])[0]
         sig = (query.get("s") or [""])[0]
         try:

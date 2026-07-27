@@ -58,6 +58,7 @@ class TestGoldenPathAllFlagsOn(TransactionCase):
         ICP.set_param(
             "southbrook_premium.default_kitchen_project_id",
             str(cls.project.id))
+        ICP.set_param("southbrook.mo_availability_gate.enabled", "0")
         ICP.set_param(
             "southbrook_premium_orchestration.auto_emit_cutlist", "True")
         ICP.set_param(
@@ -107,6 +108,8 @@ class TestGoldenPathAllFlagsOn(TransactionCase):
             })],
         })
         line = so.order_line[0]
+        if "force_production_release" in so._fields:
+            so.force_production_release = True
         # Manual MO link so P1 / P3 resolve cleanly without needing a
         # full BoM to drive Odoo's stock-quants pipeline.
         self.MO.create({

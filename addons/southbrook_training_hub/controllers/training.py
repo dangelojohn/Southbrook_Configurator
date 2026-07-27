@@ -27,6 +27,21 @@ _logger = logging.getLogger(__name__)
 
 class SouthbrookTrainingController(http.Controller):
 
+    def _require_internal(self):
+        """These routes back the internal Help panel + the intranet IQ-Deck
+        tile. Because search_for_user sudo's the catalogue read (so the model
+        ACL doesn't apply), a portal/share user would otherwise read every
+        un-role-gated item — including internal runbooks (the fail-open default).
+        Restrict to internal users; the trade-partner path is the Hermes
+        find_training tool, not these routes. Returns a 403 response or None."""
+        if not request.env.user._is_internal():
+            return request.make_response(
+                json.dumps({"error": "forbidden"}),
+                status=403,
+                headers=[("Content-Type", "application/json")],
+            )
+        return None
+
     @http.route("/training/recommended", type="http", auth="user",
                 methods=["GET"], csrf=False, save_session=False)
     def recommended(self, limit=8, **kwargs):
@@ -38,6 +53,9 @@ class SouthbrookTrainingController(http.Controller):
         Response: JSON envelope ``{"schema": "...v1", "user_id": N,
                 "count": N, "items": [...]}``.
         """
+        forbidden = self._require_internal()
+        if forbidden is not None:
+            return forbidden
         try:
             n = max(1, min(int(limit), 25))
         except (TypeError, ValueError):
@@ -66,6 +84,9 @@ class SouthbrookTrainingController(http.Controller):
                           for that menu when present.
             ``limit`` — int, default 10, cap 25.
         """
+        forbidden = self._require_internal()
+        if forbidden is not None:
+            return forbidden
         try:
             n = max(1, min(int(limit), 25))
         except (TypeError, ValueError):

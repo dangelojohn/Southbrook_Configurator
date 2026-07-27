@@ -40,7 +40,8 @@ gating, and external content (PDFs, runbooks, web tours) without
 patching the Odoo native slide model.  The seed hook keeps the mirror
 fresh on every -u of this addon.
 """
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 KIND_SELECTION = [
@@ -71,6 +72,19 @@ class SouthbrookTrainingItem(models.Model):
         help="Stable identifier of the underlying record. Examples: "
              "'slide.slide:42', 'ir.attachment:1729', 'url:https://…'.")
     url = fields.Char(required=True, tracking=True)
+
+    @api.constrains("url")
+    def _check_url_scheme(self):
+        # The Help panel opens url via window.open / act_url. Only curators can
+        # write items, but constrain the scheme anyway so a stray "javascript:"
+        # can't become a script-execution vector in the panel.
+        for rec in self:
+            u = (rec.url or "").strip().lower()
+            if u and not (u.startswith("http://") or u.startswith("https://")
+                          or rec.url.strip().startswith("/")):
+                raise ValidationError(_(
+                    "Training URL %s must be http(s):// or a leading-slash "
+                    "path.") % rec.url)
     channel_id = fields.Many2one(
         "slide.channel", string="eLearning Course",
         ondelete="set null", index=True)

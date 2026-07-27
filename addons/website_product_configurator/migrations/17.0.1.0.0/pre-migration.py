@@ -7,11 +7,15 @@ def migrate(cr, version):
     record = cr.fetchone()
 
     if record:
-        update_query = """
+        # Parameterized (not %-formatted) — disciplined SQL even though the
+        # values come from the DB, not user input.
+        cr.execute(
+            """
             UPDATE ir_config_parameter
             SET value = (
-                SELECT id FROM ir_ui_view WHERE key = '%s'
+                SELECT id FROM ir_ui_view WHERE key = %s
             )
             WHERE id = %s
-        """
-        cr.execute(update_query % (record[1], record[0]))  # pylint: disable=E8103
+            """,
+            (record[1], record[0]),
+        )

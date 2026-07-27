@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Seed a single Finance Snapshot record so the "Finance Snapshot" menu
+      renders on install. The tile fields are computed on read from the live
+      ledger / WIP / budget / HST data, so this one record is the whole
+      dashboard. company_id defaults to the main company; managers may create
+      per-company snapshots. noupdate so a user-renamed snapshot survives
+      module upgrades.
+    -->
+    <data noupdate="1">
+        <record id="mi_tiles_default" model="southbrook.finance.mi_tiles">
+            <field name="label">Finance Snapshot</field>
+        </record>
+    </data>
+</odoo>

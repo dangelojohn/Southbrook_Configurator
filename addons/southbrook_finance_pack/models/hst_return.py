@@ -127,6 +127,11 @@ class SouthbrookFinanceHstReturn(models.Model):
     def _compute_totals(self):
         AML = self.env["account.move.line"]
         for rec in self:
+            # Immutability: once filed/paid the figures are a locked snapshot of
+            # what was remitted. Leave the stored values untouched even if a
+            # depends-field (period_*) is edited via RPC after filing.
+            if rec.state and rec.state != "draft":
+                continue
             if not rec.period_from or not rec.period_to:
                 rec.total_sales = 0.0
                 rec.hst_collected = 0.0
@@ -175,6 +180,17 @@ class SouthbrookFinanceHstReturn(models.Model):
             rec.net_hst_owing = rec.hst_collected - rec.hst_paid_itc
 
     def action_compute(self):
+        # A FILED/PAID return is a snapshot of what was remitted to the CRA —
+        # recomputing it would silently pull in any invoice back-dated into the
+        # period after filing and change the officially-reported figure. Only a
+        # draft return may (re)compute.
+        for rec in self:
+            if rec.state != "draft":
+                raise UserError(
+                    _("Return %s is already %s; its figures are locked. "
+                      "Only a draft return can be recomputed.")
+                    % (rec.name, rec.state)
+                )
         # Force recompute (cache invalidation) then return self for chaining.
         self.invalidate_recordset(
             ["total_sales", "hst_collected", "hst_paid_itc", "net_hst_owing"]

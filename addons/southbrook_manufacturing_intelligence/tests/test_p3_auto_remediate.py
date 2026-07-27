@@ -90,6 +90,8 @@ class TestP3AutoRemediate(TransactionCase):
             })],
         })
         line = so.order_line[0]
+        # southbrook_mrp_pm gates sale-linked MO creation behind approval.
+        so.force_production_release = True
         mo = self.MO.create({
             "product_id": variant.id,
             "product_qty": 1.0,

@@ -114,10 +114,18 @@ class SouthbrookFinanceAsset(models.Model):
                 vals["code"] = seq or _("New")
         return super().create(vals_list)
 
-    @api.depends("schedule_ids.cca_amount", "acquisition_cost")
+    @api.depends("schedule_ids.cca_amount", "schedule_ids.posted",
+                 "acquisition_cost")
     def _compute_depreciation_totals(self):
         for asset in self:
-            accumulated = sum(line.cca_amount for line in asset.schedule_ids)
+            # Accumulated depreciation is only what has actually been TAKEN —
+            # i.e. POSTED schedule lines — not the whole projected schedule.
+            # Summing all projected lines collapsed net_book_value to ~0 the
+            # instant a schedule was generated (materially misstating book
+            # value on the financial statements), even though no depreciation
+            # had yet been recorded.
+            accumulated = sum(
+                line.cca_amount for line in asset.schedule_ids if line.posted)
             asset.accumulated_depreciation = accumulated
             asset.net_book_value = asset.acquisition_cost - accumulated
 
@@ -139,14 +147,23 @@ class SouthbrookFinanceAsset(models.Model):
         base = self._apply_cost_ceiling(self.acquisition_cost)
         if n <= 0:
             return []
-        per_year = base / n
+        # Round the per-year slice to cents, and make the LAST depreciating
+        # year absorb the rounding residual, so the schedule sums EXACTLY to the
+        # base (10000/3 rounded to 3333.33 × 3 = 9999.99 otherwise leaves a
+        # permanent $0.01 UCC and mis-states the final depreciation).
+        per_year = round(base / n, 2)
         rows = []
-        balance = base
+        balance = round(base, 2)
         for y in range(1, years + 1):
-            cca = per_year if y <= n else 0.0
+            if y < n:
+                cca = min(per_year, balance)
+            elif y == n:
+                cca = balance  # last depreciating year: whatever's left
+            else:
+                cca = 0.0
             cca = min(cca, balance)
             opening = balance
-            balance -= cca
+            balance = round(balance - cca, 2)
             rows.append(
                 {
                     "year": y,

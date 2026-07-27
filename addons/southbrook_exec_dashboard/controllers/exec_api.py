@@ -31,13 +31,22 @@ class ExecDashboardAPI(http.Controller):
         if not uid:
             return self._json_response({"error": "unauthorized"}, status=401)
 
+        # SECURITY: the payload is company-wide REVENUE / CASH / margin computed
+        # under sudo below. auth="public" + a bare session check let ANY logged-in
+        # user — a shop-floor operator, or a portal dealer/customer — read the
+        # CFO's numbers. Gate to internal executive-group members before the
+        # sudo compute; the sudo bypasses the model ACL, so this is the only
+        # boundary.
+        caller = env["res.users"].sudo().browse(uid)
+        exec_group = "southbrook_exec_dashboard.group_southbrook_exec_dashboard_user"
+        if not caller.exists() or not caller._is_internal() \
+                or not caller.has_group(exec_group):
+            return self._json_response({"error": "forbidden"}, status=403)
+
         try:
-            snapshot = (
-                env["southbrook.exec_dashboard.snapshot"]
-                .with_user(uid)
-                .sudo()
-                .get_or_create_today()
-            )
+            Snapshot = env["southbrook.exec_dashboard.snapshot"].sudo()
+            sid = Snapshot.get_or_create_today()
+            snapshot = Snapshot.browse(sid)
             payload = snapshot._compute_kpi_payload()
         except Exception as exc:  # pragma: no cover - defensive
             _logger.exception("exec/morning failed: %s", exc)
@@ -70,9 +79,16 @@ class ExecDashboardAPI(http.Controller):
         if api_key:
             ApiKey = env.get("southbrook.api.key")
             if ApiKey is not None:
-                key = ApiKey.sudo().search([("key", "=", api_key)], limit=1)
-                if key and key.user_id:
-                    return key.user_id.id
+                # Use the model's timing-safe verify() — the key is stored
+                # HASHED (key_hash), there is no cleartext `key` field, so the
+                # old search([("key","=",api_key)]) referenced a non-existent
+                # field (runtime error) and bypassed the hash comparison.
+                try:
+                    user = ApiKey.sudo().verify(api_key)
+                except Exception:
+                    user = None
+                if user:
+                    return user.id
             # Fall back to res.users.api.keys if southbrook_api isn't installed
             CoreKeys = env.get("res.users.apikeys")
             if CoreKeys is not None:

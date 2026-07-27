@@ -136,10 +136,18 @@ class SouthbrookGeminiClient(models.AbstractModel):
                 "or set ir.config_parameter `gemini.use_mock = True`."
             )) from exc
 
+        # Pass the API key in the x-goog-api-key HEADER, not the URL query
+        # string. With `?key=...` in the URL, any httpx exception that carries
+        # the request URL — notably httpx.HTTPStatusError from
+        # resp.raise_for_status() below, which is NOT caught by the transient
+        # except and propagates as a 500 — would leak the key into the
+        # traceback / server log / user-facing UserError. Headers are never in
+        # the URL, so this closes that exposure. (2026-07-11 security audit.)
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{template.model}:generateContent?key={api_key}"
+            f"{template.model}:generateContent"
         )
+        headers = {"x-goog-api-key": api_key}
         body = {
             "contents": [{
                 "parts": [
@@ -157,13 +165,17 @@ class SouthbrookGeminiClient(models.AbstractModel):
             if wait:
                 time.sleep(wait)
             try:
-                resp = httpx.post(url, json=body, timeout=60.0)
+                resp = httpx.post(url, json=body, headers=headers, timeout=60.0)
                 if resp.status_code in (401, 403):
                     raise UserError(_("Gemini auth failed (HTTP %s).") % resp.status_code)
                 if resp.status_code == 429:
                     # 1 retry only on quota
                     if attempt == 0:
-                        retry_after = float(resp.headers.get("Retry-After", 5))
+                        # Cap the server-controlled Retry-After — an unbounded
+                        # (or hostile-proxy) value would block the request
+                        # worker arbitrarily, exhausting the small pool → 502s.
+                        retry_after = min(
+                            float(resp.headers.get("Retry-After", 5)), 30.0)
                         time.sleep(retry_after)
                         continue
                     raise UserError(_("Gemini quota exhausted."))
@@ -171,6 +183,13 @@ class SouthbrookGeminiClient(models.AbstractModel):
                 text = (resp.json()["candidates"][0]["content"]
                             ["parts"][0]["text"])
                 return json.loads(text)
+            except httpx.HTTPStatusError as exc:
+                # 400/404/5xx: surface a clean, key-free message rather than
+                # letting httpx's HTTPStatusError (whose text includes the
+                # request URL) propagate as an uncaught 500.
+                raise UserError(_(
+                    "Gemini request failed (HTTP %s)."
+                ) % exc.response.status_code) from None
             except (httpx.ConnectError, httpx.ReadTimeout) as exc:
                 last_exc = exc
                 _logger.warning("Gemini transient error attempt=%s: %s",

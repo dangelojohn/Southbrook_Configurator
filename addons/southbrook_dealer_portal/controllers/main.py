@@ -2,12 +2,20 @@
 """Dealer-channel portal routes."""
 import json
 import logging
+import re
 
 from odoo import _, http
 from odoo.exceptions import AccessError, MissingError
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
+
+
+def _safe_filename_part(value):
+    """Sanitize a value interpolated into a Content-Disposition filename —
+    strip quotes / CR / LF so a crafted package name can't break out of the
+    filename or inject a header."""
+    return re.sub(r'[^\w.\- ]', "_", (value or "")).strip() or "package"
 
 
 class DealerPortal(http.Controller):
@@ -41,21 +49,16 @@ class DealerPortal(http.Controller):
     )
     def kd_export(self, pkg_id, **kw):
         self._require_dealer()
-        Package = request.env["sb.production.package"].sudo()
-        package = Package.browse(pkg_id).exists()
-        if not package:
-            raise MissingError(_("Production package not found."))
-        # ACL: package's MO must trace to an SO with the dealer's partner.
-        # (For Phase 1 we accept any package the dealer can name; a real
-        # production deployment must wire SO ↔ MO ↔ package linkage.)
+        package = self._fetch_owned_package(pkg_id)
         envelope = package.export_kd_envelope()
         body = json.dumps(envelope, indent=2)
+        fname = _safe_filename_part("kd_%s" % package.name)
         return request.make_response(
             body,
             headers=[
                 ("Content-Type", "application/json"),
                 ("Content-Disposition",
-                 f'attachment; filename="kd_{package.name}.json"'),
+                 'attachment; filename="%s.json"' % fname),
             ],
         )
 
@@ -68,23 +71,40 @@ class DealerPortal(http.Controller):
     )
     def installation_pdf(self, pkg_id, **kw):
         self._require_dealer()
-        Package = request.env["sb.production.package"].sudo()
-        package = Package.browse(pkg_id).exists()
-        if not package:
-            raise MissingError(_("Production package not found."))
+        package = self._fetch_owned_package(pkg_id)
         pdf_bytes = package.export_installation_pdf()
+        fname = _safe_filename_part("installation_%s" % package.name)
         return request.make_response(
             pdf_bytes,
             headers=[
                 ("Content-Type", "application/pdf"),
                 ("Content-Disposition",
-                 f'attachment; filename="installation_{package.name}.pdf"'),
+                 'attachment; filename="%s.pdf"' % fname),
             ],
         )
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    def _fetch_owned_package(self, pkg_id):
+        """Return the package IFF it traces to one of the acting dealer's own
+        sale orders. Object-level authorization on top of _require_dealer's
+        channel gate — WITHOUT this, a dealer could enumerate pkg ids and
+        download every other customer's KD envelope / installation PDF (the
+        record rule that should back-stop it was an empty domain). Collapse to
+        the same not-found response for missing and not-owned, so package
+        existence isn't leaked."""
+        package = request.env["sb.production.package"].sudo().browse(pkg_id).exists()
+        if not package or not package._belongs_to_partner(
+                request.env.user.partner_id):
+            if package:
+                _logger.warning(
+                    "Dealer-portal IDOR blocked: user=%s partner=%s tried "
+                    "package %s (not owned).",
+                    request.env.user.id, request.env.user.partner_id.id, pkg_id)
+            raise MissingError(_("Production package not found."))
+        return package
+
     def _require_dealer(self):
         partner = request.env.user.partner_id
         channel = partner.channel if hasattr(partner, "channel") else None

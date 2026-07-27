@@ -9,7 +9,7 @@ only one) entry in the scan log per WO advance.
 """
 import json
 
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import HttpCase, TransactionCase, tagged
 
 
 @tagged("post_install", "-at_install", "southbrook", "floor_traveler", "p8")
@@ -67,13 +67,21 @@ class TestP8FloorTraveler(TransactionCase):
             "code": "P8-SCAN-CRIB",
             "name": "P8 scan crib",
         })
+        # Use a FRESH category, not the seeded cat_blade_melamine — the seed
+        # ships an asset in that category, and the consumption resolver picks
+        # by category, so a shared category makes it resolve the seeded asset
+        # (asset(1)) instead of this test's asset.
+        category = self.env["southbrook.tool.category"].create({
+            "name": "P8 Scan Test Blades",
+            "code": "P8-SCAN-CAT",
+        })
         tool_product = self.Product.create({
             "name": "P8 scan panel saw blade",
             "default_code": "P8-SCAN-BLADE",
             "type": "consu",
             "x_southbrook_is_tool": True,
             "x_southbrook_is_reusable_tool": True,
-            "x_southbrook_tool_category_id": self.category.id,
+            "x_southbrook_tool_category_id": category.id,
         })
         asset = self.Asset.create({
             "name": "P8 scan blade asset",
@@ -115,12 +123,14 @@ class TestP8FloorTraveler(TransactionCase):
             "product_qty": 1.0,
             "bom_id": bom.id,
         })
-        mo.action_confirm()
+        # Bypass the premium_orchestration MO availability gate — no component
+        # stock is staged and this test exercises the scan/consumption loop.
+        mo.with_context(bypass_availability_gate=True).action_confirm()
         wo = mo.workorder_ids[:1]
         wo.qty_produced = 1.0
         self.OpReq.create({
             "operation_id": wo.operation_id.id,
-            "tool_category_id": self.category.id,
+            "tool_category_id": category.id,
             "quantity": 1,
             "consume_qty_per_unit": 1.0,
         })
@@ -252,3 +262,35 @@ class TestP8FloorTraveler(TransactionCase):
         # template embeds qr_payload as fallback text).
         self.assertIn("sb-package:%s" % pkg.id, rendered.decode("utf-8"),
                       "rendered traveler must include the QR payload text")
+
+
+@tagged("post_install", "-at_install", "southbrook", "floor_traveler", "p8")
+class TestP8ScanEndpointAuth(HttpCase):
+    """The scan endpoint advances/finishes production under sudo — it must
+    reject callers who aren't internal mrp operators (regression: any
+    authenticated user, incl. a portal customer, could finish any job)."""
+
+    def _post_scan(self, payload):
+        return self.url_open(
+            "/southbrook/api/floor-traveler/scan",
+            data=json.dumps({
+                "jsonrpc": "2.0", "method": "call",
+                "params": {"qr_payload": payload},
+            }),
+            headers={"Content-Type": "application/json"},
+        )
+
+    def test_non_mrp_user_is_forbidden(self):
+        self.env["res.users"].create({
+            "name": "P8 Plain User",
+            "login": "p8_plain_user",
+            "password": "p8_plain_user",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        self.authenticate("p8_plain_user", "p8_plain_user")
+        resp = self._post_scan("sb-package:1")
+        body = json.loads(resp.text)
+        # jsonrpc envelope → result is the controller's returned dict.
+        result = body.get("result", body)
+        self.assertFalse(result.get("ok"))
+        self.assertEqual(result.get("error"), "forbidden")

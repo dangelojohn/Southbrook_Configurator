@@ -189,36 +189,36 @@ class SouthbrookEco(models.Model):
     # Approval gating + terminal-stage write protection
     # ------------------------------------------------------------------
     def write(self, vals):
+        new_stage = None
         if "stage_id" in vals:
             new_stage = self.env["southbrook.eco.stage"].browse(vals["stage_id"])
-            # Terminal-stage guard: Applied / Rejected are reachable
-            # only via action_apply / action_reject (both of which
-            # always co-write `state` to the matching terminal value).
-            # A direct write of stage_id to a terminal stage WITHOUT
-            # a matching state move is a workflow-bypass attempt —
-            # it would land the ECO in Applied without running any
-            # apply handler (no BoM copy, no cut-spec activation, no
-            # chatter audit), producing a paradoxical
-            # 'stage=Applied, state=open' record. Block it.
-            # Bug found by demo walkthrough 2026-06-01 part 9.
-            if new_stage.is_final:
-                expected_state = (
-                    "rejected" if new_stage.is_rejected_stage else "applied"
-                )
-                if vals.get("state") != expected_state:
-                    raise UserError(
-                        _(
-                            "Cannot write stage '%(stage)s' directly on ECO "
-                            "%(eco)s — terminal stages are reachable only "
-                            "via the Apply or Reject buttons, which run the "
-                            "ECO's change handlers + write the matching "
-                            "lifecycle state."
-                        )
-                        % {
-                            "stage": new_stage.name,
-                            "eco": ", ".join(self.mapped("name")) or "(new)",
-                        }
-                    )
+        # Terminal states/stages (Applied / Rejected) are reachable ONLY through
+        # the gated action methods (action_apply / action_reject), which run the
+        # change handlers, enforce PLM Approver rights, and set plm_lifecycle=True
+        # on their write. A direct write of state=applied|rejected — or of
+        # stage_id to a final stage — is a workflow-forge attempt and is refused.
+        #
+        # The prior guard only fired on the stage_id path and only when `state`
+        # didn't already match, so `write({"stage_id": applied, "state":
+        # "applied"})` slipped through: a non-approver (group_southbrook_plm_user
+        # has perm_write) could forge an 'applied' ECO with NO handler run
+        # (no BoM copy / cut-spec activation) and a blank approver_id. Gate on
+        # the action-set context flag instead, covering both the state and the
+        # stage_id paths. (Bug found by demo walkthrough 2026-06-01 part 9;
+        # forge path found by the 2026-07-11 security audit.)
+        hits_terminal = (
+            vals.get("state") in ("applied", "rejected")
+            or (new_stage is not None and new_stage.is_final)
+        )
+        if hits_terminal and not self.env.context.get("plm_lifecycle"):
+            raise UserError(_(
+                "An ECO reaches a terminal state (Applied / Rejected) only via "
+                "the Apply or Reject actions — which run the ECO's change "
+                "handlers and enforce PLM Approver rights — not by a direct "
+                "edit of state or stage."))
+        # A non-terminal advance OUT of an approval-required stage still needs
+        # PLM Approver rights.
+        if new_stage is not None:
             for eco in self:
                 if (
                     eco.stage_id
@@ -292,6 +292,13 @@ class SouthbrookEco(models.Model):
         return True
 
     def action_reject(self):
+        # Rejecting an ECO is an approver decision (the PLM Approver group's
+        # remit is "approve, apply, and reject"). Gate it so a plain PLM User
+        # can't reject other people's ECOs. (Security audit 2026-07-11.)
+        if not self.env.user.has_group(
+            "southbrook_plm.group_southbrook_plm_approver"
+        ):
+            raise UserError(_("Only a PLM Approver may reject an ECO."))
         # Use is_rejected_stage so we land in the Rejected stage
         # specifically — NOT the first is_final stage in sequence
         # order (which would be Applied, because seqs are
@@ -346,6 +353,7 @@ class SouthbrookEco(models.Model):
             write_vals = {"state": "rejected"}
             if rejected_stage:
                 write_vals["stage_id"] = rejected_stage.id
+            eco = eco.with_context(plm_lifecycle=True)
             eco.write(write_vals)
             eco.message_post(body=_("Rejected by %s.") % self.env.user.display_name)
         return True
@@ -362,6 +370,16 @@ class SouthbrookEco(models.Model):
         Re-running action_approve / action_apply on the reset ECO
         will re-stamp these fields cleanly.
         """
+        # Reset clears approver_id/approval_date/applied_date — i.e. it can
+        # ERASE the change-control provenance of an already-applied ECO. Gate
+        # it on the approver group so a plain PLM User can't wipe the audit
+        # trail (the real BoM archive/version persists regardless). The view
+        # button already carries groups=, but that's UI-only; RPC ignores it.
+        # (Security audit 2026-07-11 — H2.)
+        if not self.env.user.has_group(
+            "southbrook_plm.group_southbrook_plm_approver"
+        ):
+            raise UserError(_("Only a PLM Approver may reset an ECO to draft."))
         # Filter to non-terminal stages so we don't accidentally
         # land back in Applied/Rejected if the seeded Draft stage
         # has been renamed/reordered.
@@ -441,7 +459,10 @@ class SouthbrookEco(models.Model):
             if not eco.approver_id:
                 write_vals["approver_id"] = self.env.user.id
                 write_vals["approval_date"] = now
-            eco.write(write_vals)
+            # plm_lifecycle flag authorises the terminal-state write past the
+            # write() forge-guard — we are inside the approver-gated action and
+            # have already run the change handler.
+            eco.with_context(plm_lifecycle=True).write(write_vals)
         return True
 
     # ------------------------------------------------------------------
@@ -460,6 +481,22 @@ class SouthbrookEco(models.Model):
         # IS the authorization. (NF: caught by test_bom_eco_versions_and_archives
         # on the live v19 install — AccessError creating mrp.bom otherwise.)
         old = self.bom_id.sudo()
+        # Serialise concurrent applies against the same BoM. Without this,
+        # two ECOs applying to the same bom_id both read version N, both create
+        # an active version N+1, and both archive the original — leaving TWO
+        # active BoMs at the same version and breaking the "one active BoM per
+        # template" invariant the confirm-time snapshot relies on. FOR UPDATE
+        # blocks the second apply until the first commits; we then re-read and
+        # refuse if the BoM was archived out from under us. (Security audit
+        # 2026-07-11 — H3/M2.)
+        self.env.cr.execute(
+            "SELECT id FROM mrp_bom WHERE id = %s FOR UPDATE", (old.id,))
+        old.invalidate_recordset(["active", "southbrook_version"])
+        if not old.active:
+            raise UserError(_(
+                "BoM %s is already archived — it was versioned by a concurrent "
+                "ECO. Re-target this ECO at the current active version."
+            ) % old.display_name)
         new = old.copy(
             {
                 "southbrook_version": old.southbrook_version + 1,

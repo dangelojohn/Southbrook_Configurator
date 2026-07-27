@@ -98,6 +98,10 @@ class SouthbrookSpcSample(models.Model):
         for rec in self:
             if rec.in_spec:
                 continue
+            # Idempotent: a sample already escalated to an NCR must not spawn
+            # a duplicate on a second call (e.g. a re-run of the OOS sweep).
+            if rec.ncr_ids:
+                continue
             ncr = self.env["southbrook.ncr"].create(
                 {
                     "production_id": rec.production_id.id or False,

@@ -95,7 +95,15 @@ def requires_mcp_auth(handler: Callable) -> Callable:
         if not user:
             return _error("invalid_api_key",
                           "Missing or invalid X-Api-Key header.", 401)
+        # SECURITY: the API-key login route issues keys to ANY user that can
+        # log in — including portal customers. MCP must be internal-staff only,
+        # otherwise a portal customer's key could read internal data. (Reads are
+        # also no longer sudo'd, so ACL applies on top of this gate.)
+        if not user._is_internal():
+            return _error("forbidden",
+                          "MCP is restricted to internal users.", 403)
         request.update_env(user=user.id)
+        request._mcp_key_hash = key_hash
         request._mcp_caller_persona = "mcp_server"
         return handler(self, *args, **kwargs)
     return wrapper
@@ -181,6 +189,16 @@ class SouthbrookIntegrationsMcp(http.Controller):
             ("create_date", ">=", datetime.utcfromtimestamp(window_start)),
         ])
         rl_headers = _rate_limit_headers(tool, used)
+
+        # Enforce (not just advertise) the per-tool per-minute budget so a
+        # single key can't loop expensive reads unthrottled.
+        if tool.rate_limit_per_min and used >= tool.rate_limit_per_min:
+            return _json({
+                "schema": "southbrook.mcp.error.v1",
+                "error": "rate_limited",
+                "message": "Per-minute rate limit for tool '%s' exceeded."
+                           % tool_name,
+            }, status=429, extra_headers=rl_headers)
 
         try:
             result = tool.invoke(args_json)

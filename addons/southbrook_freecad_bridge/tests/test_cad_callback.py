@@ -155,3 +155,33 @@ class TestCadCallback(HttpCase):
         self.assertEqual(r.status_code, 200, r.text)
         self.mo.invalidate_recordset(["x_cad_status"])
         self.assertEqual(self.mo.x_cad_status, "error")
+
+    # ------------------------------------------------------------------
+    # MEDIUM-1 — state guard against forged/replayed regressions
+    # ------------------------------------------------------------------
+    def test_forged_regression_of_settled_mo_is_blocked(self):
+        """A callback must not regress an MO no longer awaiting a render —
+        e.g. flip a 'done' MO to 'error'. Blocks a forged/replayed call from
+        churning settled MOs across the factory."""
+        self.mo.x_cad_status = "done"
+        self.env.flush_all()
+        r = self._post(
+            {"production_id": self.mo.id, "status": "error",
+             "attachment_ids": []},
+            secret=self.secret,
+        )
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.json().get("error"), "not_awaiting_render")
+        self.mo.invalidate_recordset(["x_cad_status"])
+        self.assertEqual(self.mo.x_cad_status, "done")
+
+    def test_idempotent_replay_of_same_status_allowed(self):
+        """A retry of the SAME terminal status (idempotent) still succeeds."""
+        self.mo.x_cad_status = "done"
+        self.env.flush_all()
+        r = self._post(
+            {"production_id": self.mo.id, "status": "done",
+             "attachment_ids": []},
+            secret=self.secret,
+        )
+        self.assertEqual(r.status_code, 200, r.text)

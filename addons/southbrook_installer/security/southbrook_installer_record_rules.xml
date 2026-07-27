@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  Per-installer job visibility. The module's group comments document that a
+  helper "can view ASSIGNED jobs" — but with no ir.rule, every role saw every
+  job company-wide (customer addresses, GPS, phase photos, builder signatures).
+  These rules enforce the documented model:
+
+    * Restrictive rule on group_sami_installer_helper (which lead/dispatcher/
+      ops inherit via implied_ids): a crew member sees only jobs where they are
+      the lead installer or in the assigned crew.
+    * Permissive rule on dispatcher/warehouse/finance/operations_mgr: full
+      company-wide visibility (their documented roles).
+
+  Because Odoo OR-combines the record rules from the groups a user belongs to,
+  a dispatcher (who is also a helper via implied_ids) gets restrictive OR
+  permissive = all; a pure helper gets restrictive only.
+
+  BEHAVIOUR CHANGE: after this loads, crew see only assigned jobs. Requires
+  lead_installer_id (already required) and assigned_crew_ids to be populated —
+  a crew member not on a job's crew will not see it. Broad-visibility roles are
+  unaffected.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <!-- ============ JOB ============ -->
+        <record id="rule_installer_job_crew_assigned" model="ir.rule">
+            <field name="name">Installer Job: crew see assigned only</field>
+            <field name="model_id" ref="model_southbrook_installer_job"/>
+            <field name="groups" eval="[(4, ref('group_sami_installer_helper'))]"/>
+            <field name="domain_force">['|', ('lead_installer_id.user_id', '=', user.id), ('assigned_crew_ids.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_installer_job_all" model="ir.rule">
+            <field name="name">Installer Job: dispatch/warehouse/finance/ops see all</field>
+            <field name="model_id" ref="model_southbrook_installer_job"/>
+            <field name="groups" eval="[(4, ref('group_sami_dispatcher')), (4, ref('group_sami_warehouse')), (4, ref('group_sami_finance')), (4, ref('group_sami_operations_mgr'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <!-- ============ STAGE LOG ============ -->
+        <record id="rule_installer_stage_log_crew_assigned" model="ir.rule">
+            <field name="name">Stage Log: crew see assigned only</field>
+            <field name="model_id" ref="model_southbrook_installer_stage_log"/>
+            <field name="groups" eval="[(4, ref('group_sami_installer_helper'))]"/>
+            <field name="domain_force">['|', ('job_id.lead_installer_id.user_id', '=', user.id), ('job_id.assigned_crew_ids.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_installer_stage_log_all" model="ir.rule">
+            <field name="name">Stage Log: broad roles see all</field>
+            <field name="model_id" ref="model_southbrook_installer_stage_log"/>
+            <field name="groups" eval="[(4, ref('group_sami_dispatcher')), (4, ref('group_sami_warehouse')), (4, ref('group_sami_finance')), (4, ref('group_sami_operations_mgr'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <!-- ============ DAMAGE FLAG ============ -->
+        <record id="rule_installer_damage_flag_crew_assigned" model="ir.rule">
+            <field name="name">Damage Flag: crew see assigned only</field>
+            <field name="model_id" ref="model_southbrook_damage_flag"/>
+            <field name="groups" eval="[(4, ref('group_sami_installer_helper'))]"/>
+            <field name="domain_force">['|', ('job_id.lead_installer_id.user_id', '=', user.id), ('job_id.assigned_crew_ids.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_installer_damage_flag_all" model="ir.rule">
+            <field name="name">Damage Flag: broad roles see all</field>
+            <field name="model_id" ref="model_southbrook_damage_flag"/>
+            <field name="groups" eval="[(4, ref('group_sami_dispatcher')), (4, ref('group_sami_warehouse')), (4, ref('group_sami_finance')), (4, ref('group_sami_operations_mgr'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <!-- ============ DELIVERY MANIFEST ============ -->
+        <record id="rule_installer_delivery_manifest_crew_assigned" model="ir.rule">
+            <field name="name">Delivery Manifest: crew see assigned only</field>
+            <field name="model_id" ref="model_southbrook_delivery_manifest"/>
+            <field name="groups" eval="[(4, ref('group_sami_installer_helper'))]"/>
+            <field name="domain_force">['|', ('job_id.lead_installer_id.user_id', '=', user.id), ('job_id.assigned_crew_ids.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_installer_delivery_manifest_all" model="ir.rule">
+            <field name="name">Delivery Manifest: broad roles see all</field>
+            <field name="model_id" ref="model_southbrook_delivery_manifest"/>
+            <field name="groups" eval="[(4, ref('group_sami_dispatcher')), (4, ref('group_sami_warehouse')), (4, ref('group_sami_finance')), (4, ref('group_sami_operations_mgr'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <!-- ============ TOOL LOAN ============ -->
+        <record id="rule_installer_tool_loan_crew_assigned" model="ir.rule">
+            <field name="name">Tool Loan: crew see assigned only</field>
+            <field name="model_id" ref="model_southbrook_installer_tool_loan"/>
+            <field name="groups" eval="[(4, ref('group_sami_installer_helper'))]"/>
+            <field name="domain_force">['|', ('job_id.lead_installer_id.user_id', '=', user.id), ('job_id.assigned_crew_ids.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_installer_tool_loan_all" model="ir.rule">
+            <field name="name">Tool Loan: broad roles see all</field>
+            <field name="model_id" ref="model_southbrook_installer_tool_loan"/>
+            <field name="groups" eval="[(4, ref('group_sami_dispatcher')), (4, ref('group_sami_warehouse')), (4, ref('group_sami_finance')), (4, ref('group_sami_operations_mgr'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <!-- ============ CLOSEOUT ============ -->
+        <record id="rule_installer_closeout_crew_assigned" model="ir.rule">
+            <field name="name">Closeout: crew see assigned only</field>
+            <field name="model_id" ref="model_southbrook_installer_closeout"/>
+            <field name="groups" eval="[(4, ref('group_sami_installer_helper'))]"/>
+            <field name="domain_force">['|', ('job_id.lead_installer_id.user_id', '=', user.id), ('job_id.assigned_crew_ids.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_installer_closeout_all" model="ir.rule">
+            <field name="name">Closeout: broad roles see all</field>
+            <field name="model_id" ref="model_southbrook_installer_closeout"/>
+            <field name="groups" eval="[(4, ref('group_sami_dispatcher')), (4, ref('group_sami_warehouse')), (4, ref('group_sami_finance')), (4, ref('group_sami_operations_mgr'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <!-- ============ PUNCHLIST ============ -->
+        <record id="rule_installer_punchlist_crew_assigned" model="ir.rule">
+            <field name="name">Punchlist: crew see assigned only</field>
+            <field name="model_id" ref="model_southbrook_installer_punchlist"/>
+            <field name="groups" eval="[(4, ref('group_sami_installer_helper'))]"/>
+            <field name="domain_force">['|', ('job_id.lead_installer_id.user_id', '=', user.id), ('job_id.assigned_crew_ids.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_installer_punchlist_all" model="ir.rule">
+            <field name="name">Punchlist: broad roles see all</field>
+            <field name="model_id" ref="model_southbrook_installer_punchlist"/>
+            <field name="groups" eval="[(4, ref('group_sami_dispatcher')), (4, ref('group_sami_warehouse')), (4, ref('group_sami_finance')), (4, ref('group_sami_operations_mgr'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+    </data>
+</odoo>

@@ -37,6 +37,25 @@ class TestMcpTool(TransactionCase):
         self.assertEqual(result["count"], 1)
         self.assertEqual(result["rows"][0]["name"], "MCP Alice")
 
+    def test_sensitive_model_is_blocked(self):
+        """A tool cannot be defined against a secret-bearing model
+        (regression H1: ir.config_parameter → sudo-read of database.secret)."""
+        cfg_model = self.env["ir.model"].search(
+            [("model", "=", "ir.config_parameter")], limit=1)
+        with self.assertRaises(UserError):
+            self._make_tool(name="leak_secrets", model_id=cfg_model.id,
+                            domain_json="[]", read_fields_json='["key","value"]')
+
+    def test_invoke_records_principal(self):
+        """The call log must attribute the invocation to a user (regression
+        M3: the log recorded no principal)."""
+        tool = self._make_tool()
+        tool.invoke("{}")
+        log = self.env["southbrook.integrations.mcp_call_log"].search(
+            [("tool_id", "=", tool.id)], limit=1, order="id desc")
+        self.assertTrue(log)
+        self.assertEqual(log.user_id, self.env.user)
+
     def test_invoke_only_returns_listed_fields(self):
         tool = self._make_tool()
         result = tool.invoke("{}")

@@ -82,8 +82,12 @@ class TestW051EquipmentAlertsClickable(TransactionCase):
         action = self.wc.action_view_inflight_workorders()
         self.assertEqual(action["type"], "ir.actions.act_window")
         self.assertEqual(action["res_model"], "mrp.workorder")
-        # Domain must filter to this workcenter.
-        domain_pairs = {tuple(t) for t in action["domain"] if isinstance(t, (list, tuple))}
+        # Domain must filter to this workcenter. Use a LIST, not a set —
+        # the domain can contain an `in`-operator leaf whose value is a list
+        # (e.g. ("state", "in", [...])), and a list is unhashable, so a set
+        # comprehension would raise "unhashable type: list". assertIn against
+        # a list compares by equality and handles that fine.
+        domain_pairs = [tuple(t) for t in action["domain"] if isinstance(t, (list, tuple))]
         self.assertIn(
             ("workcenter_id", "=", self.wc.id), domain_pairs,
             "Action domain must filter to this workcenter.",
@@ -96,9 +100,11 @@ class TestW051EquipmentAlertsClickable(TransactionCase):
         action = self.wc.action_view_impacted_productions()
         self.assertEqual(action["type"], "ir.actions.act_window")
         self.assertEqual(action["res_model"], "mrp.production")
-        # The domain pair walks the relation — match by tuple shape.
-        domain_pairs = {tuple(t) for t in action["domain"]
-                        if isinstance(t, (list, tuple))}
+        # The domain pair walks the relation — match by tuple shape. List,
+        # not set: an `in`-operator leaf's list value is unhashable (see
+        # test_30).
+        domain_pairs = [tuple(t) for t in action["domain"]
+                        if isinstance(t, (list, tuple))]
         self.assertIn(
             ("workorder_ids.workcenter_id", "=", self.wc.id),
             domain_pairs,

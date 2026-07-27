@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  Multi-company isolation for the AI request ledger. The ledger carries a
+  company_id (os_ai_request.py) but shipped without a record rule, so in a
+  multi-company deployment any OS Viewer in one company could read another
+  company's full prompt/response ledger. This global rule scopes rows to the
+  user's allowed companies (rows with no company are visible to everyone, the
+  standard Odoo multi-company pattern). No-op in a single-company database.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="rule_os_ai_request_company" model="ir.rule">
+            <field name="name">OS AI Request: multi-company</field>
+            <field name="model_id" ref="model_southbrook_os_ai_request"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

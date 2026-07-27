@@ -9,7 +9,7 @@
                 <field name="approval_type"/>
                 <field name="approver_id"/>
                 <field name="approver_type"/>
-                <field name="state" widget="badge"/>
+                <field name="state" widget="badge" readonly="1"/>
                 <field name="date_decided"/>
             </list>
         </field>

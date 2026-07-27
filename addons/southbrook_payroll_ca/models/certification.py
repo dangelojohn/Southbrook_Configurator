@@ -67,28 +67,59 @@ class SouthbrookPayrollCertification(models.Model):
 
     @api.model
     def cron_alert_expiring(self):
-        """Daily cron: post an activity on each cert expiring in <=30d."""
+        """Daily cron: refresh expiry status, then post ONE renewal activity
+        per cert expiring in <=30d (deduped, per-row isolated)."""
+        import logging
+        _logger = logging.getLogger(__name__)
         today = fields.Date.context_today(self)
         soon = today + timedelta(days=30)
+        # M8: expiry_status is a stored compute keyed only on expires_at, so a
+        # cert that crossed its expiry since the last write keeps a stale
+        # status (and the employee's expiring/expired counts drift). Recompute
+        # every dated cert nightly so the kanban grouping + counts stay true.
+        dated = self.search([("expires_at", "!=", False)])
+        if dated:
+            dated._compute_expiry_status()
+        summary = _("Certification expiring soon")
+        todo_type = self.env.ref("mail.mail_activity_data_todo")
         certs = self.search(
             [
                 ("expires_at", ">=", today),
                 ("expires_at", "<=", soon),
             ]
         )
+        posted = 0
         for cert in certs:
-            mgr = cert.employee_id.parent_id.user_id or self.env.user
-            cert.activity_schedule(
-                "mail.mail_activity_data_todo",
-                summary=_("Certification expiring soon"),
-                note=_(
-                    "Certification %(cert)s for %(emp)s expires on "
-                    "%(date)s — renew before then."
-                ) % {
-                    "cert": cert.name,
-                    "emp": cert.employee_id.name,
-                    "date": cert.expires_at,
-                },
-                user_id=mgr.id,
-            )
-        return len(certs)
+            try:
+                # M5: dedup — the cron runs daily; without this it schedules a
+                # fresh to-do every day (~30 duplicates per cert). Skip if an
+                # open renewal activity of this kind already exists.
+                already = self.env["mail.activity"].search_count(
+                    [
+                        ("res_model", "=", self._name),
+                        ("res_id", "=", cert.id),
+                        ("activity_type_id", "=", todo_type.id),
+                        ("summary", "=", summary),
+                    ]
+                )
+                if already:
+                    continue
+                mgr = cert.employee_id.parent_id.user_id or self.env.user
+                cert.activity_schedule(
+                    "mail.mail_activity_data_todo",
+                    summary=summary,
+                    note=_(
+                        "Certification %(cert)s for %(emp)s expires on "
+                        "%(date)s — renew before then."
+                    ) % {
+                        "cert": cert.name,
+                        "emp": cert.employee_id.name,
+                        "date": cert.expires_at,
+                    },
+                    user_id=mgr.id,
+                )
+                posted += 1
+            except Exception as e:  # noqa: BLE001 — one bad row must not abort the sweep
+                _logger.warning(
+                    "cert cron: activity for %s failed: %s", cert.name, e)
+        return posted

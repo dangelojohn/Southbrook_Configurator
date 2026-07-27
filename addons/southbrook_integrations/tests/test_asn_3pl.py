@@ -42,9 +42,10 @@ class TestAsn3pl(TransactionCase):
             "picking_type_id": picking_type.id,
             "location_id": location.id,
             "location_dest_id": dest.id,
+            # stock.move.name was removed in v19 — omit it (the move derives
+            # its own label from product_id).
             "move_ids": [
                 (0, 0, {
-                    "name": cls.product.name,
                     "product_id": cls.product.id,
                     "product_uom_qty": 3.0,
                     "product_uom": cls.product.uom_id.id,
@@ -52,7 +53,6 @@ class TestAsn3pl(TransactionCase):
                     "location_dest_id": dest.id,
                 }),
                 (0, 0, {
-                    "name": cls.big_product.name,
                     "product_id": cls.big_product.id,
                     "product_uom_qty": 1.0,
                     "product_uom": cls.big_product.uom_id.id,

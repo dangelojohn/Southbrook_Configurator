@@ -37,8 +37,47 @@ class TestApiAuth(HttpCase):
         self.assertEqual(body["service"], "southbrook_api")
         self.assertEqual(body["api_version"], "v1")
         self.assertEqual(body["schema_version"], SCHEMA)
-        # db key present (may be the test DB or southbrook depending on context).
-        self.assertIn("db", body)
+        # The DB name is deliberately NOT exposed to unauthenticated callers
+        # (info-disclosure hardening — see REVIEW_REPORT F9).
+        self.assertNotIn("db", body)
+
+    # ------------------------------------------------------------------
+    # F1 — API-key model may not be forged / hijacked by a regular user
+    # ------------------------------------------------------------------
+    def test_regular_user_cannot_forge_api_key(self):
+        """A base.group_user employee must not be able to create a
+        southbrook.api.key row — forging one pointing at an admin user_id
+        would let them authenticate as admin over /api/v1/*."""
+        from odoo.exceptions import AccessError
+        emp = self.env["res.users"].create({
+            "name": "API Emp F1", "login": "api_emp_f1",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        with self.assertRaises(AccessError):
+            self.env["southbrook.api.key"].with_user(emp).create({
+                "user_id": self.env.ref("base.user_admin").id,
+                "key_hash": "sha256:forged",
+            })
+
+    def test_user_cannot_revoke_another_users_key(self):
+        """action_revoke (+ the own-keys record rule) must stop a user from
+        revoking someone else's key (fleet-wide DoS otherwise)."""
+        from odoo.exceptions import AccessError
+        Key = self.env["southbrook.api.key"].sudo()
+        victim = self.env["res.users"].create({
+            "name": "Victim F1", "login": "api_victim_f1",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        attacker = self.env["res.users"].create({
+            "name": "Attacker F1", "login": "api_attacker_f1",
+            "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        victim_key = Key.create({
+            "user_id": victim.id, "key_hash": "sha256:victimkey_f1",
+        })
+        with self.assertRaises(AccessError):
+            victim_key.with_user(attacker).action_revoke()
+        self.assertFalse(victim_key.revoked_at)
 
     # ------------------------------------------------------------------
     # /auth/login

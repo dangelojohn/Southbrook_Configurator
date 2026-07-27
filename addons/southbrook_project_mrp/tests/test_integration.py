@@ -112,6 +112,9 @@ class TestProjectMrpIntegration(TransactionCase):
         job = self.env["project.task"].create({
             "name": "Job", "project_id": self.project.id,
             "x_southbrook_sale_order_id": so.id})
+        # southbrook_mrp_pm gates MO creation for a sale order behind production
+        # approval; force-release so this back-link test can create the MO.
+        so.force_production_release = True
         mo = self.env["mrp.production"].create({
             "product_id": self.fp.id, "product_qty": 1.0, "bom_id": self.bom.id,
             "sale_line_id": so.order_line[0].id})
@@ -267,6 +270,15 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("action_southbrook_open_manufacturing_jobs", arch)
 
     def test_project_task_exposes_manufacturing_calculations(self):
+        # action_view_manufacturing_calculations targets southbrook.mi.check,
+        # provided by southbrook_manufacturing_intelligence — NOT a dependency
+        # of this module. Without MI installed the action raises a clean
+        # "not installed" UserError (correct graceful degradation), so skip the
+        # scenario rather than assert a model the standalone install lacks.
+        if "southbrook.mi.check" not in self.env:
+            self.skipTest(
+                "requires southbrook_manufacturing_intelligence "
+                "(southbrook.mi.check)")
         task = self.env["project.task"].create({
             "name": "Calculation Job",
             "project_id": self.project.id,
@@ -450,7 +462,11 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn(task.risk_level, ("high", "critical"))
         self.assertTrue(task.risk_reason)
         self.assertTrue(task.top_blocker)
-        self.assertRegex(task.next_best_action, r"(Resolve|Schedule|Assign|Approve)")
+        # next_best_action surfaces the top blocker as a plain-language verb;
+        # "Confirm cabinet specs …" is a legitimate top action when specs are
+        # incomplete (the highest-priority blocker for this fixture).
+        self.assertRegex(
+            task.next_best_action, r"(Resolve|Schedule|Assign|Approve|Confirm)")
 
     def test_phase2_readiness_lines_explain_unscheduled_job(self):
         so = self.env["sale.order"].create({
@@ -1228,8 +1244,10 @@ class TestProjectMrpIntegration(TransactionCase):
             "southbrook_project_mrp.action_southbrook_bottleneck_contention")
         self.assertEqual(action.res_model, "project.task")
         # Domain must scope to tasks with MOs AND a resolved bottleneck WC
-        # (otherwise the empty-state row dominates the view).
-        self.assertIn("production_count", action.domain)
+        # (otherwise the empty-state row dominates the view). Uses the
+        # searchable One2many production_ids, not the non-stored computed
+        # production_count (which raised at search time).
+        self.assertIn("production_ids", action.domain)
         self.assertIn("current_bottleneck_workcenter_id", action.domain)
         self.assertIn(
             "search_default_group_current_bottleneck_workcenter",
@@ -1240,8 +1258,12 @@ class TestProjectMrpIntegration(TransactionCase):
         """The inherited search view must expose the group_by filter the
         action's context references — otherwise the default group is silently
         dropped and the planner sees a flat list."""
+        # The bottleneck group-by filter is added by the inheriting view
+        # project_task_search_bottleneck_group (not the base readiness view);
+        # arch_db is a view's OWN arch, so assert against the view that
+        # actually defines the filter.
         search_view = self.env.ref(
-            "southbrook_project_mrp.project_task_search_readiness")
+            "southbrook_project_mrp.project_task_search_bottleneck_group")
         self.assertIn(
             "group_current_bottleneck_workcenter", search_view.arch_db)
         self.assertIn(

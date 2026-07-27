@@ -182,6 +182,50 @@ class TestRoomCaptureModel(TransactionCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "refused")
 
+    def test_daily_cap_kill_switch_blocks_real_call(self):
+        """max_daily_calls=0 is a hard kill-switch — analyze() returns
+        rate_limited WITHOUT ever reaching _call_anthropic."""
+        self._set_real_backend()
+        self.env["ir.config_parameter"].sudo().set_param(
+            "southbrook_room_capture.max_daily_calls", "0")
+        with patch.object(
+            type(self.Capture), "_call_anthropic",
+            side_effect=AssertionError("_call_anthropic must not be called"),
+        ):
+            result = self.Capture.analyze([_one_image_dict()])
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "rate_limited")
+
+    def test_daily_cap_reached_blocks_further_real_calls(self):
+        """Once today's counter hits the cap, subsequent real calls are
+        rejected with rate_limited; calls within the cap still succeed."""
+        self._set_real_backend()
+        self.env["ir.config_parameter"].sudo().set_param(
+            "southbrook_room_capture.max_daily_calls", "1")
+        canned = {
+            "content": [{"type": "text", "text": (
+                '{"layout_shape": "straight", "walls": '
+                '[{"name": "A", "length_mm": 3000, "confidence": 0.8}], '
+                '"confidence": 0.8}')}],
+            "stop_reason": "end_turn",
+        }
+        with patch.object(
+            type(self.Capture), "_call_anthropic", return_value=canned,
+        ):
+            first = self.Capture.analyze([_one_image_dict()])
+            second = self.Capture.analyze([_one_image_dict()])
+        self.assertTrue(first["ok"], msg=first)
+        self.assertFalse(second["ok"])
+        self.assertEqual(second["error"], "rate_limited")
+
+    def test_daily_cap_does_not_apply_to_mock(self):
+        """The mock backend is free — the global cap only gates the paid
+        real call, so mock analyze() never consumes quota."""
+        self.env["ir.config_parameter"].sudo().set_param(
+            "southbrook_room_capture.max_daily_calls", "0")
+        result = self.Capture.analyze([_one_image_dict()])
+        self.assertTrue(result["ok"], msg=result)
+
     def test_real_path_json_parsing_via_mocked_transport(self):
         """Exercise the real (non-mock) JSON-parsing + normalization
         path with a canned, well-formed raw Anthropic response —

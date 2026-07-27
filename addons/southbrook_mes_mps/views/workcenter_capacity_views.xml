@@ -13,7 +13,7 @@
         <field name="week_start"/>
         <field name="available_hours"/>
         <field name="planned_hours"/>
-        <field name="load_pct" widget="percentage"/>
+        <field name="load_pct"/>
         <field name="is_overloaded"/>
         <button name="action_compute_load" type="object" string="Refresh"
                 icon="fa-refresh"/>
@@ -36,7 +36,7 @@
             <field name="week_start"/>
             <field name="available_hours"/>
             <field name="planned_hours" readonly="1"/>
-            <field name="load_pct" widget="percentage" readonly="1"/>
+            <field name="load_pct" readonly="1"/>
             <field name="is_overloaded" readonly="1"/>
           </group>
         </sheet>

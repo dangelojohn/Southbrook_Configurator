@@ -202,8 +202,19 @@ class SouthbrookMesMpsOeeSnapshot(models.Model):
                 else:  # availability + quality both block availability
                     down_min += r.duration
             planned = max(run_min + idle_min + down_min, 8 * 60.0)
-            # We don't know units produced from productivity rows
-            # alone; cron jobs may overwrite these from MO close-outs.
+            # Derive units from the workorders the day's productivity rows
+            # reference. Hardcoding units to 0 forced Performance and Quality
+            # to 0 in _compute_oee, so EVERY cron snapshot reported OEE 0% /
+            # "unacceptable" and dragged the 7-day average toward 0 — the
+            # headline metric was dead. qty_produced / qty_production give the
+            # real produced/target counts (rejected isn't tracked per-WO here,
+            # so Quality reads 1.0 when production data exists).
+            workorders = self.env["mrp.workorder"].browse()
+            for r in wc_rows:
+                if r.workorder_id:
+                    workorders |= r.workorder_id
+            units_produced = int(round(sum(workorders.mapped("qty_produced"))))
+            units_target = int(round(sum(workorders.mapped("qty_production"))))
             vals = {
                 "workcenter_id": wc.id,
                 "shift_date": snap_date,
@@ -212,8 +223,8 @@ class SouthbrookMesMpsOeeSnapshot(models.Model):
                 "actual_run_minutes": run_min,
                 "actual_idle_minutes": idle_min,
                 "actual_downtime_minutes": down_min,
-                "units_produced": 0,
-                "units_target": 0,
+                "units_produced": units_produced,
+                "units_target": units_target,
                 "units_rejected": 0,
             }
             existing = self.search(

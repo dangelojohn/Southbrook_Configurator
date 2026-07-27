@@ -24,7 +24,7 @@ import logging
 import requests
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -125,20 +125,27 @@ class SouthbrookGeminiActivator(models.Model):
     # ------------------------------------------------------------------
     # Actions
     # ------------------------------------------------------------------
+    def _check_admin(self):
+        # These methods are public (RPC-reachable) and sudo() system config
+        # internally — without this any internal employee could overwrite the
+        # API key, enable live billing, or repoint the CAD bridge. The "wizard
+        # ACL" the comments referenced does not protect a direct call_kw.
+        if not self.env.is_system():
+            raise AccessError(_(
+                "Only administrators may configure the Gemini activator."))
+
     @api.model
     def action_set_api_key(self, key):
-        """Persist the Gemini API key to ir.config_parameter.
-
-        .sudo() needed because gemini.api_key is system-scoped config;
-        admin write check happens at wizard ACL.
-        """
+        """Persist the Gemini API key to ir.config_parameter (admin only)."""
+        self._check_admin()
         param = self.env["ir.config_parameter"].sudo()
         param.set_param("gemini.api_key", (key or "").strip())
         return True
 
     def action_enable_real_calls(self):
-        """Flip ``gemini.use_mock`` to False — gated on a present key."""
+        """Flip ``gemini.use_mock`` to False — gated on a present key (admin)."""
         self.ensure_one()
+        self._check_admin()
         param = self.env["ir.config_parameter"].sudo()
         key = (param.get_param("gemini.api_key", "") or "").strip()
         if not key:
@@ -161,6 +168,7 @@ class SouthbrookGeminiActivator(models.Model):
         Writes the outcome onto the singleton row and returns a
         display_notification action so the operator gets visual feedback.
         """
+        self._check_admin()
         rec = self._get_singleton()
         param = self.env["ir.config_parameter"].sudo()
         key = (param.get_param("gemini.api_key", "") or "").strip()
@@ -179,28 +187,40 @@ class SouthbrookGeminiActivator(models.Model):
                 kind="warning",
             )
 
+        # Send the key in the x-goog-api-key HEADER, not the query string, so it
+        # never lands in the request URL — a RequestException's message embeds
+        # the URL, and the exception branch below is logged + stored in a
+        # user-readable field, which previously leaked the key.
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model_id}:generateContent?key={key}"
+            f"{model_id}:generateContent"
         )
+        headers = {"x-goog-api-key": key}
         body = {
             "contents": [{"parts": [{"text": "ping"}]}],
             "generationConfig": {"maxOutputTokens": 1},
         }
         status = "error"
         message = ""
+
+        def _redact(text):
+            return (text or "").replace(key, "***REDACTED***") if key else (text or "")
+
         try:
-            resp = requests.post(url, json=body, timeout=GEMINI_HEALTH_TIMEOUT)
+            resp = requests.post(url, json=body, headers=headers,
+                                 timeout=GEMINI_HEALTH_TIMEOUT)
             if resp.status_code == 200:
                 status = "ok"
                 message = "200 OK — model responded to one-token ping."
             else:
-                # Strip the key out of any echoed URL before persisting.
-                redacted = resp.text[:500].replace(key, "***REDACTED***")
+                redacted = _redact(resp.text[:500])
                 message = f"HTTP {resp.status_code} — {redacted}"
         except requests.RequestException as exc:
-            _logger.warning("Gemini health check raised: %s", exc)
-            message = f"Request failed: {exc}"
+            # Defensive redaction — the key shouldn't be in the URL now, but a
+            # proxy/DNS error string could still echo a header or config value.
+            safe = _redact(str(exc))
+            _logger.warning("Gemini health check raised: %s", safe)
+            message = f"Request failed: {safe}"
 
         rec.write({
             "last_health_check_at": now,

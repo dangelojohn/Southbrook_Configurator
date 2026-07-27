@@ -60,7 +60,7 @@ class SbPlacementRule(models.Model):
     active = fields.Boolean(default=True)
     note = fields.Text()
 
-    @api.constrains("constraint_json")
+    @api.constrains("constraint_json", "kind")
     def _check_constraint_json(self):
         for rule in self:
             try:
@@ -73,6 +73,33 @@ class SbPlacementRule(models.Model):
                 raise ValidationError(_(
                     "constraint_json must decode to a JSON object."
                 ))
+            # Per-kind semantic validation — a syntactically-valid but
+            # semantically-bad rule (0/negative width, non-numeric clearance)
+            # would otherwise be accepted here and only detonate later inside an
+            # engine run as an unhandled 500 / infinite recursion, not a clean
+            # UserError at save time. (bool is an int subclass → exclude it.)
+            def _pos_num(v):
+                return (isinstance(v, (int, float)) and not isinstance(v, bool)
+                        and v > 0)
+
+            def _nonneg_num(v):
+                return (isinstance(v, (int, float)) and not isinstance(v, bool)
+                        and v >= 0)
+
+            if rule.kind == "width_pref":
+                widths = payload.get("preferred_widths_mm")
+                if widths is not None and (
+                        not isinstance(widths, list)
+                        or not all(_pos_num(w) for w in widths)):
+                    raise ValidationError(_(
+                        "width_pref preferred_widths_mm must be a list of "
+                        "positive numbers."))
+            elif rule.kind == "clearance":
+                for k in ("left_mm", "right_mm"):
+                    v = payload.get(k)
+                    if v is not None and not _nonneg_num(v):
+                        raise ValidationError(_(
+                            "clearance %s must be a non-negative number.") % k)
 
     def to_dict(self) -> dict:
         self.ensure_one()

@@ -230,9 +230,10 @@ class TestW011FormOpenScanLog(TransactionCase):
         create a row even with a faked request."""
         before = self._count_form_open_for(self.wo)
         with _patched_request(_FakeRequest()):
-            # Default test env has test_enable=True; web_read still
-            # runs cleanly but the helper short-circuits.
-            self.wo.web_read(self.spec)
+            # The guard checks the `test_enable` CONTEXT key; v19's test
+            # framework does NOT auto-inject it into the env context (only the
+            # config flag), so set it explicitly to exercise the suppression.
+            self.wo.with_context(test_enable=True).web_read(self.spec)
         self.assertEqual(
             self._count_form_open_for(self.wo), before,
             "test_enable context must suppress the form-open log row.",

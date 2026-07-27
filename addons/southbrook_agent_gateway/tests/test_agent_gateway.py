@@ -100,6 +100,25 @@ class TestAgentInquiryModel(TransactionCase):
         source = self.env.ref("southbrook_agent_gateway.utm_source_ai_agent")
         self.assertEqual(inquiry.lead_id.source_id, source)
 
+    def test_verify_email_killswitch_and_cooldown(self):
+        """Security C1 mitigation: the kill-switch (daily cap = 0) suppresses
+        the verify email, and the per-recipient cooldown blocks re-emailing the
+        same address within the window."""
+        Param = self.env["ir.config_parameter"].sudo()
+        cleaned, _err = self.Inquiry.validate_payload(_payload())
+        inquiry = self.Inquiry.submit(cleaned)
+        # Kill-switch: daily cap 0 → not allowed.
+        Param.set_param("southbrook_agent_gateway.max_daily_verify_emails", "0")
+        self.assertFalse(inquiry._gateway_verify_email_allowed())
+        # Restore cap; the just-created inquiry means a SECOND to the same
+        # address is inside the cooldown → suppressed.
+        Param.set_param("southbrook_agent_gateway.max_daily_verify_emails", "200")
+        cleaned2, _e2 = self.Inquiry.validate_payload(_payload())
+        inquiry2 = self.Inquiry.submit(cleaned2)
+        self.assertFalse(
+            inquiry2._gateway_verify_email_allowed(),
+            "same address within the cooldown window must be suppressed")
+
     def test_submit_dedupes_partner_by_email(self):
         existing = self.env["res.partner"].create({
             "name": "Pat Already-Here",

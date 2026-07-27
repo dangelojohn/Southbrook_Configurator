@@ -34,7 +34,7 @@ migration happens one feature per branch, later.
     "website": "https://southbrookcabinetry.space",
     "license": "LGPL-3",
     "category": "Technical",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "depends": [
         "base",
         "mail",
@@ -42,6 +42,7 @@ migration happens one feature per branch, later.
     "data": [
         "security/groups.xml",
         "security/ir.model.access.csv",
+        "security/ir_rule.xml",
         "data/os_switch_seed.xml",
         "data/os_tool_seed.xml",
         "data/ir_cron.xml",

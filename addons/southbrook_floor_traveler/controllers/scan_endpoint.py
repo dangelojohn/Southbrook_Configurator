@@ -24,7 +24,7 @@ class FloorTravelerScanAPI(http.Controller):
 
     @http.route(
         "/southbrook/api/floor-traveler/scan",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
         csrf=False,
@@ -48,6 +48,21 @@ class FloorTravelerScanAPI(http.Controller):
         instead of two.
         """
         env = request.env
+        # SECURITY: the endpoint sudo-advances a workorder (button_finish +
+        # tool-consumption debit) for a client-supplied package id. auth="user"
+        # admits ANY session — a shop-floor operator, but ALSO an external
+        # portal dealer/customer — so without this gate any authenticated caller
+        # could finish production for any job by guessing a package id (the
+        # legacy sb-package:<id> format is unsigned). Shop-floor scanning is a
+        # GROUP-authorized action (any mrp operator, any job at their station);
+        # require an internal mrp user.
+        caller = env.user
+        if not caller._is_internal() \
+                or not caller.has_group("mrp.group_mrp_user"):
+            self._log_unified(env, qr_payload, "access_denied",
+                              error="caller not an internal mrp operator",
+                              workcenter_code=workcenter_code)
+            return {"ok": False, "error": "forbidden"}
         if not qr_payload:
             self._log_unified(env, qr_payload, "error",
                               error="empty qr_payload",
@@ -132,6 +147,10 @@ class FloorTravelerScanAPI(http.Controller):
             if "southbrook.qr.scan.log" not in env:
                 return
             env["southbrook.qr.scan.log"].sudo().create({
+                # Record the REAL caller — the create runs sudo (so create_uid
+                # would be OdooBot), which destroys attribution on a production-
+                # mutation audit log.
+                "user_id": env.uid,
                 "kind": kind,
                 "ident": ident,
                 "action": "scan",  # legacy endpoint is always "scan"
