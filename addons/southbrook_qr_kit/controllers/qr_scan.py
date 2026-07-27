@@ -261,19 +261,34 @@ class QrScanController(http.Controller):
         Body carries `sb-dense` (W039 dense class) so touch targets
         are already sized for tablet operator hands.
         """
-        # request.render returns a Response with content-type text/html
-        # but the QWeb template renders the <html> tree only. Prepend
-        # the doctype manually so Safari + Chrome use standards mode
-        # (otherwise some lazy rendering quirks bite the OWL mount).
-        resp = request.render("southbrook_qr_kit.floor_shell", {
-            "title": title,
-            "app_name": app_name,
-        })
-        body = resp.get_data(as_text=True)
+        # NB(v19): we render the template to a string DIRECTLY via
+        # `ir.ui.view._render_template` rather than going through
+        # `request.render(...)`. v19's `request.render` returns a
+        # *lazy* Response: the body is empty until `flatten()` is
+        # called or the response is serialized at end-of-dispatch.
+        # The previous implementation called
+        # `resp.get_data(as_text=True)` on that lazy Response — which
+        # returned empty bytes — then `resp.set_data("<!DOCTYPE…")`,
+        # which overwrote the template entirely and unset
+        # `resp.template`. End result: the page body was just
+        # `<!DOCTYPE html>\n`, the `<div id="sb_floor_root">` mount
+        # node never made it to the wire, and W073 test_20 / test_21
+        # failed asserting `id="sb_floor_root" in resp.text`. Rendering
+        # eagerly + prepending the DOCTYPE on the string sidesteps the
+        # lazy-render trap and produces the same final HTML that
+        # `flatten()` would have produced.
+        body = request.env["ir.ui.view"]._render_template(
+            "southbrook_qr_kit.floor_shell",
+            {"title": title, "app_name": app_name},
+        )
+        if isinstance(body, bytes):
+            body = body.decode("utf-8")
         if not body.lstrip().lower().startswith("<!doctype"):
             body = "<!DOCTYPE html>\n" + body
-            resp.set_data(body)
-        return resp
+        return request.make_response(
+            body,
+            headers=[("Content-Type", "text/html; charset=utf-8")],
+        )
 
     @http.route("/sb/qr/sw.js", type="http", auth="public",
                 methods=["GET"], csrf=False)
