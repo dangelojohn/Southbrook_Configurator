@@ -697,5 +697,218 @@
       <field name="priority">60</field>
     </record>
 
+    <!-- ═══ U-10X8X10 · U-Shape Kitchen (120" x 96") — 2 corners ═══
+         Unblocked by the T4a corner inventory (LH SB-CORNER + RH
+         SB-CORNER-R + SB-WALL-CORNER). Geometry proven by engine
+         probes (2026-07-27): back = corner 36 + 24 + 24 + corner 36 =
+         120" EXACT; legs flush at 96". Corner slots sit on the LEG
+         walls so each claims its leg + the back (the back is claimed
+         twice — once per junction). All LEAD-* slots are corner
+         buffers absorbed by substitution; the back wall tier carries
+         FIVE 24" uppers (2 leads + 3 keepers) so the upper run
+         OVERLAPS both wall-corner cells (exact-touch is not detected).
+         x-flip keeps all 4 corners (hands swap symmetrically). -->
+    <record id="ktpl_u_10x8x10" model="southbrook.kitchen.template">
+      <field name="name">U-Shape Kitchen 10' x 8'</field>
+      <field name="code">U-10X8X10</field>
+      <field name="layout_shape">u_shape</field>
+      <field name="sequence">6</field>
+      <field name="default_room_width_in">120.0</field>
+      <field name="default_room_depth_in">96.0</field>
+      <field name="default_room_height_in">96.0</field>
+      <field name="default_module_width_in">24.0</field>
+      <field name="min_cabinet_count">8</field>
+      <field name="description">The full working U: both corner units engineered in, sink on the left run, range on the right, prep along the back — the hardest kitchen to quote, pre-made.</field>
+    </record>
+    <record id="ktpl_u_corner_l" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">CL</field>
+      <field name="cabinet_type">corner</field>
+      <field name="wall">left</field>
+      <field name="run_seq">5</field>
+      <field name="priority">1</field>
+      <field name="notes">Back-left junction preference — engine derives geometry and picks the LH unit.</field>
+    </record>
+    <record id="ktpl_u_corner_r" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">CR</field>
+      <field name="cabinet_type">corner</field>
+      <field name="wall">right</field>
+      <field name="run_seq">5</field>
+      <field name="priority">1</field>
+      <field name="notes">Back-right junction preference — engine derives geometry and picks the RH unit.</field>
+    </record>
+    <record id="ktpl_u_lead_b1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">LEAD-B1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">2</field>
+      <field name="notes">Absorbed by the LH corner unit at arrange time.</field>
+    </record>
+    <record id="ktpl_u_m1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">M1</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_u_m2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">M2</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_u_lead_b2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">LEAD-B2</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">back</field>
+      <field name="run_seq">40</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">2</field>
+      <field name="notes">Absorbed by the RH corner unit at arrange time.</field>
+    </record>
+    <record id="ktpl_u_lead_l" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">LEAD-L</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">left</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">2</field>
+      <field name="notes">Absorbed by the LH corner unit at arrange time.</field>
+    </record>
+    <record id="ktpl_u_sink" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">SINK</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">left</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_u_lead_r" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">LEAD-R</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">right</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">2</field>
+      <field name="notes">Absorbed by the RH corner unit at arrange time.</field>
+    </record>
+    <record id="ktpl_u_range" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">RANGE</field>
+      <field name="cabinet_type">appliance</field>
+      <field name="appliance_type">range</field>
+      <field name="wall">right</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">30.0</field>
+      <field name="priority">5</field>
+    </record>
+    <record id="ktpl_u_b3" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">B3</field>
+      <field name="cabinet_type">base</field>
+      <field name="wall">right</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">30</field>
+    </record>
+    <record id="ktpl_u_w_l1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">W-L1</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+      <field name="notes">Absorbed by the wall corner unit at arrange time.</field>
+    </record>
+    <record id="ktpl_u_w1" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">W1</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_u_w2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">W2</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">30</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_u_w2b" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">W2B</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">40</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_u_w_l2" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">W-L2</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">back</field>
+      <field name="run_seq">50</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+      <field name="notes">Absorbed by the wall corner unit at arrange time.</field>
+    </record>
+    <record id="ktpl_u_wl_l" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">WL-L</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">left</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+      <field name="notes">Absorbed by the wall corner unit at arrange time.</field>
+    </record>
+    <record id="ktpl_u_w3" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">W3</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">left</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+    <record id="ktpl_u_wr_l" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">WR-L</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">right</field>
+      <field name="run_seq">10</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+      <field name="notes">Absorbed by the wall corner unit at arrange time.</field>
+    </record>
+    <record id="ktpl_u_w4" model="southbrook.kitchen.template.line">
+      <field name="template_id" ref="ktpl_u_10x8x10"/>
+      <field name="slot_code">W4</field>
+      <field name="cabinet_type">wall</field>
+      <field name="wall">right</field>
+      <field name="run_seq">20</field>
+      <field name="nominal_width_in">24.0</field>
+      <field name="priority">60</field>
+    </record>
+
   </data>
 </odoo>

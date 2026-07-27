@@ -93,3 +93,8 @@ from . import test_totals_filler_exclusion
 # resize re-derives through the engine; impossible shrinks are
 # detectable (raise OR archive) and revertible.
 from . import test_rearrange_route
+
+# U-shape template (2026-07-27) — U-10X8X10 two-corner flagship:
+# end-aware fit claims, all four corners derive (LH/RH base + 2 wall),
+# flip symmetry, u_shape compat preset resolves.
+from . import test_u_shape_template

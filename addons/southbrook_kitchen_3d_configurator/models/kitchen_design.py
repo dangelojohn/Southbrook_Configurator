@@ -2597,10 +2597,8 @@ class SouthbrookKitchenDesignTemplatePicker(models.TransientModel):
         # Reconciled against the shipped T4 catalog (data/kitchen_templates.xml):
         #   galley  -> GAL-10 (shipped, active)
         #   l_shape -> L-10X8 (ships in T4a, after the SB-CORNER data repair)
-        #   u_shape -> U-10X8X10 (NOT shipped — needs 2 corners; blocked on
-        #              corner SKU inventory per catalog blocker #1. The
-        #              action_create compat path falls back to the legacy
-        #              5.6.12 preset seeding until the template exists.)
+        #   u_shape -> U-10X8X10 (SHIPPED 2026-07-27 — unblocked by the
+        #              T4a corner inventory: LH + RH twin + wall corner.)
         "empty": None,
         "l_shape": "L-10X8",
         "u_shape": "U-10X8X10",

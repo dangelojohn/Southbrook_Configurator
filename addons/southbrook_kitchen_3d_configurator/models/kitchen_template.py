@@ -231,25 +231,41 @@ class SouthbrookKitchenTemplateResolve(models.Model):
         # Corner slots claim the engine's leg footprint on BOTH legs of
         # the junction: the slot's own wall plus every adjacent wall
         # that carries floor slots. The engine SUBSTITUTES the corner
-        # for run-lead cabinets that fit fully inside its cell, so
-        # leading non-repeat floor slots are ABSORBED into the claim
-        # (not double-counted as fixed width) up to the corner size.
+        # for run-end cabinets that fit fully inside its cell, so
+        # non-repeat floor slots at the junction's END of each leg are
+        # ABSORBED into the claim (not double-counted as fixed width)
+        # up to the corner size. END-AWARE (U-shape, 2 corners): each
+        # junction sits at a specific end of each leg — back-left is
+        # the back run's LEADING end, back-right its TRAILING end — so
+        # absorption walks the leg from the claiming junction's end.
         _ADJACENT = {"back": ("left", "right"), "front": ("left", "right"),
                      "left": ("back", "front"), "right": ("back", "front")}
+        # (wall, other_leg) -> which end of `wall` the junction sits at.
+        _JUNCTION_END = {
+            ("back", "left"): "lead",   ("back", "right"): "trail",
+            ("front", "left"): "lead",  ("front", "right"): "trail",
+            ("left", "back"): "lead",   ("left", "front"): "trail",
+            ("right", "back"): "lead",  ("right", "front"): "trail",
+        }
         floor_walls = set(slots.filtered(
             lambda s: s.cabinet_type not in ("wall", "corner")).mapped("wall"))
-        absorbed_ids = set()
+        claims = []   # (wall, end) — one entry per leg per corner slot
         for c in slots.filtered(lambda s: s.cabinet_type == "corner"):
-            legs = [c.wall] + [w for w in _ADJACENT[c.wall]
-                               if w in floor_walls]
-            for w in legs:
-                claimed[w] += corner_in
-        for w in [w for w, v in claimed.items() if v]:
+            for other in [w for w in _ADJACENT[c.wall] if w in floor_walls]:
+                claims.append((c.wall, _JUNCTION_END[(c.wall, other)]))
+                claims.append((other, _JUNCTION_END[(other, c.wall)]))
+        absorbed_ids = set()
+        for w, end in claims:
+            claimed[w] += corner_in
+            leg = [s for s in slots
+                   if s.wall == w and s.cabinet_type in ("base", "tall")
+                   and not s.repeat_ok]
+            if end == "trail":
+                leg = list(reversed(leg))
             cum = 0.0
-            for s in slots.filtered(
-                    lambda s, _w=w: s.wall == _w
-                    and s.cabinet_type in ("base", "tall")
-                    and not s.repeat_ok):
+            for s in leg:
+                if s.id in absorbed_ids:
+                    continue
                 width = self._slot_fixed_width(s, module_w, appliance_widths)
                 if cum + width <= corner_in + 1e-6:
                     absorbed_ids.add(s.id)
