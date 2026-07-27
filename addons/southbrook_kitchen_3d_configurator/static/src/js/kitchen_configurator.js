@@ -2148,6 +2148,7 @@ SouthbrookKitchenConfigurator.template = xml`
                      onSelectItem="(item) => this._onCanvasSelect(item)"
                      onMoveItem="(p) => this._onCanvasMove(p)"
                      onResizeRoom="(nw, f) => this._onCanvasResize(nw, f)"
+                     onResizeRoomDepth="(nd, f) => this._onCanvasResizeDepth(nd, f)"
                      onViewChange="(k) => this._onCanvasViewChange(k)"
                      onReady="(api) => this._onCanvasReady(api)"/>
 
@@ -2518,6 +2519,23 @@ SouthbrookKitchenConfigurator.prototype._onCanvasMove = function ({ item, x_posi
 };
 SouthbrookKitchenConfigurator.prototype._onCanvasResize = function (newWidthIn, inFlight) {
     this.state.room.width_in = newWidthIn;
+    if (!inFlight) {
+        this._refreshLayout().then(() => this._queueAutoSave());
+    }
+};
+// Depth-axis counterpart of _onCanvasResize. The front-wall puller
+// (isDepthHandle in canvas/drag_handle.esm.js) reports the dragged room
+// depth through the child's onResizeRoomDepth callback (fired guarded at
+// kitchen_canvas.esm.js — in-flight on move, committed on release). This
+// mirrors the width path exactly: write state.room.depth_in live during
+// the drag so the scene tracks the pointer, then on release run the
+// layout regen + debounced auto-save. The /layout RPC payload already
+// sends room_depth_in, so no controller change is required. Before this
+// existed, the parent bound onResizeRoom but never onResizeRoomDepth and
+// had no depth handler, so the child's guarded call was a silent no-op —
+// the "left/front puller does nothing" defect.
+SouthbrookKitchenConfigurator.prototype._onCanvasResizeDepth = function (newDepthIn, inFlight) {
+    this.state.room.depth_in = newDepthIn;
     if (!inFlight) {
         this._refreshLayout().then(() => this._queueAutoSave());
     }
