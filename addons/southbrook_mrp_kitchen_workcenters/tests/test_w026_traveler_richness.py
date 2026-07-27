@@ -82,7 +82,9 @@ class TestW026TravelerRichness(TransactionCase):
             "product_qty": 1.0,
             "bom_id": bom.id,
         })
-        mo._onchange_move_raw()
+        # v19: onchange dispatches implicitly on field write; the legacy
+        # `_onchange_move_raw()` internal method was removed in v19, and
+        # `action_confirm()` below explodes the BOM into raw moves anyway.
         mo.action_confirm()
         wo = mo.workorder_ids[:1]
         self.assertTrue(wo, "Expected MO confirm to spawn a workorder")
