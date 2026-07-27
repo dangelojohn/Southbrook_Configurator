@@ -94,6 +94,17 @@ class MrpWorkorder(models.Model):
         Prefer real wall-clock between ``date_start`` and ``date_finished``;
         otherwise fall back to the routing operation's expected duration.
         Leaves a non-zero operator-entered duration untouched.
+
+        ASSUMPTION: caller is inside the native ``button_finish`` flow,
+        which writes ``date_finished`` with
+        ``with_context(bypass_duration_calculation=True)`` (see
+        ``odoo/addons/mrp/models/mrp_workorder.py:button_finish``). That
+        context flag stops native ``mrp.workorder.write`` from rewriting
+        ``date_finished`` via ``_calculate_date_finished`` (the
+        calendar-aware "next workday + duration_expected" planner). Any
+        future direct caller of this method must enter the same context,
+        otherwise ``self.date_finished`` will be a planning timestamp, not
+        the operator-real-time finish, and the delta will be wrong.
         """
         self.ensure_one()
         if self.duration and self.duration > 0.0:

@@ -198,7 +198,19 @@ class TestPhase2PracticalLoop(TransactionCase):
     def test_button_finish_logs_duration(self):
         _mo, wo, _req = self._new_mo_with_wo()
         now = fields.Datetime.now()
-        wo.write({
+        # Native ``mrp.workorder.write`` rewrites ``date_finished`` via
+        # ``_calculate_date_finished`` (calendar-aware, next-workday +
+        # ``duration_expected``) whenever both ``date_start`` and
+        # ``date_finished`` are written together without the
+        # ``bypass_duration_calculation`` context flag. The real
+        # ``button_finish`` flow already passes that flag (see odoo/addons/
+        # mrp/models/mrp_workorder.py: ``with_context(bypass_duration_
+        # calculation=True).write(...)``), so production traffic preserves
+        # the operator-real-time timestamps that ``_sbk_record_duration_
+        # if_zero`` then reads. The test must enter the same context;
+        # otherwise Odoo silently overwrites ``date_finished`` with the
+        # next working slot and the assertion sees a 9–11 hour delta.
+        wo.with_context(bypass_duration_calculation=True).write({
             "date_start": now - timedelta(minutes=10),
             "date_finished": now,
             "duration": 0.0,
