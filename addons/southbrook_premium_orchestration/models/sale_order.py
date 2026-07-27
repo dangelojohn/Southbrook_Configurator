@@ -176,6 +176,27 @@ class SaleOrder(models.Model):
                     pass
             return existing
 
+        # R7 (2026-06-30) — Complete R3 PR #27's scope-gate.
+        # The R3 fix added `_southbrook_has_manufacturable_line()` to
+        # `southbrook_project_mrp.SaleOrder._southbrook_ensure_job` so
+        # that non-manufacturing sales (service-only, refacing-deposit,
+        # freight-only) stop polluting the project kanban with empty
+        # jobs. This override — added later to close the "8 of 9 orders
+        # skipped their spine" prod gap — runs alongside (and slightly
+        # after) `_action_confirm`, and had NO gate of its own, so
+        # every confirm continued to spawn a spine regardless of BoM.
+        # `test_non_manufacturing_sale_makes_no_job` in
+        # southbrook_project_mrp/tests/test_integration.py pinned the
+        # regression after R3 landed. Gate here mirrors the R3 semantics
+        # exactly by delegating to the same helper (contributed by our
+        # `southbrook_project_mrp` dep). `getattr` probe keeps this
+        # module installable even if that dep is stripped in a bespoke
+        # deployment — in which case we fall back to the old always-on
+        # behaviour (the historical bug preference).
+        gate = getattr(self, "_southbrook_has_manufacturable_line", None)
+        if callable(gate) and not self._southbrook_has_manufacturable_line():
+            return self.env["project.task"]
+
         project = self._resolve_kitchen_project()
         if not project:
             # No active project to attach to — nothing we can do here.

@@ -256,10 +256,26 @@ class ProjectTask(models.Model):
         compute="_compute_phase1_operational_context",
         readonly=True,
     )
+    # R3 PR #27 fix (2026-06-30): store=True is required so the
+    # W029 Bottleneck Contention view can put this column in a search
+    # domain AND group-by it from the search filter. Odoo 19's SQL
+    # builder raises
+    #   ValueError: Cannot convert ... to SQL because it is not stored
+    # for unstored compute fields the moment a user clicks Group-By in
+    # the kanban — the test_w029_* cases pin both surfaces (action
+    # domain + search-view group_by). Indexed because the group-by +
+    # domain together hit the column on every planner refresh. The
+    # @api.depends chain on the shared compute
+    # (_compute_phase1_operational_context) already lists
+    # production_ids.workorder_ids.workcenter_id and
+    # production_ids.workorder_ids.duration_expected — the two source
+    # fields _southbrook_current_bottleneck_workcenter() reads.
     current_bottleneck_workcenter_id = fields.Many2one(
         "mrp.workcenter",
         string="Current Bottleneck Work Center",
         compute="_compute_phase1_operational_context",
+        store=True,
+        index=True,
         readonly=True,
     )
     cabinet_family_summary = fields.Char(
