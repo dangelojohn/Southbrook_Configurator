@@ -483,7 +483,7 @@ $sbk-amber:      #B45309;
     font-size: 13px;
     font-weight: 500;
     color: $sbk-ink;
-    line-height: 1;
+    line-height: 1.4;
     &:focus-visible {
         outline: 2px solid var(--sb-blue);
         outline-offset: 2px;
@@ -493,17 +493,21 @@ $sbk-amber:      #B45309;
 }
 .o_sbk_inv_search_clear {
     position: absolute;
-    right: 4px;
+    right: 0;
     top: 50%;
     transform: translateY(-50%);
-    width: 24px;
-    height: 24px;
+    min-width: 32px;
+    min-height: 32px;
+    width: 32px;
+    height: 32px;
     border: 0;
     background: transparent;
     color: $sbk-muted;
     font-size: 16px;
     cursor: pointer;
-    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--sb-radius);
     transition: var(--sb-transition);
     &:hover { background: rgba(0,0,0,0.06); color: $sbk-ink; }
@@ -967,6 +971,7 @@ $sbk-amber:      #B45309;
     strong {
         font-size: 13px;
         font-weight: 500;
+        line-height: 1.4;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -980,6 +985,7 @@ $sbk-amber:      #B45309;
     small {
         font-size: 9px;
         color: $sbk-muted;
+        line-height: 1.4;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1033,13 +1039,16 @@ $sbk-amber:      #B45309;
     border: 1px solid rgba(192, 73, 47, 0.35);
     background: transparent;
     color: #c0492f;
-    width: 24px;
-    height: 24px;
-    line-height: 22px;
+    min-width: 32px;
+    min-height: 32px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--sb-radius-btn);
     cursor: pointer;
     font-size: 13px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 0;
     transition: var(--sb-transition);
     &:hover { background: rgba(192, 73, 47, 0.12); }
@@ -1119,12 +1128,14 @@ $sbk-amber:      #B45309;
     // Typo-spec item 4 — product names are body/control text: 13px/500.
     font-weight: 500;
     font-size: 13px;
+    line-height: 1.4;
     margin: 0 0 3px;
     color: $sbk-dark;
 }
 
 .o_sbk_detail_type {
     font-size: 10px;
+    line-height: 1.4;
     color: $sbk-muted;
     margin: 0;
 }
