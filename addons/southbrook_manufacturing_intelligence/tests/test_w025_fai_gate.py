@@ -50,7 +50,7 @@ class TestW025FaiGate(TransactionCase):
             vals["type"] = "consu"
         return self.env["product.product"].create(vals)
 
-    def _make_bom(self, product, fai_required=False, user=None,
+    def _make_bom(self, product, fai_required=None, user=None,
                   southbrook_version=1):
         env = self.env(user=user) if user else self.env
         vals = {
@@ -58,8 +58,17 @@ class TestW025FaiGate(TransactionCase):
             "product_qty": 1.0,
             "product_uom_id": product.uom_id.id,
             "type": "normal",
-            "fai_required": fai_required,
         }
+        # `fai_required` defaults to the None sentinel, NOT False, and is
+        # omitted from vals when unset. mrp_bom.create() skips its
+        # auto-stamp heuristics whenever "fai_required" is present in vals
+        # ("don't clobber an explicit caller intent"), so passing False
+        # unconditionally made the auto-stamp path untestable — the
+        # southbrook_version > 1 case silently asserted against a flag the
+        # override had deliberately declined to set. Callers that mean to
+        # pin the flag still pass True/False explicitly.
+        if fai_required is not None:
+            vals["fai_required"] = fai_required
         # Only set southbrook_version when the field is on the model
         # (it is — PLM is a transitive dep — but be defensive in case
         # of future module-shape changes).
