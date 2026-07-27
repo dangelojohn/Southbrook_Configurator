@@ -967,6 +967,19 @@ class SouthbrookKitchenDesign(models.Model):
             })
             return issues
 
+        # 1b) Task 2 (kitchen templates) — unresolved template slots block
+        # quoting: the honesty contract keeps them VISIBLE, and this check
+        # keeps them un-quotable until a real product is chosen.
+        for line in self.cabinet_line_ids.filtered("is_unresolved"):
+            issues.append({
+                "code":     "UNRESOLVED_SLOT",
+                "severity": "blocking",
+                "message":  "Template slot '%s' has no matching product yet. "
+                            "Swap the placeholder for a real cabinet before "
+                            "quoting." % (line.template_slot_code
+                                          or line.display_name),
+            })
+
         # 2) Customer required — message polished 2026-07-01 task #48
         # from "Select a customer before quoting (needed for pricelist
         # resolution)." to a customer-safe phrasing that surfaces the
@@ -2074,6 +2087,10 @@ _ZONE_FROM_CABINET_TYPE = {
     "corner": "base_run",   # dominant case is base-run corner; user overrides for tall/wall corners
     "filler": "accessory",
     "panel":  "accessory",
+    # Task 2 (kitchen templates): appliance spaces are floor-standing run
+    # members priced at 0 — Q21 zone = accessory (see sale_order._ZONE_LAYOUT:
+    # accessory shares the ground cursor with the base run).
+    "appliance": "accessory",
 }
 
 
@@ -2124,7 +2141,32 @@ class SouthbrookKitchenDesignLine(models.Model):
         ("filler", "Filler Panel"),
         ("panel",  "Decorative Panel"),
         ("corner", "Corner Unit"),
+        # Task 2 (kitchen templates): a customer-appliance stand-in (range/
+        # fridge/dishwasher space). Flows through auto-arrange as a
+        # floor-standing run member (NOT in the skip tuple) so the run packs
+        # around it; priced 0; excluded from the drag catalog.
+        ("appliance", "Appliance Space"),
     ], required=True)
+
+    # ── Task 2 (kitchen templates) — template provenance + honesty flags ──
+    template_slot_code = fields.Char(
+        index=True,
+        help="Slot code of the template line this design line was "
+             "instantiated from (template provenance; empty for lines "
+             "added manually).")
+    appliance_type = fields.Selection([
+        ("range", "Range / Stove"),
+        ("fridge", "Refrigerator"),
+        ("dishwasher", "Dishwasher"),
+        ("hood", "Range Hood"),
+        ("other", "Other Appliance"),
+    ], help="Which appliance this Appliance Space line reserves room for.")
+    is_unresolved = fields.Boolean(
+        default=False,
+        help="Honesty flag: the template slot could not be resolved to a "
+             "real product. The line is a VISIBLE placeholder (never "
+             "silently dropped or substituted) and blocks quoting via "
+             "_check_production_ready (UNRESOLVED_SLOT).")
 
     # ── v19.0.4.22.0 audit P2#9 — Q21 zone tagging ─────────────────────
     # Mirrors the sale.order.line zone lexicon locked by PUNCHLIST Q21
@@ -2328,13 +2370,26 @@ class SouthbrookKitchenDesignLine(models.Model):
             if line.zone != "other" and line.zone_label:
                 line.zone_label = False
 
-    @api.depends("cabinet_type", "x_position_in", "z_position_in")
+    @api.depends("cabinet_type", "x_position_in", "z_position_in",
+                 "is_unresolved", "appliance_type", "width_in",
+                 "template_slot_code")
     def _compute_position_label(self):
         type_map = {
             "base": "Base", "wall": "Wall", "tall": "Tall",
             "filler": "Filler", "panel": "Panel", "corner": "Corner",
+            "appliance": "Appliance",
         }
         for line in self:
+            # Task 2 (kitchen templates): honesty-first labels — an
+            # unresolved slot SAYS so, an appliance space says what it is.
+            if line.is_unresolved:
+                line.position_label = "UNRESOLVED: %s" % (
+                    line.template_slot_code or line.product_id.display_name)
+                continue
+            if line.cabinet_type == "appliance":
+                line.position_label = 'APPLIANCE: %s %g"' % (
+                    line.appliance_type or "space", line.width_in or 0)
+                continue
             label = type_map.get(line.cabinet_type, line.cabinet_type)
             line.position_label = "%s @ X=%.0f\"" % (label, line.x_position_in)
 

@@ -67,3 +67,4 @@ from . import test_collision_matrix
 # .line model regression pins: slot zone default, is_appliance_slot,
 # layout_shape lexicon reuse from southbrook.room, unique code.
 from . import test_kitchen_template_model
+from . import test_template_instantiate

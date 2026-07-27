@@ -20,6 +20,10 @@ class ProductTemplate(models.Model):
             ("filler", "Filler Panel"),
             ("panel",  "Decorative Panel"),
             ("corner", "Corner Unit"),
+            # Task 2 (kitchen templates): appliance-space stand-in products
+            # (SBK-APPL-*). southbrook_is_cabinet stays False on them, so
+            # they never appear in the drag catalog.
+            ("appliance", "Appliance Space"),
         ],
         string="Cabinet Type",
     )

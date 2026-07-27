@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Task 2 (kitchen templates) — support products for template
+       instantiation. noupdate="0": these are engine artifacts a later
+       release may correct, not shop-owned data.
+
+       - SBK-APPL-* "Appliance Space" products: the design-line stand-ins
+         for the customer's own appliances (zero price; never shown in the
+         cabinet drag catalog because southbrook_is_cabinet stays False).
+       - SBK-UNRESOLVED: the visible placeholder product for template
+         slots the resolver could not map (honesty contract: unresolved
+         slots are SEEN, never silently dropped or substituted).
+       - Placement rules give the M4 motion-envelope validator the
+         appliance front-clearances with zero new validator code. -->
+  <data noupdate="0">
+
+    <record id="product_tmpl_appl_range" model="product.template">
+      <field name="name">Appliance Space — Range</field>
+      <field name="default_code">SBK-APPL-RANGE</field>
+      <field name="type">consu</field>
+      <field name="list_price">0.0</field>
+      <field name="sale_ok" eval="True"/>
+      <field name="purchase_ok" eval="False"/>
+      <field name="southbrook_cabinet_type">appliance</field>
+      <field name="southbrook_width_in">30.0</field>
+      <field name="southbrook_height_in">36.0</field>
+      <field name="southbrook_depth_in">25.0</field>
+    </record>
+
+    <record id="product_tmpl_appl_fridge" model="product.template">
+      <field name="name">Appliance Space — Refrigerator</field>
+      <field name="default_code">SBK-APPL-FRIDGE</field>
+      <field name="type">consu</field>
+      <field name="list_price">0.0</field>
+      <field name="sale_ok" eval="True"/>
+      <field name="purchase_ok" eval="False"/>
+      <field name="southbrook_cabinet_type">appliance</field>
+      <field name="southbrook_width_in">36.0</field>
+      <field name="southbrook_height_in">70.0</field>
+      <field name="southbrook_depth_in">30.0</field>
+    </record>
+
+    <record id="product_tmpl_appl_dishwasher" model="product.template">
+      <field name="name">Appliance Space — Dishwasher</field>
+      <field name="default_code">SBK-APPL-DW</field>
+      <field name="type">consu</field>
+      <field name="list_price">0.0</field>
+      <field name="sale_ok" eval="True"/>
+      <field name="purchase_ok" eval="False"/>
+      <field name="southbrook_cabinet_type">appliance</field>
+      <field name="southbrook_width_in">24.0</field>
+      <field name="southbrook_height_in">34.5</field>
+      <field name="southbrook_depth_in">24.0</field>
+    </record>
+
+    <record id="product_tmpl_appl_hood" model="product.template">
+      <field name="name">Appliance Space — Range Hood</field>
+      <field name="default_code">SBK-APPL-HOOD</field>
+      <field name="type">consu</field>
+      <field name="list_price">0.0</field>
+      <field name="sale_ok" eval="True"/>
+      <field name="purchase_ok" eval="False"/>
+      <field name="southbrook_cabinet_type">appliance</field>
+      <field name="southbrook_width_in">30.0</field>
+      <field name="southbrook_height_in">12.0</field>
+      <field name="southbrook_depth_in">18.0</field>
+    </record>
+
+    <record id="product_tmpl_unresolved_slot" model="product.template">
+      <field name="name">Unresolved Template Slot</field>
+      <field name="default_code">SBK-UNRESOLVED</field>
+      <field name="type">consu</field>
+      <field name="list_price">0.0</field>
+      <field name="sale_ok" eval="True"/>
+      <field name="purchase_ok" eval="False"/>
+    </record>
+
+    <!-- Appliance front-clearance rules for the M4 motion-envelope
+         validator (anchor_class="run": along-wall run members; payload
+         lengths in mm — 610mm = 24" door swing / 914mm = 36" fridge). -->
+    <record id="placement_rule_appl_range_clearance" model="southbrook.placement.rule">
+      <field name="name">Appliance clearance — range (front 610mm)</field>
+      <field name="product_tmpl_id" ref="product_tmpl_appl_range"/>
+      <field name="anchor_class">run</field>
+      <field name="tier">base</field>
+      <field name="payload" eval="{'clearance_front_mm': 610.0}"/>
+    </record>
+
+    <record id="placement_rule_appl_fridge_clearance" model="southbrook.placement.rule">
+      <field name="name">Appliance clearance — refrigerator (front 914mm)</field>
+      <field name="product_tmpl_id" ref="product_tmpl_appl_fridge"/>
+      <field name="anchor_class">run</field>
+      <field name="tier">base</field>
+      <field name="payload" eval="{'clearance_front_mm': 914.0}"/>
+    </record>
+
+    <record id="placement_rule_appl_dw_clearance" model="southbrook.placement.rule">
+      <field name="name">Appliance clearance — dishwasher (front 610mm)</field>
+      <field name="product_tmpl_id" ref="product_tmpl_appl_dishwasher"/>
+      <field name="anchor_class">run</field>
+      <field name="tier">base</field>
+      <field name="payload" eval="{'clearance_front_mm': 610.0}"/>
+    </record>
+
+  </data>
+</odoo>
