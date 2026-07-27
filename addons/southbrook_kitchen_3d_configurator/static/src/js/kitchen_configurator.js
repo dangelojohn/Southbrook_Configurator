@@ -572,7 +572,7 @@ class SouthbrookKitchenConfigurator extends Component {
         }
     }
 
-    async _refreshLayout() {
+    async _refreshLayout(opts = {}) {
         // PR2.5 — once hydrated from a saved design's canonical lines,
         // /layout must never run again for the life of this session:
         // it's a pure generator that reflows a brand-new cabinet fill
@@ -592,7 +592,17 @@ class SouthbrookKitchenConfigurator extends Component {
         // don't refresh after hydration. Re-running the generator
         // post-hydration is a placement/packing concern, explicitly out
         // of scope per the PR2.5 brief ("no placement/packing changes").
-        if (this._hydratedFromDesign) {
+        // 2026-07-27 (user decision) — `opts.force` pierces the guard for
+        // the ROOM-RESIZE family only (width/depth pullers, the numeric
+        // room fields, the ± stretch buttons): resizing the room on a
+        // reopened saved design now REGENERATES the layout, replacing the
+        // saved arrangement (and the ensuing auto-save persists that).
+        // The guard still protects everything else — most importantly the
+        // boot/hydration path the original PR2.5 data-loss bug came from.
+        // After a successful forced regen the design is generator-owned
+        // again, so the hydration flag flips off below (re-enabling the
+        // filler/alignment controls consistently).
+        if (this._hydratedFromDesign && !opts.force) {
             this._recomputeLayoutFromItems();
             return;
         }
@@ -616,6 +626,14 @@ class SouthbrookKitchenConfigurator extends Component {
             if (!this.state.selected && this.state.items.length) {
                 this.state.selected = this.state.items[0];
             }
+            // Forced regen on a hydrated design succeeded: the layout is
+            // now generator-owned — drop hydration semantics so later
+            // edits (incl. the F12-disabled controls) behave like a
+            // normal fresh session.
+            if (opts.force && this._hydratedFromDesign) {
+                this._hydratedFromDesign = false;
+                this.state.hydratedFromDesign = false;
+            }
             // Rebuild 3D after data refresh
             } catch (e) {
             this.state.error = "Layout error: " + (e.message || e);
@@ -628,13 +646,13 @@ class SouthbrookKitchenConfigurator extends Component {
         if (!Number.isFinite(v)) return;
         const min = { width_in: 12, depth_in: 12, height_in: 84 };
         this.state.room[field] = Math.max(min[field] || 12, v);
-        await this._refreshLayout();
+        await this._refreshLayout({ force: true });   // room resize regenerates, saved designs included
         this._queueAutoSave();    // D5
     }
 
     async _stretchWidth(delta) {
         this.state.room.width_in = Math.max(12, this.state.room.width_in + delta);
-        await this._refreshLayout();
+        await this._refreshLayout({ force: true });   // room resize regenerates, saved designs included
         this._queueAutoSave();    // D5
     }
 
@@ -2520,7 +2538,7 @@ SouthbrookKitchenConfigurator.prototype._onCanvasMove = function ({ item, x_posi
 SouthbrookKitchenConfigurator.prototype._onCanvasResize = function (newWidthIn, inFlight) {
     this.state.room.width_in = newWidthIn;
     if (!inFlight) {
-        this._refreshLayout().then(() => this._queueAutoSave());
+        this._refreshLayout({ force: true }).then(() => this._queueAutoSave());
     }
 };
 // Depth-axis counterpart of _onCanvasResize. The front-wall puller
@@ -2537,7 +2555,7 @@ SouthbrookKitchenConfigurator.prototype._onCanvasResize = function (newWidthIn, 
 SouthbrookKitchenConfigurator.prototype._onCanvasResizeDepth = function (newDepthIn, inFlight) {
     this.state.room.depth_in = newDepthIn;
     if (!inFlight) {
-        this._refreshLayout().then(() => this._queueAutoSave());
+        this._refreshLayout({ force: true }).then(() => this._queueAutoSave());
     }
 };
 SouthbrookKitchenConfigurator.prototype._onCanvasViewChange = function (key) {

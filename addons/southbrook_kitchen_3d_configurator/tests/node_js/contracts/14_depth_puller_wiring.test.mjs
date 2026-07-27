@@ -99,3 +99,62 @@ test("depth handler is axis-symmetric with the width handler", async () => {
     assert.equal(h2.component.state.room.depth_in, d0,
         "width path must not touch depth");
 });
+
+// ── 2026-07-27 (user decision) — pullers regenerate on SAVED designs too ──
+// The room-resize family passes { force: true } through _refreshLayout's
+// hydration guard: resizing a reopened design regenerates (replacing the
+// saved arrangement) and drops hydration semantics on success.
+
+test("puller commit passes force:true to _refreshLayout", async () => {
+    const h = await mountConfigurator({});
+    const seen = [];
+    h.component._refreshLayout = (opts) => {
+        seen.push(opts);
+        return Promise.resolve();
+    };
+    h.component._queueAutoSave = () => {};
+    h.component._onCanvasResizeDepth(120, false);
+    h.component._onCanvasResize(140, false);
+    await Promise.resolve();
+    assert.equal(seen.length, 2);
+    assert.ok(seen.every(o => o && o.force === true),
+        "both pullers must pierce the hydration guard with force:true");
+});
+
+test("forced regen on a hydrated design regenerates and drops hydration", async () => {
+    let layoutCalls = 0;
+    const h = await mountConfigurator({
+        actionParams: { design_id: 4242 },
+        rpcRoutes: {
+            "/southbrook_kitchen/configurator/load_design_lines": () => ({
+                room: { width_in: 120, depth_in: 96, height_in: 96 },
+                design_name: "saved design",
+                lines: [{
+                    id: 1, product_id: 1, layout_key: "b-1",
+                    product_name: "Base 24", cabinet_type: "base",
+                    width_in: 24, height_in: 34.5, depth_in: 24,
+                    x_position_in: 0, y_position_in: 0, z_position_in: 0,
+                    rotation_deg: 0, wall: "back", price: 100,
+                }],
+            }),
+            "/southbrook_kitchen/configurator/layout": () => {
+                layoutCalls += 1;
+                return { items: [], summary: {}, warnings: [] };
+            },
+        },
+    });
+    // Sanity: hydration succeeded and the guard is armed.
+    assert.equal(h.component._hydratedFromDesign, true,
+        "fixture must start hydrated");
+    h.component._queueAutoSave = () => {};
+
+    h.component._onCanvasResizeDepth(72, false);
+    // _refreshLayout awaits the /layout rpc; flush microtasks.
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(layoutCalls, 1,
+        "puller commit on a hydrated design must hit /layout (regenerate)");
+    assert.equal(h.component._hydratedFromDesign, false,
+        "successful forced regen must drop hydration semantics");
+    assert.equal(h.component.state.hydratedFromDesign, false,
+        "reactive mirror must drop too (re-enables F12 controls)");
+});
