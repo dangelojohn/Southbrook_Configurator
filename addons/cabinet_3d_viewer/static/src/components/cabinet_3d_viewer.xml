@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <t t-name="cabinet_3d_viewer.Cabinet3dViewerTemplate">
+        <div class="s_cabinet_3d_viewer container-fluid py-4 bg-slate-900 text-white rounded-xl shadow-2xl my-3">
+            <div class="row align-items-center">
+                <!-- 3D Canvas Container -->
+                <div class="col-lg-8 position-relative" style="min-height: 500px;">
+                    <div t-ref="canvasContainer" class="w-100 h-100 rounded-lg overflow-hidden border border-slate-700 shadow-inner"></div>
+                    <t t-if="state.isLoading">
+                        <div class="position-absolute top-50 start-50 translate-middle text-center">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 text-muted">Loading Interactive 3D Cabinet...</p>
+                        </div>
+                    </t>
+                </div>
+
+                <!-- Odoo Website Interactive Specification Panel -->
+                <div class="col-lg-4 p-4 border-start border-slate-800">
+                    <h3 class="fw-bold text-sky-400 mb-2">24" 3-Drawer Base Cabinet</h3>
+                    <p class="text-slate-400 text-sm mb-4">Interactive 3D Euro-Standard Cabinet Configurator powered by Odoo v19 CE &amp; OWL Component Architecture.</p>
+
+                    <div class="card bg-slate-800 border-slate-700 text-white p-3 mb-3">
+                        <h6 class="text-uppercase text-xs font-mono text-slate-400 mb-2">3D Cabinet Specifications</h6>
+                        <ul class="list-unstyled mb-0 text-sm">
+                            <li class="d-flex justify-content-between py-1 border-bottom border-slate-700">
+                                <span>Width:</span> <strong class="text-sky-300"><t t-esc="state.width"/>"</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-1 border-bottom border-slate-700">
+                                <span>Height:</span> <strong class="text-sky-300"><t t-esc="state.height"/>"</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-1 border-bottom border-slate-700">
+                                <span>Depth:</span> <strong class="text-sky-300"><t t-esc="state.depth"/>"</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-1 border-bottom border-slate-700">
+                                <span>Countertop:</span> <strong class="text-amber-300"><t t-esc="state.countertop"/></strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-1">
+                                <span>Standard:</span> <strong class="text-emerald-400">32mm Euro System</strong>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <a href="/shop/cart" class="btn btn-primary btn-lg w-100 font-bold shadow-lg">
+                        <i class="fa fa-shopping-cart me-2"></i> Add Custom Cabinet to Cart
+                    </a>
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>
