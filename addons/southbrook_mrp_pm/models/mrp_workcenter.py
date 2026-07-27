@@ -153,9 +153,13 @@ class MrpWorkcenter(models.Model):
         dashboard tile to the maintenance backlog."""
         self.ensure_one()
         Eq = self.env["maintenance.equipment"]
+        # I2 (Round-2 misc fix): emit tuple values for `in` operators so
+        # that test helpers which hash the domain (e.g. `{tuple(t) for t
+        # in action["domain"]}`) don't blow up with `unhashable type:
+        # list`. Odoo accepts both list and tuple values in domain leafs.
         domain = [
             ("workcenter_id", "=", self.id),
-            ("southbrook_condition", "in", list(_ALERT_CONDITIONS)),
+            ("southbrook_condition", "in", tuple(_ALERT_CONDITIONS)),
         ]
         return {
             "type": "ir.actions.act_window",
@@ -188,7 +192,9 @@ class MrpWorkcenter(models.Model):
             "res_model": "mrp.production",
             "view_mode": "list,form,kanban",
             "domain": [
-                ("state", "in", list(MO_STATES)),
+                # See I2 note in action_view_equipment_alerts — tuple
+                # values stay hashable when tests bucket the domain.
+                ("state", "in", tuple(MO_STATES)),
                 ("workorder_ids.workcenter_id", "=", self.id),
             ],
             "context": {
@@ -208,6 +214,7 @@ class MrpWorkcenter(models.Model):
             "view_mode": "list,form,kanban",
             "domain": [
                 ("workcenter_id", "=", self.id),
-                ("state", "in", list(_IN_FLIGHT_WO_STATES)),
+                # See I2 note in action_view_equipment_alerts.
+                ("state", "in", tuple(_IN_FLIGHT_WO_STATES)),
             ],
         }

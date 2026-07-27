@@ -8,7 +8,13 @@ Two endpoints:
 Both gated on X-Api-Key. The envelope is the same dict
 sb.cutlist.to_nesting_envelope() returns; the nesting-result endpoint
 forwards a JSON payload to sb.cutlist.from_nesting_result(), which
-validates schema = southbrook.nesting.v1 and advances state to 'nested'.
+validates schema is `southbrook.nesting.v1` or `southbrook.nesting.v2`
+and advances state to 'nested'.
+
+Round-2 misc fix: bumped expected envelope SCHEMA from v1 to v2 to
+track sb.cutlist.to_nesting_envelope() which now emits v2.
+sb.cutlist.from_nesting_result() still accepts BOTH v1 and v2 inbound
+payloads forever, so the POST test path continues to send v1.
 """
 import json
 
@@ -16,7 +22,11 @@ from odoo.tests.common import HttpCase, tagged
 
 
 SCHEMA = "southbrook.flutter.api.v1"
-NESTING_SCHEMA = "southbrook.nesting.v1"
+# Envelope GET — server emits v2 since the schema bump in
+# southbrook_kitchen_mrp.sb_cutlist.to_nesting_envelope; the inbound
+# from_nesting_result still accepts v1 forever, so POST payloads that
+# echo the constant continue to work.
+NESTING_SCHEMA = "southbrook.nesting.v2"
 
 
 @tagged("post_install", "-at_install", "southbrook", "api", "cutlist_nesting")

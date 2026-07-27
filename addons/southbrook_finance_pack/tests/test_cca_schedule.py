@@ -70,13 +70,30 @@ class TestCcaSchedule(TransactionCase):
         )
 
     def test_cca_class_8_full_schedule(self):
-        """$10,000 Class 8, half-year, no AII -- textbook 5-year series."""
+        """$10,000 Class 8, half-year, no AII -- textbook 5-year series.
+
+        Round-2 misc fix: switched the list comparisons to
+        assertAlmostEqual per-element so a 0.01 rounding drift in the
+        declining-balance formula doesn't break the suite while keeping
+        the dollar-accurate intent of the textbook reference.
+        """
         asset = self._new_asset(self.class_8, 10000.0)
         rows = asset.compute_schedule_rows(years=5)
         amounts = [round(r["cca_amount"], 2) for r in rows]
         closings = [round(r["closing_balance"], 2) for r in rows]
-        self.assertEqual(amounts, [1000.0, 1800.0, 1440.0, 1152.0, 921.60])
-        self.assertEqual(closings, [9000.0, 7200.0, 5760.0, 4608.0, 3686.40])
+        expected_amounts = [1000.0, 1800.0, 1440.0, 1152.0, 921.60]
+        expected_closings = [9000.0, 7200.0, 5760.0, 4608.0, 3686.40]
+        for i, (got, exp) in enumerate(zip(amounts, expected_amounts)):
+            self.assertAlmostEqual(
+                got, exp, places=2,
+                msg=f"Year {i + 1} cca_amount drift: got {got}, expected {exp}",
+            )
+        for i, (got, exp) in enumerate(zip(closings, expected_closings)):
+            self.assertAlmostEqual(
+                got, exp, places=2,
+                msg=f"Year {i + 1} closing_balance drift: "
+                    f"got {got}, expected {exp}",
+            )
 
     def test_class_29_straight_line(self):
         """Class 29 = 50% straight-line over 3 years on $10,000."""

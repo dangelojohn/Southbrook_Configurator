@@ -79,6 +79,16 @@ class TestSendToManufacturing(TransactionCase):
         # cross-contaminate the assertions.
         if "force_production_release" in cls.order._fields:
             cls.order.sudo().force_production_release = True
+        # Round-2 A2-straggler fix: short-circuit the
+        # southbrook_mrp_pm production-approval gate so this suite's
+        # action_confirm calls don't trip on "Cannot confirm sale
+        # order ... — these lines would generate manufacturing orders
+        # but the order is not Production-Approved". The field is
+        # only present when southbrook_mrp_pm is installed, so guard
+        # the write via _fields lookup to keep this test runnable on
+        # a stack without mrp_pm.
+        if "production_approval_state" in cls.env["sale.order"]._fields:
+            cls.order.production_approval_state = "approved"
 
     def _fire(self):
         controller = ctrl_main.SouthbrookOrderBuilderPortal()

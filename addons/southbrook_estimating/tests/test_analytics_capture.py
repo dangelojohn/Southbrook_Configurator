@@ -67,6 +67,13 @@ class TestAnalyticsCapture(SouthbrookTestCase):
             "product_id": product.id,
             "product_uom_qty": 1.0,
         })
+        # Round-2 A2-straggler fix: short-circuit the
+        # southbrook_mrp_pm production-approval gate so action_confirm
+        # doesn't trip on the unapproved-manufacturing-lines check.
+        # Field-guarded so the test still runs on a stack without
+        # southbrook_mrp_pm installed.
+        if "production_approval_state" in self.env["sale.order"]._fields:
+            order.production_approval_state = "approved"
         order.action_confirm()
         row = self.Analytics.search([("sale_order_id", "=", order.id)])
         self.assertEqual(len(row), 1)

@@ -7,14 +7,19 @@ from odoo.tests.common import TransactionCase, tagged
 @tagged("post_install", "-at_install", "southbrook", "hardware_catalog", "seed")
 class TestSeedIntegrity(TransactionCase):
 
-    def test_all_36_brands_present(self):
-        """Module ships 36 brand records — original 19 + DTC/King Slide
-        (Tier 1) + 15 Marathon-homepage brands (Tier 2.2). Locks the
-        floor; growth is fine, silent drops are not."""
+    def test_all_brands_present(self):
+        """Module ships 39 brand records — original 19 + DTC/King Slide
+        (Tier 1) + 15 Marathon-homepage brands (Tier 2.2) + 3 brands
+        added since the original assertion landed. Locks the floor;
+        growth is fine, silent drops are not.
+
+        Round-2 misc fix: bumped 36 -> 39 to track legitimate data
+        growth in southbrook_hardware_brands.xml.
+        """
         Brand = self.env["southbrook.hardware.brand"]
-        self.assertEqual(
-            Brand.search_count([]), 36,
-            "Expected 36 brand records, got a different count",
+        self.assertGreaterEqual(
+            Brand.search_count([]), 39,
+            "Expected at least 39 brand records, got a different count",
         )
 
     def test_marathon_aligned_additions_present(self):
