@@ -136,7 +136,10 @@ class TestPlacementRule(TransactionCase):
         self.assertEqual(rule.anchor_class, "junction")
         self.assertEqual(rule.payload["leg_x_mm"], 610.0)
         self.assertEqual(rule.payload["leg_z_mm"], 1143.0)
-        self.assertEqual(rule.payload["min_leg_x_mm"], 610.0)
+        # M3 — blind seed carries the 3in filler; min_leg_x covers
+        # leg + filler (686.2 = 610 + 76.2).
+        self.assertEqual(rule.payload["filler_x_mm"], 76.2)
+        self.assertEqual(rule.payload["min_leg_x_mm"], 686.2)
         self.assertEqual(rule.payload["min_leg_z_mm"], 1372.0)
         self.assertEqual(rule.payload["host_leg"], "z")
 

@@ -147,6 +147,25 @@ def footprint_from_anchor_mm(cab, place):
     return (x - d, x, z, z + w)
 
 
+def motion_envelope_from_anchor_mm(cab, place, clearance_front_mm):
+    """M4 — AABB of the region a cabinet's doors/mechanism sweep IN FRONT
+    of its face (the direction it faces per rotation), extending
+    `clearance_front_mm` from the ANCHOR-convention footprint. Solid
+    cabinets inside this box block the mechanism (motion-vs-solid =
+    blocking per 09-rule-engine-spec.md §5)."""
+    x0, x1, z0, z1 = footprint_from_anchor_mm(cab, place)
+    c = clearance_front_mm
+    rot = int(round(place.get("rotation_deg", 0))) % 360
+    if rot == 0:        # faces +Z
+        return (x0, x1, z1, z1 + c)
+    if rot == 180:      # faces -Z
+        return (x0, x1, z0 - c, z0)
+    if rot == 90:       # faces +X
+        return (x1, x1 + c, z0, z1)
+    # rot == 270        # faces -X
+    return (x0 - c, x0, z0, z1)
+
+
 def footprints_overlap(a, b, eps=1.0):
     return (a[0] < b[1] - eps and b[0] < a[1] - eps and
             a[2] < b[3] - eps and b[2] < a[3] - eps)
@@ -358,6 +377,9 @@ def _layer_of(cab):
 # constant.
 _CORNER_FOOTPRINT_MM = 914.0            # 36"
 _CORNER_HEIGHT_MM = {"base": 876.0, "wall": 762.0}   # 34.5" / 30"
+# M3 — a corner filler strip's depth matches its layer's run depth
+# (24" base / 12" upper), same convention as the corner heights above.
+_CORNER_FILLER_DEPTH_MM = {"base": 610.0, "wall": 305.0}
 
 
 def _corner_cell_aabb(xk, zk, room, corner_size_mm):
@@ -677,6 +699,7 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     corners = detect_corners(assigned, room, placements=provisional_placements,
                               corner_size_mm=corner_size_mm)
     inserted = []
+    fillers = []            # M3 — rule-demanded corner filler strips
     removed_ids = set()
     offsets = {}
     standalone_cells = []   # [(cell_aabb, corner_node)] for the cap pass
@@ -821,17 +844,92 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         # corner's consumption ALONG THAT WALL's axis (X-running walls use
         # ext_x, Z-running use ext_z). Symmetric rules and the legacy
         # square reduce to the old single corner_size_mm behavior.
+        #
+        # M3 — a rule may additionally demand a FILLER strip on a leg
+        # (filler_x_mm / filler_z_mm — e.g. the 3" blind-corner filler
+        # per KraftMaid/NKBA, docs 02/06 `filler-blind-corner-min`). The
+        # filler is a REAL node (emitted below, → BOM/cutlist in the ORM
+        # layer) and the leg's run starts past corner + filler.
+        filler_x = (rule.get("filler_x_mm") or 0.0) if rule else 0.0
+        filler_z = (rule.get("filler_z_mm") or 0.0) if rule else 0.0
+
         def _leg_for(wall):
             return ext_x if wall in ("back", "front") else ext_z
+
+        def _filler_for(wall):
+            return filler_x if wall in ("back", "front") else filler_z
+
+        def _emit_filler(wall):
+            fw = _filler_for(wall)
+            if fw <= 0:
+                return
+            fdepth = _CORNER_FILLER_DEPTH_MM[layer]
+            # Strip cell: between the corner cell's interior edge and the
+            # run start on `wall`, hugging that wall.
+            if wall in ("back", "front"):
+                if xk == "0":
+                    fx0, fx1 = ext_x, ext_x + fw
+                else:   # "W"
+                    fx0, fx1 = room_w - ext_x - fw, room_w - ext_x
+                fz0, fz1 = (0.0, fdepth) if zk == "0" else (room_d - fdepth,
+                                                            room_d)
+            else:
+                if zk == "0":
+                    fz0, fz1 = ext_z, ext_z + fw
+                else:   # "D"
+                    fz0, fz1 = room_d - ext_z - fw, room_d - ext_z
+                fx0, fx1 = (0.0, fdepth) if xk == "0" else (room_w - fdepth,
+                                                            room_w)
+            frot = _WALL_SPEC[wall]["rot"]
+            cell_f = (fx0, fx1, fz0, fz1)
+            fillers.append({
+                "id": "cornerfill-%s-%s-%s" % (corner["corner"], layer,
+                                               wall),
+                "corner_filler": True,
+                "corner": corner["corner"],
+                "layer": layer,
+                "cabinet_type": "filler",
+                "family": "filler",
+                # width runs along the strip's wall (pose convention).
+                "width_mm": fw,
+                "depth_mm": fdepth,
+                "height_mm": height_mm,
+                "zone": "wall" if layer == "wall" else "accessory",
+                "wall": wall,
+                "__pose": _corner_node_pose_rect(cell_f, frot, y_floor),
+                "rule_id": rule.get("rule_id") if rule else None,
+            })
+
         offsets[(host_wall, layer)] = max(
-            offsets.get((host_wall, layer), 0), _leg_for(host_wall))
+            offsets.get((host_wall, layer), 0),
+            _leg_for(host_wall) + _filler_for(host_wall))
+        _emit_filler(host_wall)
         if other_end == "first":
-            # The adjoining low-end run must start past the corner footprint.
+            # The adjoining low-end run must start past corner + filler.
             offsets[(other_wall, layer)] = max(
-                offsets.get((other_wall, layer), 0), _leg_for(other_wall))
+                offsets.get((other_wall, layer), 0),
+                _leg_for(other_wall) + _filler_for(other_wall))
+            _emit_filler(other_wall)
+        elif _filler_for(other_wall) > 0:
+            # High-end adjoining run (it TERMINATES at the corner): the
+            # engine cannot reserve space for a filler there — the run's
+            # last cabinet may legitimately end flush at the cell, and a
+            # strip emitted into that gap could silently overlap it (the
+            # postcondition checks in-room, not pairwise overlap). Skip
+            # the strip and record why; the installer scribes this edge
+            # on site (docs 05 `absorb-out-of-square-at-shorter-leg-end`).
+            corner_diagnostics.append({
+                "corner": corner["corner"], "layer": layer,
+                "reason": "filler on %s skipped: run terminates at the "
+                          "corner (high-end leg) — scribe on site"
+                          % other_wall,
+            })
 
     final = [dict(c) for c in assigned if c["id"] not in removed_ids]
     final.extend(dict(n) for n in inserted)
+    # M3 — filler strips are real, solid layout members: they ride the
+    # postcondition (in-room) check and reach the ORM layer for BOM.
+    final.extend(dict(f) for f in fillers)
     placements = layout(final, room, wall_start_offsets=offsets,
                         **layout_kwargs)
 
@@ -845,7 +943,8 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
         capped = set()
         for cell, node in standalone_cells:
             for c in final:
-                if c.get("corner_cabinet") or c["id"] in capped:
+                if (c.get("corner_cabinet") or c.get("corner_filler")
+                        or c["id"] in capped):
                     continue
                 if footprints_overlap(
                         footprint_mm(c, place_by_id[c["id"]]), cell):
@@ -892,5 +991,6 @@ def resolve_and_layout(cabinets, room, corner_size_mm=_CORNER_FOOTPRINT_MM,
     # — the auto-arrange idempotence break (2026-07-26).
     return {"cabinets": final, "assigned": assigned,
             "placements": placements, "corners": corners,
-            "inserted": inserted, "removed_ids": sorted(removed_ids),
+            "inserted": inserted, "fillers": fillers,
+            "removed_ids": sorted(removed_ids),
             "corner_diagnostics": corner_diagnostics}

@@ -640,6 +640,62 @@ class SouthbrookKitchenDesign(models.Model):
                     "layout_role":   "derived",
                 })
 
+            # 3b) M3 — rule-demanded corner FILLER strips become real
+            #     derived design lines so they reach the manufacturing
+            #     mirror/BOM/cutlist (docs 08
+            #     `blind-corner-filler-strip-separate-bom-line`). The
+            #     engine already reserved their space (run offsets), so
+            #     a missing filler product degrades to a geometric gap
+            #     the installer scribes — never a collision.
+            # NOTE: filler templates in the live catalog (e.g. FP3,
+            # "Filler Panel 3in") carry southbrook_cabinet_type='filler'
+            # but NOT southbrook_is_cabinet — they're accessories, not
+            # droppable cabinets. Order by is_cabinet DESC so a properly
+            # flagged filler wins if one ever exists, else FP3-class.
+            filler_tmpl = self.env["product.template"].sudo().search(
+                [("southbrook_cabinet_type", "=", "filler")],
+                order="southbrook_is_cabinet desc, id", limit=1)
+            filler_variant = False
+            if filler_tmpl:
+                filler_variant = (filler_tmpl.product_variant_id
+                                  or filler_tmpl.product_variant_ids[:1])
+            for node in r.get("fillers") or ():
+                if not filler_variant:
+                    _logger.warning(
+                        "[auto-arrange] no filler product template — "
+                        "skipping corner filler line %s (design %s); the "
+                        "engine still reserved its space",
+                        node["id"], design.id)
+                    break
+                place = places.get(node["id"])
+                if place is None:
+                    continue
+                anchor = kitchen_layout_engine.anchor_pose_mm(node, place)
+                Line.create({
+                    "design_id":     design.id,
+                    "product_id":    filler_variant.id,
+                    "quantity":      1,
+                    "price_unit":    (filler_variant.list_price
+                                      or filler_tmpl.list_price),
+                    "cabinet_type":  "filler",
+                    "zone":          node.get("zone") or "accessory",
+                    "width_in":      node["width_mm"] * IN,
+                    "height_in":     node["height_mm"] * IN,
+                    "depth_in":      node["depth_mm"] * IN,
+                    "x_position_in": anchor["x"] * IN,
+                    "y_position_in": anchor["y"] * IN,
+                    "z_position_in": anchor["z"] * IN,
+                    "rotation_deg":  anchor["rotation_deg"],
+                    "wall":          node["wall"],
+                    "run_seq":       -1,
+                    "pinned":        False,
+                    "layout_key":    "cornerfill-%s-%s-%s-%s" % (
+                        design.id, node["corner"], node["layer"],
+                        node["wall"]),
+                    "origin":        "configurator",
+                    "layout_role":   "derived",
+                })
+
             # 4) mirror to the manufacturing model NOW (don't wait for the
             #    5-min reconcile cron) so BOM/price/cutlist reflect the corner.
             #    sync=False skips this — used by the CONTINUOUS interactive
@@ -759,6 +815,27 @@ class SouthbrookKitchenDesign(models.Model):
                 leg = ext_x if w in ("back", "front") else ext_z
                 wall_start_offsets[(w, layer)] = max(
                     wall_start_offsets.get((w, layer), 0), leg)
+
+        # M3 — a corner FILLER strip (derived, layout_key
+        # "cornerfill-<design>-<corner>-<layer>-<wall>") extends its
+        # wall's reservation past the corner cell by its own width, so a
+        # newly added cabinet lands after corner + filler, not inside the
+        # strip. Added ON TOP of the corner extents above (sum, not max —
+        # the strip sits between the cell edge and the run start).
+        fill_prefix = "cornerfill-%s-" % design.id
+        for dl in design.cabinet_line_ids:
+            if dl.cabinet_type != "filler" or dl.layout_role != "derived":
+                continue
+            key = dl.layout_key or ""
+            if not key.startswith(fill_prefix):
+                continue
+            # A wall-layer strip carries zone="wall" (set at create from
+            # the engine node); everything else is base-layer.
+            layer = "wall" if dl.zone == "wall" else "base"
+            w = dl.wall or "back"
+            wall_start_offsets[(w, layer)] = (
+                wall_start_offsets.get((w, layer), 0)
+                + (dl.width_in or 0) * MM)
 
         cabs = []
         for dl in design.cabinet_line_ids:
@@ -1195,6 +1272,113 @@ class SouthbrookKitchenDesign(models.Model):
                         "is unusual; confirm not a typo."
                     ) % (line.product_id.display_name, line.width_in),
                 })
+
+        # 12) M4 — corner MOTION envelope vs. solids. A corner rule may
+        #     declare `clearance_front_mm`: the region its doors /
+        #     mechanism (susan bifold, LeMans arm, blind pullout) sweep
+        #     in front of the cell. Any SAME-layer solid inside that box
+        #     blocks the mechanism (motion-vs-solid = blocking per
+        #     docs/research/corner-engine/09-rule-engine-spec.md §5).
+        # 13) M4 — rule-demanded corner filler strips must exist. The
+        #     engine emits them as derived lines (M3); a user deleting
+        #     one leaves a gap the BOM no longer covers → warning (the
+        #     installer CAN scribe on site, so not blocking).
+        Rule = self.env.get("southbrook.placement.rule")
+        if Rule is not None:
+            _MM12 = 25.4
+
+            def _line_layer(line):
+                if line.cabinet_type == "wall" or (
+                        line.cabinet_type == "corner"
+                        and line.zone == "wall"):
+                    return "wall"
+                return "base"
+
+            def _anchor_place(line):
+                return {"x": (line.x_position_in or 0) * _MM12,
+                        "z": (line.z_position_in or 0) * _MM12,
+                        "rotation_deg": line.rotation_deg or 0}
+
+            def _cab(line):
+                return {"width_mm": (line.width_in or 0) * _MM12,
+                        "depth_mm": (line.depth_in or 0) * _MM12}
+
+            rules_by_tmpl = {}
+            for rr in Rule.sudo().search(
+                    [("anchor_class", "=", "junction")]):
+                rules_by_tmpl.setdefault(rr.product_tmpl_id.id, rr)
+            corner_lines = self.cabinet_line_ids.filtered(
+                lambda l: l.cabinet_type == "corner")
+            key_prefix12 = "corner-%s-" % self.id
+            for cl in corner_lines:
+                rr = rules_by_tmpl.get(cl.product_id.product_tmpl_id.id)
+                if rr is None:
+                    continue
+                payload = rr.payload or {}
+                layer = _line_layer(cl)
+                # -- 12: motion envelope --
+                clearance = payload.get("clearance_front_mm") or 0
+                if clearance > 0:
+                    env_box = kitchen_layout_engine.\
+                        motion_envelope_from_anchor_mm(
+                            _cab(cl), _anchor_place(cl), clearance)
+                    for other in self.cabinet_line_ids:
+                        if other.id == cl.id:
+                            continue
+                        if other.cabinet_type in ("filler", "panel"):
+                            continue
+                        if _line_layer(other) != layer:
+                            continue
+                        fp = kitchen_layout_engine.footprint_from_anchor_mm(
+                            _cab(other), _anchor_place(other))
+                        if kitchen_layout_engine.footprints_overlap(
+                                env_box, fp):
+                            issues.append({
+                                "code":     "MOTION_ENVELOPE_COLLISION",
+                                "severity": "blocking",
+                                "message":  (
+                                    "%s sits inside the %.1f\" door/"
+                                    "mechanism clearance in front of the "
+                                    "corner cabinet %s (%s) — the corner "
+                                    "cannot open."
+                                ) % (other.product_id.display_name,
+                                     clearance / _MM12,
+                                     cl.product_id.display_name,
+                                     rr.corner_type_id or rr.name),
+                            })
+                # -- 13: demanded fillers present --
+                fx = payload.get("filler_x_mm") or 0
+                fz = payload.get("filler_z_mm") or 0
+                if (fx <= 0 and fz <= 0) or not (
+                        cl.layout_key or "").startswith(key_prefix12):
+                    continue
+                cname = (cl.layout_key[len(key_prefix12):]
+                         .rsplit("-", 1)[0])
+                spec12 = kitchen_layout_engine._CORNER_RESOLVE.get(cname)
+                if spec12 is None:
+                    continue   # standalone corner — engine emits none
+                host_w, other_w, other_end12, _h = spec12
+                expected_walls = [host_w] + (
+                    [other_w] if other_end12 == "first" else [])
+                for w in expected_walls:
+                    fw = fx if w in ("back", "front") else fz
+                    if fw <= 0:
+                        continue
+                    want_key = "cornerfill-%s-%s-%s-%s" % (
+                        self.id, cname, layer, w)
+                    if not self.cabinet_line_ids.filtered(
+                            lambda l: l.layout_key == want_key):
+                        issues.append({
+                            "code":     "CORNER_FILLER_MISSING",
+                            "severity": "warning",
+                            "message":  (
+                                "The %s corner (%s) requires a %.1f\" "
+                                "filler on the %s wall but the strip is "
+                                "missing — re-run auto-arrange or plan "
+                                "to scribe on site."
+                            ) % (cname, cl.product_id.display_name,
+                                 fw / _MM12, w),
+                        })
 
         return issues
 

@@ -54,6 +54,10 @@ _SEED_RULES = [
             "height_mm": 876.0,
             "min_leg_x_mm": 1143.0,
             "min_leg_z_mm": 1143.0,
+            # M4 — bifold door swing / tray access in front of the cell
+            # (ESTIMATE per docs 04/06; surfaces as a blocking
+            # MOTION_ENVELOPE_COLLISION when violated).
+            "clearance_front_mm": 500.0,
         },
     },
     {
@@ -67,9 +71,14 @@ _SEED_RULES = [
             "leg_x_mm": 610.0,
             "leg_z_mm": 1143.0,
             "height_mm": 876.0,
-            "min_leg_x_mm": 610.0,
+            # M3 — the 3in blind-corner filler on the X-wall run
+            # (docs 02/06 `filler-blind-corner-min`): min_leg_x must
+            # cover leg + filler.
+            "filler_x_mm": 76.2,
+            "min_leg_x_mm": 686.2,
             "min_leg_z_mm": 1372.0,
             "host_leg": "z",
+            "clearance_front_mm": 450.0,
         },
     },
     {
@@ -85,9 +94,30 @@ _SEED_RULES = [
             "height_mm": 762.0,
             "min_leg_x_mm": 762.0,
             "min_leg_z_mm": 762.0,
+            "clearance_front_mm": 300.0,
         },
     },
 ]
+
+# Prior seed payload versions, keyed by (corner_type_id, tier). When the
+# seeder finds an existing rule whose payload EXACTLY matches one of these
+# historical versions, the rule is still factory-state and is upgraded to
+# the current _SEED_RULES payload in place. A payload the user has edited
+# matches none of them and is left untouched.
+_SEED_PAYLOADS_LEGACY = {
+    ("diagonal-corner-lazy-susan", "base"): [
+        {"leg_x_mm": 914.0, "leg_z_mm": 914.0, "height_mm": 876.0,
+         "min_leg_x_mm": 1143.0, "min_leg_z_mm": 1143.0},
+    ],
+    ("blind-corner-basic", "base"): [
+        {"leg_x_mm": 610.0, "leg_z_mm": 1143.0, "height_mm": 876.0,
+         "min_leg_x_mm": 610.0, "min_leg_z_mm": 1372.0, "host_leg": "z"},
+    ],
+    ("pie-cut-wall-corner", "wall"): [
+        {"leg_x_mm": 610.0, "leg_z_mm": 610.0, "height_mm": 762.0,
+         "min_leg_x_mm": 762.0, "min_leg_z_mm": 762.0},
+    ],
+}
 
 # Fallback product when a seed rule's product_default_code has no
 # resolvable product.template in THIS module (see _seed_default_rules).
@@ -190,6 +220,38 @@ class SouthbrookPlacementRule(models.Model):
                         "%(value)r.",
                         name=rule.name, value=host_leg))
 
+            # M3/M4 — optional numeric keys: corner filler strips per leg
+            # and the front motion-envelope clearance. All must be
+            # numeric >= 0 when present; a filler additionally extends
+            # the leg's minimum wall-length requirement.
+            for opt_key in ("filler_x_mm", "filler_z_mm",
+                            "clearance_front_mm"):
+                if opt_key not in payload:
+                    continue
+                value = payload[opt_key]
+                if isinstance(value, bool) or not isinstance(
+                        value, (int, float)) or value < 0:
+                    raise ValidationError(
+                        self.env._(
+                            "Placement rule '%(name)s': payload key "
+                            "'%(key)s' must be numeric >= 0 if present, "
+                            "got %(value)r.",
+                            name=rule.name, key=opt_key, value=value))
+            for leg, fill, mn in (("leg_x_mm", "filler_x_mm",
+                                   "min_leg_x_mm"),
+                                  ("leg_z_mm", "filler_z_mm",
+                                   "min_leg_z_mm")):
+                fw = payload.get(fill) or 0
+                if fw and payload[mn] < payload[leg] + fw:
+                    raise ValidationError(
+                        self.env._(
+                            "Placement rule '%(name)s': %(mn)s (%(m)r) "
+                            "must cover %(leg)s + %(fill)s "
+                            "(%(l)r + %(f)r).",
+                            name=rule.name, mn=mn,
+                            m=payload[mn], leg=leg, fill=fill,
+                            l=payload[leg], f=fw))
+
     def engine_dicts(self):
         """Plain-dict form the pure kitchen_layout_engine consumes as
         `corner_rules`. sku comes from the linked template's default_code;
@@ -237,6 +299,16 @@ class SouthbrookPlacementRule(models.Model):
                 ("tier", "=", spec["tier"]),
             ], limit=1)
             if existing:
+                # M3/M4 upgrade path — a rule still carrying a prior
+                # seed payload verbatim is factory-state: bring it up to
+                # the current seed (adds filler/clearance keys). Any
+                # user-edited payload matches no legacy version and is
+                # preserved.
+                legacy = _SEED_PAYLOADS_LEGACY.get(
+                    (spec["corner_type_id"], spec["tier"]), [])
+                if (existing.payload or {}) in legacy \
+                        and existing.payload != spec["payload"]:
+                    existing.payload = spec["payload"]
                 skipped += 1
                 continue
 

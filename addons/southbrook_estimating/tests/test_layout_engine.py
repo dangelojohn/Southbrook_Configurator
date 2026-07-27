@@ -701,3 +701,97 @@ class TestCornerRulesAsData(TransactionCase):
         base = {n["id"]: n for n in r["inserted"]}["corner-back-left-base"]
         self.assertEqual(base["rule_id"], "susan-preferred")
         self.assertEqual(base["sku"], "SB-CORNER-DIAG")
+
+
+class TestCornerFillersM3(TransactionCase):
+    """M3 — rule-demanded corner filler strips: emitted as real nodes,
+    reservation extends past corner + filler, zero-filler rules and the
+    legacy path emit none."""
+
+    BLIND = {"rule_id": "blind", "sku": "SB-CORNER-BLIND", "tier": "base",
+             "sequence": 10, "leg_x_mm": 610.0, "leg_z_mm": 1143.0,
+             "height_mm": 876.0, "filler_x_mm": 76.2,
+             "min_leg_x_mm": 686.2, "min_leg_z_mm": 1372.0,
+             "host_leg": "z"}
+
+    @staticmethod
+    def _cab(i, wall, seq):
+        return {"id": "base-%s-%d" % (wall, i), "width_mm": 610.0,
+                "height_mm": 876.0, "depth_mm": 610.0, "family": "base",
+                "cabinet_type": "base", "zone": "base_run",
+                "wall": wall, "run_seq": seq}
+
+    ROOM = {"width_mm": 5080.0, "depth_mm": 5080.0, "height_mm": 2438.0}
+
+    def test_blind_rule_emits_filler_and_reserves_past_it(self):
+        cabs = ([self._cab(i, "back", i) for i in range(3)]
+                + [self._cab(i, "left", i) for i in range(3)])
+        r = E.resolve_and_layout(cabs, self.ROOM, auto_assign=False,
+                                 corner_rules=[self.BLIND])
+        self.assertEqual(len(r["fillers"]), 1)
+        f = r["fillers"][0]
+        self.assertEqual(f["id"], "cornerfill-back-left-base-back")
+        self.assertTrue(f["corner_filler"])
+        self.assertEqual(f["wall"], "back")
+        self.assertAlmostEqual(f["width_mm"], 76.2)
+        place = {p["id"]: p for p in r["placements"]}
+        # Strip sits exactly between the corner cell (x ends 610) and
+        # the back run start (686.2).
+        fx0, fx1, fz0, fz1 = E.footprint_mm(f, place[f["id"]])
+        self.assertAlmostEqual(fx0, 610.0)
+        self.assertAlmostEqual(fx1, 686.2)
+        # Back run survivors start past corner + filler.
+        back_starts = [E.footprint_mm(c, place[c["id"]])[0]
+                       for c in r["cabinets"]
+                       if c.get("wall") == "back"
+                       and not c.get("corner_cabinet")
+                       and not c.get("corner_filler")]
+        self.assertTrue(all(x0 >= 686.2 - 1 for x0 in back_starts),
+                        back_starts)
+        # Fillers are solid members: no same-layer overlap anywhere.
+        cabs_all = r["cabinets"]
+        for i in range(len(cabs_all)):
+            for j in range(i + 1, len(cabs_all)):
+                a, b = cabs_all[i], cabs_all[j]
+                self.assertFalse(E.footprints_overlap(
+                    E.footprint_mm(a, place[a["id"]]),
+                    E.footprint_mm(b, place[b["id"]])),
+                    "%s overlaps %s" % (a["id"], b["id"]))
+
+    def test_zero_filler_rules_emit_none(self):
+        susan = {"rule_id": "susan", "sku": "SB-CORNER", "tier": "base",
+                 "sequence": 10, "leg_x_mm": 914.0, "leg_z_mm": 914.0,
+                 "height_mm": 876.0, "min_leg_x_mm": 1143.0,
+                 "min_leg_z_mm": 1143.0}
+        cabs = ([self._cab(i, "back", i) for i in range(3)]
+                + [self._cab(i, "left", i) for i in range(3)])
+        r = E.resolve_and_layout(cabs, self.ROOM, auto_assign=False,
+                                 corner_rules=[susan])
+        self.assertEqual(r["fillers"], [])
+
+    def test_legacy_path_emits_none(self):
+        cabs = ([self._cab(i, "back", i) for i in range(3)]
+                + [self._cab(i, "left", i) for i in range(3)])
+        r = E.resolve_and_layout(cabs, self.ROOM, auto_assign=False)
+        self.assertEqual(r["fillers"], [])
+
+    def test_motion_envelope_helper_all_rotations(self):
+        cab = {"width_mm": 914.0, "depth_mm": 914.0}
+        c = 500.0
+        # Anchor at origin; footprint_from_anchor first, then extend
+        # along the FACING direction: rot 0 fp=(0,914,0,914) faces +Z;
+        # rot 90 fp=(0,914,-914,0)... no: rot 90 fp=(x,x+d,z-w,z)
+        # =(0,914,-914,0), faces +X -> (914,1414,-914,0); rot 180
+        # fp=(-914,0,-914,0) faces -Z -> (-914,0,-1414,-914); rot 270
+        # fp=(-914,0,0,914) faces -X -> (-1414,-914,0,914).
+        cases = {
+            0:   (0, 914, 914, 1414),
+            90:  (914, 1414, -914, 0),
+            180: (-914, 0, -1414, -914),
+            270: (-1414, -914, 0, 914),
+        }
+        for rot, want in cases.items():
+            got = E.motion_envelope_from_anchor_mm(
+                cab, {"x": 0, "z": 0, "rotation_deg": rot}, c)
+            self.assertEqual(tuple(round(v) for v in got), want,
+                             "rot %d" % rot)

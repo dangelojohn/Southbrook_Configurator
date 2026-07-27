@@ -54,3 +54,11 @@ from . import test_geo_b3_line_dims
 # C4 (engine's centre-convention poses persisted without converting to
 # the anchor convention), C8 (corner lines omitted `zone`).
 from . import test_zone_corner_l_shape_fixes
+
+# M4 (2026-07-27) — collision-matrix regression suite: makes
+# docs/research/corner-engine/06-collision-matrix.md's 23-pair JSON
+# block visible in CI (4 pairs geometrically exercised, 19 skipped-but-
+# visible pending appliance/drawer/handle/mechanism modeling), plus the
+# concurrently-landed validator checks MOTION_ENVELOPE_COLLISION and
+# CORNER_FILLER_MISSING.
+from . import test_collision_matrix
