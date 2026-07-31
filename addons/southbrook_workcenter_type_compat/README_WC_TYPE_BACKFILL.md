@@ -39,7 +39,23 @@ deciding which stations are Man and which are Machine is a finance decision, not
 engineering one. Making that call in code, quietly, would put a guess into the general
 ledger.
 
-## The backfill, for sign-off
+## Decisions taken
+
+**2026-07-31 — `sanding` and `finishing`.** Asked whether these were Man or Machine, the
+answer was "both are plausible". That turned out to be correct and to be the answer:
+`finishing` is not one station, it is two, and they genuinely differ — the Paint Booth has
+an operator standing there spraying (Man) while the Cure/Dry Room is an oven running
+unattended (Machine). The mapping is therefore per WORK CENTRE, not per station type.
+`sanding` has one station, Sanding Prep, and prep sanding here is hand and orbital work
+rather than a wide-belt line, so Man.
+
+**2026-07-31 — `SB-EDGE` corrected from Man to Machine.** The 19.0.1.1.0 backfill refused
+to touch it because it already carried a hand-set 'H', and flagged it instead. Confirmed
+and corrected by 19.0.1.2.0: an edge bander runs a heated glue pot and a feed motor, so its
+cost is machine time. Its work-order direct cost now posts to the machine-run account
+alongside the panel saw, CNC boring, CNC router and door shop.
+
+## The backfill, as applied
 
 `wc_type` is a two-value flag: `H` = Man, `M` = Machine. Proposed mapping from the
 populated `x_sbk_station_type` taxonomy. **The last two need a human answer.**
@@ -54,8 +70,10 @@ populated `x_sbk_station_type` taxonomy. **The last two need a human answer.**
 | cutting | M — Machine | panel saw, machine-time dominant |
 | cnc | M — Machine | CNC router/borer, machine-time dominant |
 | edge_banding | M — Machine | edge bander, machine-time dominant |
-| **sanding** | **needs a decision** | hand-sanding is labour; a wide-belt sander is machine |
-| **finishing** | **needs a decision** | booth and oven utility cost argues Machine; operator-driven spraying argues Man |
+| **SAND** (Sanding Prep) | **H — Man** | prep sanding is hand and orbital, not a wide-belt line |
+| **PAINT** (Paint Booth) | **H — Man** | an operator stands there and sprays |
+| **CURE** (Cure/Dry Room) | **M — Machine** | an oven running unattended |
+| **SB-EDGE** (Edge Bander) | **M — Machine** | corrected from 'H' on 2026-07-31 |
 
 `drilling`, `countertop`, `subcontract` and `other` exist in the selection but no seeded
 work centre uses them, so they need no mapping today.

@@ -49,7 +49,11 @@ WC_TYPE_BY_CODE = {
     "SB-HW":       ("H", "hardware fitting — manual"),
     "SB-QC":       ("H", "quality inspection — manual"),
     "SB-PACK":     ("H", "pack and label — manual"),
-    # SB-EDGE deliberately absent — see the docstring.
+    # SB-EDGE was deliberately absent here when this migration was written, because it
+    # already carried a hand-set 'H' and this pass only fills NULLs. Finance confirmed on
+    # 2026-07-31 that it should be 'M'; the correction is applied by 19.0.1.2.0. Listed
+    # now so a fresh backfill on a clean database agrees with that decision.
+    "SB-EDGE":     ("M", "edge bander — heated glue pot and feed motor; machine time"),
 }
 
 
